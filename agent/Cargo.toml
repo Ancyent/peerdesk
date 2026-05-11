@@ -1,0 +1,25 @@
+[package]
+name = "peerdesk-agent"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+scrap = "0.5"
+openh264 = "0.6"
+webrtc = "0.11"
+enigo = "0.2"
+arboard = "3"
+tokio-tungstenite = { version = "0.23", features = ["native-tls"] }
+futures-util = "0.3"
+bcrypt = "0.15"
+rand = "0.8"
+dirs = "5"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
