@@ -25,7 +25,18 @@ impl Config {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(path, serde_json::to_string_pretty(self)?)?;
+        let content = serde_json::to_string_pretty(self)?;
+        #[cfg(unix)]
+        {
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+            std::fs::OpenOptions::new()
+                .write(true).create(true).truncate(true).mode(0o600)
+                .open(path)?
+                .write_all(content.as_bytes())?;
+        }
+        #[cfg(not(unix))]
+        std::fs::write(path, content)?;
         Ok(())
     }
 
@@ -35,8 +46,16 @@ impl Config {
             .join("peerdesk")
             .join("config.json");
 
-        if path.exists() {
-            return Self::load(&path);
+        match Self::load(&path) {
+            Ok(cfg) => return Ok(cfg),
+            Err(ref e) => {
+                let is_not_found = e.downcast_ref::<std::io::Error>()
+                    .map_or(false, |io| io.kind() == std::io::ErrorKind::NotFound);
+                if !is_not_found {
+                    return Err(anyhow::anyhow!("{}", e));
+                }
+                // File not found — fall through to create
+            }
         }
         let hash = bcrypt::hash(password, bcrypt::DEFAULT_COST)?;
         let cfg = Config {
