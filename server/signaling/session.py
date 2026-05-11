@@ -39,6 +39,12 @@ async def unregister_agent(
     state.agent_connections.pop(peer_id, None)
     viewer_id = state.agent_to_viewer.pop(peer_id, None)
     if viewer_id:
+        viewer_ws = state.viewer_connections.get(viewer_id)
+        if viewer_ws:
+            try:
+                await viewer_ws.send_text(json.dumps({"type": "agent_disconnected"}))
+            except Exception:
+                pass
         state.viewer_to_agent.pop(viewer_id, None)
         state.viewer_connections.pop(viewer_id, None)
     await redis.delete(f"agent:{peer_id}")
@@ -57,7 +63,11 @@ async def handle_join(
         await viewer_ws.send_text(json.dumps({"type": "error", "code": "not_found"}))
         return None
 
-    stored_hash = agent_data[b"password_hash"].decode()
+    raw = agent_data.get(b"password_hash") or agent_data.get("password_hash")
+    if not raw:
+        await viewer_ws.send_text(json.dumps({"type": "error", "code": "not_found"}))
+        return None
+    stored_hash = raw.decode() if isinstance(raw, bytes) else raw
     if not bcrypt.checkpw(password.encode(), stored_hash.encode()):
         await viewer_ws.send_text(json.dumps({"type": "error", "code": "unauthorized"}))
         return None
@@ -82,7 +92,7 @@ async def forward_to_peer(
     data: dict,
 ) -> None:
     """Forward SDP offer/answer/ICE between agent and viewer."""
-    if sender_peer_id:
+    if sender_peer_id is not None:
         viewer_id = state.agent_to_viewer.get(sender_peer_id)
         ws = state.viewer_connections.get(viewer_id) if viewer_id else None
     else:
