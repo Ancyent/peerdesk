@@ -48,3 +48,12 @@ async def test_unregister_agent_cleans_up_viewer():
     assert "viewer-abc" not in state.viewer_connections
     assert "viewer-abc" not in state.viewer_to_agent
     assert "123456789" not in state.agent_to_viewer
+
+
+def test_health_endpoint():
+    from main import app
+    from fastapi.testclient import TestClient
+    client = TestClient(app)
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
