@@ -1,5 +1,7 @@
 import json
 import os
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -13,6 +15,25 @@ from session import (
     register_agent,
     unregister_agent,
 )
+
+# Per-IP rate limiter: track WebSocket connection timestamps
+_connection_attempts: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT_WINDOW = 60.0   # seconds
+_RATE_LIMIT_MAX = 10        # max new connections per window per IP
+
+
+def _check_rate_limit(client_ip: str) -> bool:
+    """Returns True if the connection is allowed, False if rate limited."""
+    now = time.time()
+    # Prune old entries outside window
+    _connection_attempts[client_ip] = [
+        t for t in _connection_attempts[client_ip]
+        if now - t < _RATE_LIMIT_WINDOW
+    ]
+    if len(_connection_attempts[client_ip]) >= _RATE_LIMIT_MAX:
+        return False
+    _connection_attempts[client_ip].append(now)
+    return True
 
 state = ConnectionState()
 redis_client: Optional[aioredis.Redis] = None
@@ -36,6 +57,10 @@ async def health():
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
+    client_ip = ws.client.host if ws.client else "unknown"
+    if not _check_rate_limit(client_ip):
+        await ws.close(code=1008, reason="rate limited")
+        return
     await ws.accept()
     if redis_client is None:
         await ws.close(1011)
