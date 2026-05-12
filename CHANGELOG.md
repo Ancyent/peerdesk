@@ -2,6 +2,30 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.0.3-Alpha] — 2026-05-12
+
+Phase 3: production deployment stack and self-hosted installer.
+
+### Added
+
+#### Web (`web/`)
+- Multi-stage production Dockerfile: `node:20-alpine` builds React app → `nginx:alpine` serves `dist/`
+- `web/nginx.conf` — SPA routing (`try_files` fallback to `index.html`), gzip, immutable cache headers for assets
+- Build accepts `VITE_SIGNALING_URL` and `VITE_API_URL` as Docker build args (baked at build time)
+
+#### Infrastructure (`deploy/`)
+- `deploy/docker-compose.yml` — production stack: all 6 services (postgres, redis, api, signaling, web, nginx) on isolated `internal` bridge network; only nginx exposes ports 80/443
+- `deploy/nginx/default.conf` — HTTP reverse proxy: `/ws` (WebSocket with 3600s timeout), `/api/` (REST with prefix rewrite), `/` (React SPA)
+- `deploy/.env.example` — documented environment variable template with generation hints
+- `deploy/install.sh` — interactive one-command self-hosted installer:
+  - Auto-detects and installs Docker if missing (Ubuntu/Debian/CentOS/RHEL)
+  - Prompts for domain/IP and optional HTTPS
+  - Generates `.env` with `openssl rand` random secrets
+  - Optionally provisions TLS via Let's Encrypt (certbot standalone)
+  - Builds and starts the full Docker Compose stack
+  - Runs Alembic database migrations
+  - Prints dashboard URL and agent setup instructions
+
 ## [0.0.2-Alpha] — 2026-05-12
 
 Phase 2: user accounts, machine registry, and web dashboard.
