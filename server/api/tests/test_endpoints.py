@@ -84,3 +84,25 @@ async def test_get_turn_credentials(client):
     assert "credential" in data
     assert ":" in data["username"]  # format: "<timestamp>:<user_id>"
     assert data["ttl"] == 3600
+
+
+async def test_start_and_end_session(client):
+    # Start a session
+    r = await client.post("/sessions", json={
+        "host_peer_id": "123456789",
+        "connection_type": "p2p"
+    })
+    assert r.status_code == 201
+    data = r.json()
+    assert data["host_peer_id"] == "123456789"
+    assert data["ended_at"] is None
+    session_id = data["id"]
+
+    # End the session
+    r2 = await client.patch(f"/sessions/{session_id}/end")
+    assert r2.status_code == 204
+
+
+async def test_end_nonexistent_session(client):
+    r = await client.patch("/sessions/nonexistent-id/end")
+    assert r.status_code == 404

@@ -47,3 +47,20 @@ class MachineOut(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class SessionStart(BaseModel):
+    host_peer_id: str
+    viewer_user_id: Optional[str] = None
+    connection_type: str = "p2p"
+
+
+class SessionOut(BaseModel):
+    id: str
+    host_peer_id: str
+    viewer_user_id: Optional[str]
+    started_at: datetime
+    ended_at: Optional[datetime]
+    connection_type: str
+    bytes_transferred: int
+    model_config = {"from_attributes": True}

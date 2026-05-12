@@ -55,3 +55,28 @@ class Machine(Base):
         if "created_at" not in kwargs:
             kwargs["created_at"] = utcnow()
         super().__init__(**kwargs)
+
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    host_peer_id: Mapped[str] = mapped_column(String(9), nullable=False, index=True)
+    viewer_user_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    connection_type: Mapped[str] = mapped_column(String(10), default="p2p")  # p2p | relay
+    bytes_transferred: Mapped[int] = mapped_column(default=0)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "connection_type" not in kwargs:
+            kwargs["connection_type"] = "p2p"
+        if "bytes_transferred" not in kwargs:
+            kwargs["bytes_transferred"] = 0
+        if "started_at" not in kwargs:
+            kwargs["started_at"] = utcnow()
+        super().__init__(**kwargs)
