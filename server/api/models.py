@@ -48,6 +48,9 @@ class Machine(Base):
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    company_id: Mapped[str | None] = mapped_column(String, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
+    location_id: Mapped[str | None] = mapped_column(String, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
+    group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
     owner: Mapped["User"] = relationship("User", back_populates="machines")
 
@@ -60,6 +63,12 @@ class Machine(Base):
             kwargs["is_online"] = False
         if "created_at" not in kwargs:
             kwargs["created_at"] = utcnow()
+        if "company_id" not in kwargs:
+            kwargs["company_id"] = None
+        if "location_id" not in kwargs:
+            kwargs["location_id"] = None
+        if "group_id" not in kwargs:
+            kwargs["group_id"] = None
         super().__init__(**kwargs)
 
 

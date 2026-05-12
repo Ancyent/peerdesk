@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user
 from models import User, Machine
-from schemas import MachineRegister, MachineOut
+from schemas import MachineRegister, MachineOut, MachinePlacement
 
 router = APIRouter(prefix="/machines", tags=["machines"])
 
@@ -70,3 +70,24 @@ async def machine_heartbeat(
         machine.is_online = online
         machine.last_seen_at = datetime.now(timezone.utc)
         await db.commit()
+
+
+@router.patch("/{machine_id}/placement", response_model=MachineOut)
+async def set_placement(
+    machine_id: str,
+    body: MachinePlacement,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Machine).where(Machine.id == machine_id, Machine.owner_id == current_user.id)
+    )
+    machine = result.scalar_one_or_none()
+    if not machine:
+        raise HTTPException(404, "Machine not found")
+    machine.company_id = body.company_id
+    machine.location_id = body.location_id
+    machine.group_id = body.group_id
+    await db.commit()
+    await db.refresh(machine)
+    return machine
