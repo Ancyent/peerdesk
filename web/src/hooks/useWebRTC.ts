@@ -10,6 +10,11 @@ export function useWebRTC(sendSignaling: (msg: SignalingMessage) => void) {
   sendSignalingRef.current = sendSignaling;
 
   const startOffer = useCallback(() => {
+    // Close any existing connection before creating a new one
+    pcRef.current?.close();
+    inputChRef.current = null;
+    setStream(null);
+
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
     });
@@ -30,8 +35,8 @@ export function useWebRTC(sendSignaling: (msg: SignalingMessage) => void) {
       }
     };
 
-    pc.createOffer({ offerToReceiveVideo: true }).then((offer) => {
-      pc.setLocalDescription(offer);
+    pc.createOffer({ offerToReceiveVideo: true }).then(async (offer) => {
+      await pc.setLocalDescription(offer);
       if (offer.sdp) {
         sendSignalingRef.current({ type: 'offer', sdp: offer.sdp });
       }
