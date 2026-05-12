@@ -107,3 +107,58 @@ class Branding(Base):
             self.accent_color = "#2563eb"
         if self.updated_at is None:
             self.updated_at = utcnow()
+
+
+class Company(Base):
+    __tablename__ = "companies"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    locations: Mapped[list["Location"]] = relationship("Location", back_populates="company", cascade="all, delete-orphan")
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)
+
+
+class Location(Base):
+    __tablename__ = "locations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    company_id: Mapped[str] = mapped_column(String, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    company: Mapped["Company"] = relationship("Company", back_populates="locations")
+    groups: Mapped[list["Group"]] = relationship("Group", back_populates="location", cascade="all, delete-orphan")
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)
+
+
+class Group(Base):
+    __tablename__ = "groups"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    location_id: Mapped[str] = mapped_column(String, ForeignKey("locations.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    location: Mapped["Location"] = relationship("Location", back_populates="groups")
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)
