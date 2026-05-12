@@ -1,122 +1,76 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+// web/src/App.tsx
+import { useCallback, useRef, useState } from 'react';
+import { ConnectForm } from './components/ConnectForm';
+import { Viewer } from './components/Viewer';
+import { useSignaling } from './hooks/useSignaling';
+import { useWebRTC } from './hooks/useWebRTC';
+import type { SignalingMessage } from './types/messages';
 
-function App() {
-  const [count, setCount] = useState(0)
+const SIGNALING_URL = (import.meta.env.VITE_SIGNALING_URL as string | undefined)
+  ?? 'ws://localhost:8001/ws';
+
+type State = 'idle' | 'connecting' | 'connected' | 'error';
+
+export default function App() {
+  const [appState, setAppState] = useState<State>('idle');
+  const [errMsg, setErrMsg] = useState('');
+
+  const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
+
+  const webrtc = useWebRTC(
+    useCallback((m: SignalingMessage) => { sendRef.current?.(m); }, [])
+  );
+
+  const { send } = useSignaling(SIGNALING_URL, async (msg) => {
+    if (msg.type === 'joined') {
+      webrtc.startOffer();
+    } else if (msg.type === 'answer') {
+      await webrtc.handleAnswer(msg.sdp);
+      setAppState('connected');
+    } else if (msg.type === 'ice_candidate') {
+      await webrtc.handleIceCandidate(msg.candidate);
+    } else if (msg.type === 'error') {
+      setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found');
+      setAppState('error');
+    } else if (msg.type === 'agent_disconnected') {
+      webrtc.disconnect();
+      setErrMsg('Remote machine disconnected');
+      setAppState('error');
+    }
+  });
+
+  // Sync send function into ref so webrtc hook can use it
+  sendRef.current = send;
+
+  const handleConnect = (peerId: string, password: string) => {
+    setErrMsg('');
+    setAppState('connecting');
+    send({ type: 'join', peer_id: peerId, password });
+  };
+
+  if (appState === 'idle' || appState === 'error') {
+    return <ConnectForm onConnect={handleConnect} error={errMsg || undefined} />;
+  }
+
+  if (appState === 'connecting') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
+        Connecting…
+      </div>
+    );
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    <div style={{ width: '100vw', height: '100vh', background: '#000' }}>
+      <Viewer
+        stream={webrtc.stream}
+        onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
+        onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
+        onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
+        onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
+        onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
+        onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
+      />
+    </div>
+  );
 }
-
-export default App
