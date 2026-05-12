@@ -49,6 +49,7 @@ export function Viewer({ stream, onMouseMove, onMouseDown, onMouseUp, onKeyDown,
         onKeyDown={(e) => { e.preventDefault(); onKeyDown(e.key); }}
         onKeyUp={(e) => { e.preventDefault(); onKeyUp(e.key); }}
         onWheel={(e) => { e.preventDefault(); onScroll(Math.round(e.deltaX), Math.round(e.deltaY)); }}
+        onMouseEnter={(e) => (e.currentTarget as HTMLDivElement).focus()}
         onContextMenu={(e) => e.preventDefault()}
       />
     </div>
