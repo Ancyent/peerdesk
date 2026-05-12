@@ -2,6 +2,44 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.0.5-Alpha] — 2026-05-12
+
+Phase 5: coturn TURN relay, TURN credentials API, signaling rate limiting, connection approval flow, and session audit logging.
+
+### Added
+
+#### TURN Relay (`deploy/`)
+- `coturn/coturn:latest` Docker service added to both `docker-compose.dev.yml` and `docker-compose.yml`
+- Service runs with `network_mode: host` for proper ICE relay candidate binding
+- `--use-auth-secret` mode: no static passwords, only RFC 5766 time-limited credentials
+- `deploy/coturn/turnserver.conf` — base configuration (realm, port range 49152-65535, no loopback/multicast peers)
+- `TURN_SECRET` added to `.env.example` and auto-generated in `install.sh`
+
+#### TURN Credentials API (`server/api/`)
+- `GET /turn/credentials` — RFC 5766 HMAC-SHA1 time-limited TURN credentials
+  - `username = "<expiry_unix_ts>:<user_id>"`, `password = base64(HMAC-SHA1(secret, username))`
+  - Credentials expire after 3600 seconds (configurable via env)
+  - Returns `urls`, `username`, `credential`, `ttl`
+- Reads `TURN_SECRET`, `TURN_HOST`, `TURN_PORT` from environment
+
+#### Signaling Security (`server/signaling/`)
+- Per-IP rate limiting: max 10 WebSocket connections per 60-second window
+- Excess connections rejected with WebSocket close code 1008 (`rate limited`)
+- In-memory `defaultdict(list)` tracking connection timestamps per IP
+- Old entries automatically pruned from the window on each check
+
+#### Connection Approval Flow
+- **Signaling server** — new `viewer_pending` state in `ConnectionState`; `handle_join` now queues the viewer and sends `viewer_pending` to the agent instead of immediately joining; `request_approval()` / `handle_approval()` functions; handles `approve`/`deny` messages from agent
+- **Agent** (`signaling/mod.rs`) — new `SignalingMessage` variants: `ViewerPending`, `Approve`, `Deny`, `Denied`
+- **Agent** (`lib.rs`) — handles `ViewerPending` with **auto-approve** (sends `Approve` back immediately); UI-driven approval is post-MVP
+- **Browser viewer** — `SignalingMessage` union extended with `viewer_pending`, `approved`, `denied` types; `denied` message shows reason in error state and returns to connect form
+
+#### Session Audit Log (`server/api/`)
+- `Session` SQLAlchemy model: `id`, `host_peer_id`, `viewer_user_id` (FK → users, SET NULL on delete), `started_at`, `ended_at`, `connection_type` (p2p|relay), `bytes_transferred`
+- Alembic migration `0002_sessions` creating the sessions table
+- `POST /sessions` — create session record (no auth, called by signaling)
+- `PATCH /sessions/{id}/end` — stamp `ended_at` on session end (no auth)
+
 ## [0.0.4-Alpha] — 2026-05-12
 
 Phase 4: clipboard sync + Tauri v2 native desktop client scaffold.
