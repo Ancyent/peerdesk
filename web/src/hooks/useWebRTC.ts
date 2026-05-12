@@ -9,6 +9,7 @@ export function useWebRTC(
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const inputChRef = useRef<RTCDataChannel | null>(null);
   const clipboardChRef = useRef<RTCDataChannel | null>(null);
+  const ftChRef = useRef<RTCDataChannel | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const sendSignalingRef = useRef(sendSignaling);
   sendSignalingRef.current = sendSignaling;
@@ -20,6 +21,7 @@ export function useWebRTC(
     pcRef.current?.close();
     inputChRef.current = null;
     clipboardChRef.current = null;
+    ftChRef.current = null;
     setStream(null);
 
     const pc = new RTCPeerConnection({
@@ -34,6 +36,9 @@ export function useWebRTC(
     clipboardCh.onmessage = (e) => {
       onClipboardRef.current?.(e.data as string);
     };
+
+    const ftCh = pc.createDataChannel('filetransfer', { ordered: true });
+    ftChRef.current = ftCh;
 
     pc.ontrack = (e) => {
       if (e.streams[0]) setStream(e.streams[0]);
@@ -81,8 +86,11 @@ export function useWebRTC(
     pcRef.current = null;
     inputChRef.current = null;
     clipboardChRef.current = null;
+    ftChRef.current = null;
     setStream(null);
   }, []);
 
-  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, disconnect };
+  const getFtChannel = useCallback(() => ftChRef.current, []);
+
+  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, disconnect, getFtChannel };
 }

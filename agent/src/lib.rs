@@ -3,6 +3,7 @@ pub mod capture;
 pub mod clipboard;
 pub mod config;
 pub mod encode;
+pub mod file_transfer;
 pub mod input;
 pub mod signaling;
 pub mod webrtc_peer;

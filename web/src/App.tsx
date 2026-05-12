@@ -1,13 +1,15 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from './auth/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ConnectForm } from './components/ConnectForm';
 import { Viewer } from './components/Viewer';
+import { FileTransferBar } from './components/FileTransferBar';
 import { useSignaling } from './hooks/useSignaling';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useClipboard } from './hooks/useClipboard';
+import { useFileTransfer } from './hooks/useFileTransfer';
 import type { SignalingMessage } from './types/messages';
 
 const SIGNALING_URL = (import.meta.env.VITE_SIGNALING_URL as string | undefined)
@@ -36,6 +38,16 @@ export default function App() {
     webrtc.stream ? webrtc.sendClipboard : null  // only sync when connected
   );
   clipboardReceiveRef.current = receiveFromAgent;
+
+  const ftChannel = webrtc.getFtChannel?.() ?? null;
+  const { transfer, sendFile, handleMessage: handleFtMessage } = useFileTransfer(ftChannel);
+
+  // Wire the ft channel onmessage when the stream is connected
+  useEffect(() => {
+    const ch = webrtc.getFtChannel?.();
+    if (!ch) return;
+    ch.onmessage = (e: MessageEvent) => handleFtMessage(e.data as string | ArrayBuffer);
+  }, [webrtc.stream, handleFtMessage, webrtc]);
 
   const { send } = useSignaling(SIGNALING_URL, async (msg) => {
     if (msg.type === 'joined') {
@@ -113,6 +125,7 @@ export default function App() {
             onKeyUp={(key) => webrtc.sendInput({ type:'key_up', key })}
             onScroll={(dx, dy) => webrtc.sendInput({ type:'scroll', delta_x: dx, delta_y: dy })}
           />
+          <FileTransferBar transfer={transfer} onSendFile={sendFile} />
         </div>
       );
     }

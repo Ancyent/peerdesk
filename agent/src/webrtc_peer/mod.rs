@@ -24,6 +24,8 @@ pub struct PeerConnection {
     pub from_signaling_rx: Option<Receiver<SignalingMessage>>,
     pub clipboard_in_rx: Option<tokio::sync::mpsc::Receiver<String>>,  // from viewer → agent writes to clipboard
     pub clipboard_out_tx: tokio::sync::mpsc::Sender<String>,           // from agent clipboard → viewer
+    pub ft_in_tx: tokio::sync::mpsc::Sender<crate::file_transfer::FtMessage>,
+    pub ft_control_rx: Option<tokio::sync::mpsc::Receiver<String>>,
 }
 
 impl PeerConnection {
@@ -69,15 +71,19 @@ impl PeerConnection {
         )
         .await?;
 
-        // Handle incoming data channels from viewer (input events, clipboard)
+        // Handle incoming data channels from viewer (input events, clipboard, file transfer)
         let input_tx_clone = input_tx.clone();
         let (clipboard_in_tx, clipboard_in_rx) = tokio::sync::mpsc::channel::<String>(16);
         let (clipboard_out_tx, clipboard_out_rx) = tokio::sync::mpsc::channel::<String>(16);
         let _ = clipboard_out_rx; // receiver wired in main.rs when needed
+        let (ft_in_tx, ft_in_rx) = tokio::sync::mpsc::channel::<crate::file_transfer::FtMessage>(32);
+        let (ft_control_tx, ft_control_rx) = tokio::sync::mpsc::channel::<String>(32);
         let clipboard_in_tx_clone = clipboard_in_tx.clone();
+        let ft_in_tx_clone = ft_in_tx.clone();
         pc.on_data_channel(Box::new(move |dc| {
             let input_tx = input_tx_clone.clone();
             let clipboard_tx = clipboard_in_tx_clone.clone();
+            let ft_tx = ft_in_tx_clone.clone();
             Box::pin(async move {
                 match dc.label() {
                     "input" => {
@@ -104,10 +110,26 @@ impl PeerConnection {
                             })
                         }));
                     }
+                    "filetransfer" => {
+                        dc.on_message(Box::new(move |msg| {
+                            let tx = ft_tx.clone();
+                            let data = msg.data.to_vec();
+                            let is_binary = !msg.is_string;
+                            Box::pin(async move {
+                                if is_binary {
+                                    let _ = tx.send(crate::file_transfer::FtMessage::Chunk(data)).await;
+                                } else if let Ok(text) = std::str::from_utf8(&data) {
+                                    let _ = tx.send(crate::file_transfer::FtMessage::Control(text.to_string())).await;
+                                }
+                            })
+                        }));
+                    }
                     _ => {}
                 }
             })
         }));
+
+        tokio::spawn(crate::file_transfer::run(ft_in_rx, ft_control_tx));
 
         // Spawn video frame sender
         let track = Arc::clone(&video_track);
@@ -137,6 +159,8 @@ impl PeerConnection {
             from_signaling_rx: Some(to_sig_rx),  // receiver for ICE+Answer outbound to signaling
             clipboard_in_rx: Some(clipboard_in_rx),
             clipboard_out_tx,
+            ft_in_tx,
+            ft_control_rx: Some(ft_control_rx),
         })
     }
 
