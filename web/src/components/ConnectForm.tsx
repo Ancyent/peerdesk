@@ -48,7 +48,7 @@ export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
           disabled={peerId.length !== 9}
           style={{
             padding: 10, fontSize: 16, borderRadius: 6,
-            background: '#2563eb', color: '#fff', border: 'none',
+            background: 'var(--accent)', color: '#fff', border: 'none',
             cursor: peerId.length === 9 ? 'pointer' : 'not-allowed',
             opacity: peerId.length === 9 ? 1 : 0.6
           }}

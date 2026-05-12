@@ -1,0 +1,5 @@
+/* Default CSS custom properties for PeerDesk theming */
+:root {
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+}

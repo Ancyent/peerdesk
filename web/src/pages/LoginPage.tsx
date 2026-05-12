@@ -37,13 +37,13 @@ export function LoginPage({ onGoRegister }: Props) {
         <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
           style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid #ccc' }} required />
         <button type="submit" disabled={loading}
-          style={{ padding:10, fontSize:15, borderRadius:6, background:'#2563eb', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+          style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? 'Signing in…' : 'Sign In'}
         </button>
       </form>
       <p style={{ color:'#666', fontSize:14, margin:0 }}>
         No account?{' '}
-        <button onClick={onGoRegister} style={{ background:'none', border:'none', color:'#2563eb', cursor:'pointer', fontSize:14, padding:0 }}>
+        <button onClick={onGoRegister} style={{ background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontSize:14, padding:0 }}>
           Register
         </button>
       </p>

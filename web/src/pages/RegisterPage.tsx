@@ -40,13 +40,13 @@ export function RegisterPage({ onGoLogin }: Props) {
         <input type="password" placeholder="Password (min 8 chars)" value={password} onChange={e => setPassword(e.target.value)}
           style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid #ccc' }} minLength={8} required />
         <button type="submit" disabled={loading}
-          style={{ padding:10, fontSize:15, borderRadius:6, background:'#2563eb', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+          style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? 'Creating account…' : 'Create Account'}
         </button>
       </form>
       <p style={{ color:'#666', fontSize:14, margin:0 }}>
         Already have an account?{' '}
-        <button onClick={onGoLogin} style={{ background:'none', border:'none', color:'#2563eb', cursor:'pointer', fontSize:14, padding:0 }}>
+        <button onClick={onGoLogin} style={{ background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontSize:14, padding:0 }}>
           Sign in
         </button>
       </p>

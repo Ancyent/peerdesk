@@ -26,7 +26,7 @@ export function FileTransferBar({ transfer, onSendFile }: Props) {
       />
       <button
         onClick={() => inputRef.current?.click()}
-        style={{ padding: '5px 14px', borderRadius: 5, background: '#2563eb',
+        style={{ padding: '5px 14px', borderRadius: 5, background: 'var(--accent)',
           border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 500 }}
       >
         Send File
@@ -47,7 +47,7 @@ export function FileTransferBar({ transfer, onSendFile }: Props) {
           {transfer.status === 'sending' && (
             <div style={{ background: '#374151', borderRadius: 2, height: 4 }}>
               <div style={{
-                background: '#2563eb', height: '100%', borderRadius: 2,
+                background: 'var(--accent)', height: '100%', borderRadius: 2,
                 width: `${pct}%`, transition: 'width 0.15s',
               }} />
             </div>

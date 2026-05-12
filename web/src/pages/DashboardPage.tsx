@@ -73,7 +73,7 @@ export function DashboardPage({ onConnect }: Props) {
               onClick={() => onConnect(m.peer_id)}
               style={{
                 padding:'8px 20px', borderRadius:6, fontSize:14, fontWeight:500, border:'none',
-                background: m.is_online ? '#2563eb' : '#f3f4f6',
+                background: m.is_online ? 'var(--accent)' : '#f3f4f6',
                 color: m.is_online ? '#fff' : '#9ca3af',
                 cursor: m.is_online ? 'pointer' : 'default',
               }}

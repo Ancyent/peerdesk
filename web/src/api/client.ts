@@ -48,6 +48,12 @@ export interface MachineOut {
   created_at: string;
 }
 
+export interface BrandingConfig {
+  brand_name: string;
+  logo_data_url: string | null;
+  accent_color: string;
+}
+
 export const api = {
   auth: {
     register: (email: string, name: string, password: string) =>
@@ -78,6 +84,15 @@ export const api = {
         method: 'POST',
         headers: authHeaders(token),
         body: JSON.stringify({ peer_id, name, os }),
+      }),
+  },
+  branding: {
+    get: () => request<BrandingConfig>('/branding'),
+    update: (token: string, data: Partial<Omit<BrandingConfig, 'updated_at'>>) =>
+      request<BrandingConfig>('/branding', {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify(data),
       }),
   },
 };
