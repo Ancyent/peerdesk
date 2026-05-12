@@ -2,6 +2,32 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.0.4-Alpha] — 2026-05-12
+
+Phase 4: clipboard sync + Tauri v2 native desktop client scaffold.
+
+### Added
+
+#### Clipboard Sync
+- **Agent** (`agent/src/clipboard/mod.rs`) — bidirectional clipboard sync using `arboard` crate; clipboard polling runs on a dedicated OS thread (arboard is blocking/`!Send`), polls every 500ms for local changes, writes incoming viewer clipboard to system clipboard
+- **Agent WebRTC** — `PeerConnection` now handles `"clipboard"` data channel alongside `"input"`; exposes `clipboard_in_rx` and `clipboard_out_tx` for wiring
+- **Browser viewer** (`web/src/hooks/useClipboard.ts`) — listens for `copy`/`cut` document events, reads via `navigator.clipboard.readText()`, sends to agent; receives agent clipboard via `receiveFromAgent()` and writes via `navigator.clipboard.writeText()`
+- **Browser viewer** (`web/src/hooks/useWebRTC.ts`) — creates `"clipboard"` RTCDataChannel in `startOffer`; exposes `sendClipboard()` and accepts `onClipboardFromAgent` callback; clipboard sync is only active while a WebRTC session is live
+
+#### Rust Agent Library Refactor
+- Added `[lib]` target to `agent/Cargo.toml` — crate now builds as both binary and library (`peerdesk_agent`)
+- `agent/src/lib.rs` — public API: `AgentConfig` struct (password, signaling_url, api_url, api_token) with `Default` reading from env vars; `run_agent(AgentConfig) -> Result<()>` containing the full agent logic
+- `agent/src/main.rs` — now a 5-line thin wrapper calling `run_agent(AgentConfig::default())`
+- All submodules re-exported as `pub mod` for Tauri embedding
+
+#### Tauri v2 Native Client (`desktop/`)
+- `desktop/src-tauri/` — Tauri v2 Rust backend: system tray with Show/Quit menu items, left-click tray to show window, Tauri commands `get_agent_info` and `open_viewer`
+- `desktop/src-tauri/Cargo.toml` — imports `peerdesk-agent` as a path dependency
+- `desktop/src-tauri/tauri.conf.json` — window config (1000×700), tray icon, SPA frontend
+- `desktop/src-tauri/capabilities/default.json` — default capability set
+- `desktop/src/main.tsx` — React frontend with Host Mode / View Mode panels
+- `cargo check` passes — Tauri scaffold builds successfully (runtime requires desktop environment)
+
 ## [0.0.3-Alpha] — 2026-05-12
 
 Phase 3: production deployment stack and self-hosted installer.
