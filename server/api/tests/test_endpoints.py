@@ -70,3 +70,17 @@ async def test_machines_isolated_between_users(client):
     await client.post("/machines", json={"peer_id": "111111111"}, headers={"Authorization": f"Bearer {t1}"})
     r3 = await client.get("/machines", headers={"Authorization": f"Bearer {t2}"})
     assert r3.json() == []
+
+
+async def test_get_turn_credentials(client):
+    r = await client.post("/auth/register", json={"email": "turn@b.com", "name": "Turn", "password": "pass1234"})
+    token = r.json()["access_token"]
+    r2 = await client.get("/turn/credentials", headers={"Authorization": f"Bearer {token}"})
+    assert r2.status_code == 200
+    data = r2.json()
+    assert "urls" in data
+    assert len(data["urls"]) >= 1
+    assert "username" in data
+    assert "credential" in data
+    assert ":" in data["username"]  # format: "<timestamp>:<user_id>"
+    assert data["ttl"] == 3600

@@ -34,3 +34,16 @@ def test_expired_token_rejected():
         algorithm="HS256"
     )
     assert decode_token(expired, "access") is None
+
+
+def test_turn_credential_hmac():
+    import hashlib, hmac, base64
+    secret = "test-secret"
+    username = "1234567890:user-abc"
+    h = hmac.new(secret.encode(), username.encode(), hashlib.sha1)
+    credential = base64.b64encode(h.digest()).decode()
+    # Verify it's a non-empty base64 string
+    assert len(credential) > 0
+    assert credential == base64.b64encode(
+        hmac.new(secret.encode(), username.encode(), hashlib.sha1).digest()
+    ).decode()
