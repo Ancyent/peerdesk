@@ -155,3 +155,49 @@ async def test_2fa_login_flow(client):
     assert r4.status_code == 200
     assert "access_token" in r4.json()
     assert r4.json()["access_token"] != ""
+
+
+async def test_get_branding_public(client):
+    """GET /branding works without auth."""
+    r = await client.get("/branding")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["brand_name"] == "PeerDesk"
+    assert data["accent_color"] == "#2563eb"
+    assert "logo_data_url" in data
+
+
+async def test_update_branding_requires_auth(client):
+    """POST /branding without token returns 403."""
+    r = await client.post("/branding", json={"brand_name": "TestBrand"})
+    assert r.status_code == 403
+
+
+async def test_update_branding_authenticated(client):
+    """Authenticated user can update brand_name and accent_color."""
+    r = await client.post("/auth/register", json={
+        "email": "brandtest@b.com", "name": "Brand", "password": "pass1234"
+    })
+    token = r.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r2 = await client.post("/branding",
+        json={"brand_name": "MyDesk", "accent_color": "#e63946"},
+        headers=headers,
+    )
+    assert r2.status_code == 200
+    assert r2.json()["brand_name"] == "MyDesk"
+    assert r2.json()["accent_color"] == "#e63946"
+
+
+async def test_branding_invalid_color_rejected(client):
+    """Invalid hex color returns 400."""
+    r = await client.post("/auth/register", json={
+        "email": "brandtest2@b.com", "name": "B2", "password": "pass1234"
+    })
+    token = r.json()["access_token"]
+    r2 = await client.post("/branding",
+        json={"accent_color": "not-a-color"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r2.status_code == 400

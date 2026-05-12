@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, ForeignKey, DateTime
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -86,3 +86,24 @@ class Session(Base):
         if "started_at" not in kwargs:
             kwargs["started_at"] = utcnow()
         super().__init__(**kwargs)
+
+
+class Branding(Base):
+    __tablename__ = "branding"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    brand_name: Mapped[str] = mapped_column(String(100), default="PeerDesk")
+    logo_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    accent_color: Mapped[str] = mapped_column(String(7), default="#2563eb")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not hasattr(self, 'id') or self.id is None:
+            pass
+        if not self.brand_name:
+            self.brand_name = "PeerDesk"
+        if not self.accent_color:
+            self.accent_color = "#2563eb"
+        if self.updated_at is None:
+            self.updated_at = utcnow()

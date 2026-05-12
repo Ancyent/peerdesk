@@ -80,3 +80,16 @@ class TOTPVerifyRequest(BaseModel):
 class LoginStep2Request(BaseModel):
     temp_token: str
     code: str
+
+
+class BrandingOut(BaseModel):
+    brand_name: str
+    logo_data_url: Optional[str]
+    accent_color: str
+    model_config = {"from_attributes": True}
+
+
+class BrandingUpdate(BaseModel):
+    brand_name: Optional[str] = None
+    logo_data_url: Optional[str] = None
+    accent_color: Optional[str] = None
