@@ -1,4 +1,4 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
 
