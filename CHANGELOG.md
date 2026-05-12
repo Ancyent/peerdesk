@@ -2,6 +2,33 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.1.2] — 2026-05-12
+
+Native desktop clients for Linux, Windows, macOS, and Android.
+
+### Added
+
+#### Tauri Desktop App (`desktop/`)
+- **Host Mode** — system tray app that starts the PeerDesk agent, displays peer ID with copy button, shows/hides password; polls agent status every 5 seconds; persists signaling server URL in localStorage
+- **Viewer Mode** — connect form (peer ID + password + signaling URL) → full-screen video viewer with Disconnect/Back overlay buttons; reuses `useSignaling` + `useWebRTC` hooks from the web app
+- **Mode selector** — launch screen with "Host This PC" and "Connect to PC" buttons
+- `useTauriAgent` hook — wraps Tauri `invoke` calls for `start_agent`, `stop_agent`, `get_agent_status`
+- Tauri commands: `start_agent` (launches agent library, returns peer_id), `stop_agent`, `get_agent_status`
+- Shared state `Arc<Mutex<AgentState>>` for thread-safe agent lifecycle management
+
+#### Build Scripts (`scripts/`)
+- `build-linux.sh` — builds `.deb` + `.AppImage` via `cargo tauri build`
+- `build-windows-agent.sh` — cross-compiles agent `.exe` from Linux via mingw-w64
+- `build-windows-tauri.ps1` — full Tauri `.msi`/`.exe` build on Windows (PowerShell)
+- `build-macos.sh` — Universal binary `.dmg` (Intel + Apple Silicon) on macOS
+- `build-android.sh` — builds `.apk` via `cargo tauri android build`
+- `setup-android.sh` — one-time Android SDK + NDK setup (OpenJDK 17, SDK 34, NDK 26)
+
+#### GitHub Actions (`.github/workflows/build-clients.yml`)
+- Matrix build triggered on `v*` tags or manual dispatch
+- Jobs: `build-linux` (ubuntu-22.04), `build-windows` (windows-latest), `build-macos` (macos-latest), `build-android` (ubuntu-22.04 + Android NDK)
+- `release` job creates a draft GitHub Release with all artifacts on tag push
+
 ## [0.1.1] — 2026-05-12
 
 White-label branding — customize logo, product name, and accent color from the admin dashboard.

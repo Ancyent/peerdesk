@@ -6,6 +6,24 @@ Open-source remote desktop platform — alternative to RustDesk / AnyDesk.
 
 ---
 
+## Download
+
+Pre-built installers are available on the [Releases page](https://github.com/Ancyent/peerdesk/releases).
+
+| Platform | Package | Notes |
+|---|---|---|
+| **Linux** | `.deb` (Debian/Ubuntu) | `sudo dpkg -i peerdesk_*.deb` |
+| **Linux** | `.AppImage` | `chmod +x peerdesk_*.AppImage && ./peerdesk_*.AppImage` |
+| **Windows** | `.msi` installer | Requires WebView2 Runtime (included) |
+| **Windows** | `.exe` (NSIS) | Portable installer |
+| **macOS** | `.dmg` (Universal) | Intel + Apple Silicon |
+| **Android** | `.apk` | Enable "Install from unknown sources" in Settings |
+| **iOS** | — | Coming soon |
+
+> **Build from source:** See [Building](#building) section below.
+
+---
+
 ## Features
 
 | Feature | Status |
@@ -328,6 +346,64 @@ cd server/signaling && source .venv/bin/activate && pytest tests/ -v
 # TypeScript
 cd web && npx tsc --noEmit
 ```
+
+---
+
+## Building
+
+### Prerequisites
+
+- Rust 1.78+ — `rustup`
+- Node.js 20 — `nvm`
+- System deps (Linux): `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev libasound2-dev`
+
+### Linux (.deb + .AppImage)
+
+```bash
+bash scripts/build-linux.sh
+```
+
+### Windows (.msi + .exe) — run on Windows
+
+```powershell
+.\scripts\build-windows-tauri.ps1
+```
+
+Or cross-compile the **agent only** from Linux:
+
+```bash
+bash scripts/build-windows-agent.sh
+```
+
+### macOS (.dmg Universal) — run on macOS
+
+```bash
+bash scripts/build-macos.sh
+```
+
+### Android (.apk)
+
+```bash
+# One-time setup (downloads Android SDK)
+sudo bash scripts/setup-android.sh
+
+# Initialize Android target (first time)
+cd desktop && cargo tauri android init
+
+# Build APK
+bash scripts/build-android.sh
+```
+
+### Automated CI/CD
+
+Push a tag to trigger builds for all platforms:
+
+```bash
+git tag v0.1.2
+git push origin v0.1.2
+```
+
+GitHub Actions will build all platforms and create a draft release automatically.
 
 ---
 
