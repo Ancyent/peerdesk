@@ -3,6 +3,14 @@ name = "peerdesk-agent"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "peerdesk_agent"
+path = "src/lib.rs"
+
+[[bin]]
+name = "peerdesk-agent"
+path = "src/main.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
