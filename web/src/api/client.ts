@@ -45,13 +45,23 @@ export interface UserOut {
 }
 
 export interface MachineOut {
-  id: string;
-  peer_id: string;
-  name: string;
-  os: string | null;
-  is_online: boolean;
-  last_seen_at: string | null;
-  created_at: string;
+  id: string; peer_id: string; name: string; os: string | null;
+  is_online: boolean; last_seen_at: string | null; created_at: string;
+  company_id: string | null; location_id: string | null; group_id: string | null;
+}
+
+export interface CompanyOut {
+  id: string; name: string; owner_id: string; created_at: string;
+}
+export interface LocationOut {
+  id: string; name: string; company_id: string; created_at: string;
+}
+export interface GroupOut {
+  id: string; name: string; location_id: string; created_at: string;
+}
+export interface RegistrationTokenOut {
+  id: string; token: string; expires_at: string; used_at: string | null;
+  company_id: string | null; location_id: string | null; group_id: string | null;
 }
 
 export interface BrandingConfig {
@@ -81,6 +91,10 @@ export const api = {
   users: {
     me: (token: string) =>
       request<UserOut>('/users/me', { headers: authHeaders(token) }),
+    update: (token: string, data: { name?: string; email?: string }) =>
+      request<UserOut>('/users/me', { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify(data) }),
+    changePassword: (token: string, current_password: string, new_password: string) =>
+      request<void>('/users/me/password', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ current_password, new_password }) }),
   },
   machines: {
     list: (token: string) =>
@@ -100,5 +114,43 @@ export const api = {
         headers: authHeaders(token),
         body: JSON.stringify(data),
       }),
+  },
+  companies: {
+    list: (token: string) =>
+      request<CompanyOut[]>('/companies', { headers: authHeaders(token) }),
+    create: (token: string, name: string) =>
+      request<CompanyOut>('/companies', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ name }) }),
+    update: (token: string, id: string, name: string) =>
+      request<CompanyOut>(`/companies/${id}`, { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify({ name }) }),
+    delete: (token: string, id: string) =>
+      request<void>(`/companies/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  },
+  locations: {
+    list: (token: string, companyId: string) =>
+      request<LocationOut[]>(`/companies/${companyId}/locations`, { headers: authHeaders(token) }),
+    create: (token: string, companyId: string, name: string) =>
+      request<LocationOut>(`/companies/${companyId}/locations`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ name }) }),
+    update: (token: string, id: string, name: string) =>
+      request<LocationOut>(`/locations/${id}`, { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify({ name }) }),
+    delete: (token: string, id: string) =>
+      request<void>(`/locations/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  },
+  groups: {
+    list: (token: string, locationId: string) =>
+      request<GroupOut[]>(`/locations/${locationId}/groups`, { headers: authHeaders(token) }),
+    create: (token: string, locationId: string, name: string) =>
+      request<GroupOut>(`/locations/${locationId}/groups`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ name }) }),
+    update: (token: string, id: string, name: string) =>
+      request<GroupOut>(`/groups/${id}`, { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify({ name }) }),
+    delete: (token: string, id: string) =>
+      request<void>(`/groups/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+  },
+  placement: {
+    set: (token: string, machineId: string, data: { company_id?: string | null; location_id?: string | null; group_id?: string | null }) =>
+      request<MachineOut>(`/machines/${machineId}/placement`, { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify(data) }),
+  },
+  tokens: {
+    create: (token: string, placement?: { company_id?: string; location_id?: string; group_id?: string }) =>
+      request<RegistrationTokenOut>('/tokens', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(placement ?? {}) }),
   },
 };

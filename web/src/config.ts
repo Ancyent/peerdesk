@@ -1,11 +1,13 @@
 export interface AppConfig {
   apiUrl: string;
   signalingUrl: string;
+  releasesUrl: string;
 }
 
 const DEFAULTS: AppConfig = {
   apiUrl: '/api',
   signalingUrl: '/ws',
+  releasesUrl: 'https://github.com/Ancyent/peerdesk/releases/latest',
 };
 
 let _config: AppConfig = {
@@ -29,6 +31,7 @@ export async function initConfig(): Promise<void> {
       _config = {
         apiUrl: data.apiUrl ?? DEFAULTS.apiUrl,
         signalingUrl: resolveWsUrl(data.signalingUrl ?? DEFAULTS.signalingUrl),
+        releasesUrl: data.releasesUrl ?? DEFAULTS.releasesUrl,
       };
     }
   } catch {
