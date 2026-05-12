@@ -5,4 +5,98 @@ mod input;
 mod signaling;
 mod webrtc_peer;
 
-fn main() {}
+use anyhow::Result;
+use tracing::info;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
+
+    let password = std::env::var("PEERDESK_PASSWORD").unwrap_or_else(|_| "changeme".into());
+    let cfg = config::Config::load_or_create(&password)?;
+
+    info!("PeerDesk agent — peer_id={}", cfg.peer_id);
+    info!("Password set. Waiting for connections...");
+
+    let (frame_tx, frame_rx) = tokio::sync::mpsc::channel(2);
+    let (input_tx, input_rx) = tokio::sync::mpsc::channel(100);
+
+    let mut peer = webrtc_peer::PeerConnection::new(frame_rx, input_tx).await?;
+
+    // Channel: signaling server → main (Offer, IceCandidate, ViewerJoined, Error)
+    let (from_sig_tx, mut from_sig_rx) =
+        tokio::sync::mpsc::channel::<signaling::SignalingMessage>(32);
+
+    // Channel: main → signaling server (Answer, outbound ICE from webrtc)
+    let (to_sig_tx, to_sig_rx) =
+        tokio::sync::mpsc::channel::<signaling::SignalingMessage>(32);
+
+    // capture::run uses scrap::Capturer which is !Send, so run it on a
+    // dedicated OS thread with its own single-threaded tokio runtime.
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("capture runtime");
+        if let Err(e) = rt.block_on(capture::run(frame_tx)) {
+            tracing::error!("Capture error: {}", e);
+        }
+    });
+
+    tokio::spawn(input::run(input_rx));
+
+    let peer_id = cfg.peer_id.clone();
+    let pw_hash = cfg.password_hash.clone();
+    let sig_url = cfg.signaling_url.clone();
+
+    // Spawn signaling client
+    tokio::spawn(async move {
+        if let Err(e) =
+            signaling::run(&sig_url, &peer_id, &pw_hash, from_sig_tx, to_sig_rx).await
+        {
+            tracing::error!("Signaling error: {}", e);
+        }
+    });
+
+    // Forward outbound WebRTC messages (Answer + ICE) → signaling server
+    // Use take() to extract without consuming `peer`, so it remains usable below.
+    let mut webrtc_out_rx = peer.from_signaling_rx.take().expect("from_signaling_rx must be Some");
+    let to_sig_fwd = to_sig_tx.clone();
+    tokio::spawn(async move {
+        while let Some(msg) = webrtc_out_rx.recv().await {
+            if to_sig_fwd.send(msg).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Main event loop: handle messages from signaling server
+    loop {
+        match from_sig_rx.recv().await {
+            Some(signaling::SignalingMessage::ViewerJoined { viewer_id }) => {
+                info!("Viewer {} joined — waiting for WebRTC offer", viewer_id);
+            }
+            Some(signaling::SignalingMessage::Offer { sdp }) => {
+                info!("Got offer — creating answer");
+                if let Err(e) = peer.handle_offer(sdp).await {
+                    tracing::error!("handle_offer failed: {}", e);
+                }
+            }
+            Some(signaling::SignalingMessage::IceCandidate { candidate }) => {
+                if let Err(e) = peer.add_ice_candidate(candidate).await {
+                    tracing::warn!("add_ice_candidate failed: {}", e);
+                }
+            }
+            Some(signaling::SignalingMessage::Error { code }) => {
+                tracing::warn!("Signaling error from server: {}", code);
+            }
+            Some(_) => {} // Registered, Answer, etc. — ignore in main loop
+            None => {
+                info!("Signaling channel closed — shutting down");
+                break;
+            }
+        }
+    }
+
+    Ok(())
+}
