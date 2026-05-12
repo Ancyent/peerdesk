@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { api, MachineOut, ApiError } from '../api/client';
+import { api, ApiError } from '../api/client';
+import type { MachineOut } from '../api/client';
 
 interface Props {
   onConnect: (peerId: string) => void;

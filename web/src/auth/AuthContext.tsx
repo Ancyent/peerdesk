@@ -1,5 +1,7 @@
-import { createContext, useCallback, useEffect, useState, ReactNode } from 'react';
-import { api, UserOut } from '../api/client';
+import { createContext, useCallback, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { api } from '../api/client';
+import type { UserOut } from '../api/client';
 
 interface AuthState {
   accessToken: string | null;
