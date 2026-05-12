@@ -84,7 +84,16 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         }
     });
 
-    tokio::spawn(input::run(input_rx));
+    // enigo (input injection) is !Send on macOS, so run on a dedicated OS thread.
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("input runtime");
+        if let Err(e) = rt.block_on(input::run(input_rx)) {
+            tracing::warn!("Input error: {}", e);
+        }
+    });
 
     // Audio streaming (non-fatal if no device)
     // cpal::Stream is !Send, so run on a dedicated OS thread with its own runtime.

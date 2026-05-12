@@ -18,7 +18,9 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxdo-dev libasound2-dev libx11-dev libxcb1-dev libssl-dev libxtst-dev
+          sudo apt-get install -y \
+            libxdo-dev libasound2-dev libx11-dev libssl-dev libxtst-dev \
+            libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev
       - name: Build agent
         run: cargo build -p peerdesk-agent --release
       - name: Rename binary
