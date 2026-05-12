@@ -17,6 +17,8 @@ class User(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    totp_secret: Mapped[str | None] = mapped_column(String, nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     machines: Mapped[list["Machine"]] = relationship("Machine", back_populates="owner", cascade="all, delete-orphan")
@@ -26,6 +28,10 @@ class User(Base):
             kwargs["id"] = str(uuid.uuid4())
         if "is_active" not in kwargs:
             kwargs["is_active"] = True
+        if "totp_secret" not in kwargs:
+            kwargs["totp_secret"] = None
+        if "totp_enabled" not in kwargs:
+            kwargs["totp_enabled"] = False
         if "created_at" not in kwargs:
             kwargs["created_at"] = utcnow()
         super().__init__(**kwargs)

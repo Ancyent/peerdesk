@@ -18,6 +18,8 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    requires_2fa: bool = False
+    temp_token: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -64,3 +66,17 @@ class SessionOut(BaseModel):
     connection_type: str
     bytes_transferred: int
     model_config = {"from_attributes": True}
+
+
+class TOTPSetupResponse(BaseModel):
+    secret: str
+    qr_uri: str
+
+
+class TOTPVerifyRequest(BaseModel):
+    code: str
+
+
+class LoginStep2Request(BaseModel):
+    temp_token: str
+    code: str

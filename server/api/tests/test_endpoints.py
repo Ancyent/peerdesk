@@ -106,3 +106,52 @@ async def test_start_and_end_session(client):
 async def test_end_nonexistent_session(client):
     r = await client.patch("/sessions/nonexistent-id/end")
     assert r.status_code == 404
+
+
+async def test_2fa_enable_and_confirm(client):
+    # Register user
+    r = await client.post("/auth/register", json={"email": "totp@b.com", "name": "TOTP", "password": "pass1234"})
+    token = r.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Enable 2FA
+    r2 = await client.post("/auth/2fa/enable", headers=headers)
+    assert r2.status_code == 200
+    data = r2.json()
+    assert "secret" in data
+    assert "qr_uri" in data
+    secret = data["secret"]
+
+    # Confirm with valid TOTP code
+    import pyotp
+    code = pyotp.TOTP(secret).now()
+    r3 = await client.post("/auth/2fa/confirm", json={"code": code}, headers=headers)
+    assert r3.status_code == 200
+
+
+async def test_2fa_login_flow(client):
+    import pyotp
+
+    # Register and enable 2FA
+    r = await client.post("/auth/register", json={"email": "totp2@b.com", "name": "TOTP2", "password": "pass1234"})
+    token = r.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r2 = await client.post("/auth/2fa/enable", headers=headers)
+    secret = r2.json()["secret"]
+    code = pyotp.TOTP(secret).now()
+    await client.post("/auth/2fa/confirm", json={"code": code}, headers=headers)
+
+    # Login should now require 2FA
+    r3 = await client.post("/auth/login", json={"email": "totp2@b.com", "password": "pass1234"})
+    assert r3.status_code == 200
+    data = r3.json()
+    assert data["requires_2fa"] is True
+    assert data["temp_token"] is not None
+
+    # Complete login with TOTP code
+    code2 = pyotp.TOTP(secret).now()
+    r4 = await client.post("/auth/login/2fa", json={"temp_token": data["temp_token"], "code": code2})
+    assert r4.status_code == 200
+    assert "access_token" in r4.json()
+    assert r4.json()["access_token"] != ""
