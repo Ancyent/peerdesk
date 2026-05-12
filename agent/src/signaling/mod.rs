@@ -30,23 +30,46 @@ pub async fn run(
         peer_id: peer_id.to_string(),
         password_hash: password_hash.to_string(),
     };
-    write
-        .send(Message::Text(serde_json::to_string(&register)?))
-        .await?;
+    write.send(Message::Text(serde_json::to_string(&register)?)).await?;
     tracing::info!("Registered with signaling server, peer_id={}", peer_id);
 
     loop {
         tokio::select! {
-            Some(msg) = read.next() => {
-                let text = msg?.into_text()?;
-                let parsed: SignalingMessage = serde_json::from_str(&text)?;
-                to_webrtc.send(parsed).await?;
-            }
-            Some(msg) = from_webrtc.recv() => {
-                write.send(Message::Text(serde_json::to_string(&msg)?)).await?;
-            }
+            msg = read.next() => match msg {
+                Some(Ok(Message::Text(text))) => {
+                    match serde_json::from_str::<SignalingMessage>(&text) {
+                        Ok(parsed) => {
+                            if to_webrtc.send(parsed).await.is_err() {
+                                // WebRTC side dropped — clean shutdown
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Ignoring unrecognised signaling message: {}", e);
+                        }
+                    }
+                }
+                Some(Ok(_)) => {
+                    // Ping/Pong/Binary/Close frames — ignore
+                }
+                Some(Err(e)) => return Err(e.into()),
+                None => {
+                    tracing::info!("Signaling server closed connection");
+                    break;
+                }
+            },
+            msg = from_webrtc.recv() => match msg {
+                Some(msg) => {
+                    write.send(Message::Text(serde_json::to_string(&msg)?)).await?;
+                }
+                None => {
+                    // All WebRTC senders dropped — nothing more to forward
+                    break;
+                }
+            },
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
