@@ -10,12 +10,18 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${getConfig().apiUrl}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, body.detail ?? 'Request failed');
+    const detail = body.detail;
+    const message = typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map((e: { loc?: string[]; msg?: string }) => e.msg ?? JSON.stringify(e)).join('; ')
+        : 'Request failed';
+    throw new ApiError(res.status, message);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

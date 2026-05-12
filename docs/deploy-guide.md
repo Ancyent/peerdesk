@@ -23,10 +23,6 @@
 5. [Testare automată](#5-testare-automata)
 6. [Actualizare aplicație](#6-actualizare-aplicatie)
 7. [Troubleshooting](#7-troubleshooting)
-3. [Producție — deployment complet](#3-productie--deployment-complet)
-4. [Testare automată](#4-testare-automata)
-5. [Actualizare aplicație](#5-actualizare-aplicatie)
-6. [Troubleshooting](#6-troubleshooting)
 
 ---
 
@@ -130,7 +126,22 @@ pkill -f "Xvfb :99" 2>/dev/null
 
 ## 3. Productie — deployment complet
 
-### 3.1 Configurare variabile de mediu
+**Metoda recomandată** — `install.sh` face totul automat:
+
+```bash
+cd deploy
+bash install.sh
+# alege opțiunea 2 (Producție + nginx)
+```
+
+Sau non-interactiv:
+```bash
+bash install.sh --domain peerdesk.example.com --tls --email admin@example.com
+```
+
+Pașii manuali de mai jos sunt pentru cazuri speciale sau debugging.
+
+### 3.1 Configurare variabile de mediu (manual)
 
 ```bash
 cd deploy
@@ -138,14 +149,12 @@ cp .env.example .env
 nano .env
 ```
 
-Completează **toate** valorile:
+Completează:
 
 ```env
 POSTGRES_PASSWORD=<parola-puternica>
 JWT_SECRET=<openssl rand -hex 32>
 TURN_SECRET=<openssl rand -hex 24>
-VITE_SIGNALING_URL=wss://domain.com/ws
-VITE_API_URL=https://domain.com/api
 ```
 
 Generare secrete:
@@ -357,7 +366,7 @@ curl http://localhost:8000/machines -H "Authorization: Bearer $TOKEN"
 
 ---
 
-## 5. Actualizare aplicatie
+## 6. Actualizare aplicatie
 
 ```bash
 git pull
@@ -377,7 +386,7 @@ sudo systemctl restart peerdesk-agent
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 ### Stack Docker nu pornește
 
