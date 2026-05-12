@@ -2,6 +2,42 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.1.1] — 2026-05-12
+
+White-label branding — customize logo, product name, and accent color from the admin dashboard.
+
+### Added
+
+#### Branding API (`server/api/`)
+- `Branding` SQLAlchemy model (singleton row, id=1): `brand_name`, `logo_data_url` (Text, base64 data URL), `accent_color` (hex), `updated_at`
+- Alembic migration `0004_branding`
+- `GET /branding` — public endpoint, returns current branding config (defaults: PeerDesk / #2563eb)
+- `POST /branding` — authenticated, updates branding fields with hex color validation
+- `BrandingOut` and `BrandingUpdate` Pydantic schemas
+
+#### Web Theming (`web/`)
+- `web/src/branding.css` — CSS custom properties: `--accent`, `--accent-hover` (defaults to #2563eb / #1d4ed8)
+- `web/src/hooks/useBranding.ts` — fetches `/branding` on mount, applies CSS vars to `:root` via `document.documentElement.style.setProperty`, updates `document.title` with brand name
+- `applyBranding()` utility — accepts `BrandingConfig`, applies `--accent` + `--accent-hover` (auto-darkened) + page title
+- All hardcoded `#2563eb` accent colors replaced with `var(--accent)` across ConnectForm, FileTransferBar, LoginPage, RegisterPage, DashboardPage
+- `api.branding` added to API client (get + update)
+
+#### Web Admin (`web/`)
+- `BrandingPage` — admin page accessible from the dashboard header:
+  - Logo upload: accepts any image, max 512 KB, stored as base64 data URL
+  - Brand name text input (max 100 chars)
+  - Accent color picker: native `<input type="color">` + hex text field
+  - Live preview panel showing logo/name + Connect button in selected color
+  - Save button applies changes immediately via `applyBranding()`
+  - Reset to Default button restores PeerDesk defaults
+- `DashboardPage` — "Branding" button added to header
+- `App.tsx` — new `'branding'` route
+
+#### Web Branding Context (`web/`)
+- `BrandingContext` React context — provides `BrandingConfig` (brand_name, logo_data_url, accent_color) to all components
+- `BrandingProvider` — wraps the entire app in `main.tsx`, loads branding on boot
+- `ConnectForm`, `LoginPage`, `RegisterPage` — show `<img>` logo when `logo_data_url` is set, otherwise `<h1>{brand_name}</h1>`
+
 ## [0.1.0-Beta] — 2026-05-12
 
 First feature-complete beta release. All post-MVP features implemented.
