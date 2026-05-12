@@ -7,4 +7,7 @@ export type SignalingMessage =
   | { type: 'ice_candidate'; candidate: RTCIceCandidateInit }
   | { type: 'error'; code: string }
   | { type: 'registered'; peer_id: string }
-  | { type: 'agent_disconnected' };
+  | { type: 'agent_disconnected' }
+  | { type: 'viewer_pending'; viewer_id: string; remote_ip: string }
+  | { type: 'approved' }
+  | { type: 'denied'; reason: string };

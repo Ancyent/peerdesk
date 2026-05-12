@@ -54,6 +54,11 @@ export default function App() {
       setErrMsg('Remote machine disconnected');
       setViewerState('error');
       setPage('dashboard');
+    } else if (msg.type === 'denied') {
+      webrtc.disconnect();
+      setErrMsg(msg.reason ?? 'Connection denied by host');
+      setViewerState('error');
+      setPage('connect');
     }
   });
   sendRef.current = send;

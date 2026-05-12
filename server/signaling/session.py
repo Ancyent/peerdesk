@@ -17,6 +17,8 @@ class ConnectionState:
     viewer_to_agent: Dict[str, str] = field(default_factory=dict)
     # peer_id → viewer_session_id
     agent_to_viewer: Dict[str, str] = field(default_factory=dict)
+    # viewer_session_id → WebSocket for viewers awaiting approval
+    viewer_pending: Dict[str, WebSocket] = field(default_factory=dict)
 
 
 async def register_agent(
@@ -73,16 +75,59 @@ async def handle_join(
         return None
 
     viewer_id = str(uuid.uuid4())
-    state.viewer_connections[viewer_id] = viewer_ws
-    state.viewer_to_agent[viewer_id] = peer_id
-    state.agent_to_viewer[peer_id] = viewer_id
+    # Don't register yet — wait for agent approval
+    await request_approval(state, peer_id, viewer_id, viewer_ws, "unknown")
+    return viewer_id
 
+
+async def request_approval(
+    state: ConnectionState,
+    peer_id: str,
+    viewer_id: str,
+    viewer_ws: WebSocket,
+    remote_ip: str,
+) -> None:
+    """Store pending viewer and notify agent to approve/deny."""
+    state.viewer_pending[viewer_id] = viewer_ws
     agent_ws = state.agent_connections.get(peer_id)
     if agent_ws:
-        await agent_ws.send_text(json.dumps({"type": "viewer_joined", "viewer_id": viewer_id}))
+        await agent_ws.send_text(json.dumps({
+            "type": "viewer_pending",
+            "viewer_id": viewer_id,
+            "remote_ip": remote_ip,
+        }))
+    else:
+        # Agent disconnected — deny immediately
+        await viewer_ws.send_text(json.dumps({
+            "type": "denied",
+            "reason": "Host not connected",
+        }))
+        state.viewer_pending.pop(viewer_id, None)
 
-    await viewer_ws.send_text(json.dumps({"type": "joined", "viewer_id": viewer_id}))
-    return viewer_id
+
+async def handle_approval(
+    state: ConnectionState,
+    peer_id: str,
+    viewer_id: str,
+    approved: bool,
+) -> None:
+    """Complete or reject the pending connection."""
+    viewer_ws = state.viewer_pending.pop(viewer_id, None)
+    if not viewer_ws:
+        return
+    if approved:
+        state.viewer_connections[viewer_id] = viewer_ws
+        state.viewer_to_agent[viewer_id] = peer_id
+        state.agent_to_viewer[peer_id] = viewer_id
+        await viewer_ws.send_text(json.dumps({
+            "type": "joined",
+            "viewer_id": viewer_id,
+        }))
+    else:
+        await viewer_ws.send_text(json.dumps({
+            "type": "denied",
+            "reason": "Host denied the connection",
+        }))
 
 
 async def forward_to_peer(

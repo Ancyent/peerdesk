@@ -10,6 +10,10 @@ pub enum SignalingMessage {
     Register { peer_id: String, password_hash: String },
     Registered { peer_id: String },
     ViewerJoined { viewer_id: String },
+    ViewerPending { viewer_id: String, remote_ip: String },
+    Approve { viewer_id: String },
+    Deny { viewer_id: String },
+    Denied { reason: String },
     Offer { sdp: String },
     Answer { sdp: String },
     IceCandidate { candidate: serde_json::Value },
@@ -92,5 +96,19 @@ mod tests {
         let json = r#"{"type":"viewer_joined","viewer_id":"abc-123"}"#;
         let msg: SignalingMessage = serde_json::from_str(json).unwrap();
         assert!(matches!(msg, SignalingMessage::ViewerJoined { .. }));
+    }
+
+    #[test]
+    fn deserializes_viewer_pending() {
+        let json = r#"{"type":"viewer_pending","viewer_id":"abc","remote_ip":"1.2.3.4"}"#;
+        let msg: SignalingMessage = serde_json::from_str(json).unwrap();
+        assert!(matches!(msg, SignalingMessage::ViewerPending { .. }));
+    }
+
+    #[test]
+    fn serializes_approve_message() {
+        let msg = SignalingMessage::Approve { viewer_id: "abc".into() };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains("\"type\":\"approve\""));
     }
 }

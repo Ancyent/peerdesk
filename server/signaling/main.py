@@ -11,6 +11,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from session import (
     ConnectionState,
     forward_to_peer,
+    handle_approval,
     handle_join,
     register_agent,
     unregister_agent,
@@ -91,6 +92,16 @@ async def websocket_endpoint(ws: WebSocket):
 
                 elif msg_type in ("offer", "answer", "ice_candidate"):
                     await forward_to_peer(state, peer_id, viewer_id, data)
+
+                elif msg_type == "approve":
+                    viewer_id_to_approve = data.get("viewer_id")
+                    if peer_id and viewer_id_to_approve:
+                        await handle_approval(state, peer_id, viewer_id_to_approve, True)
+
+                elif msg_type == "deny":
+                    viewer_id_to_deny = data.get("viewer_id")
+                    if peer_id and viewer_id_to_deny:
+                        await handle_approval(state, peer_id, viewer_id_to_deny, False)
 
             except KeyError as e:
                 await ws.send_text(json.dumps({"type": "error", "code": f"missing_field:{e}"}))

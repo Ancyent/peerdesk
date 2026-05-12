@@ -106,6 +106,14 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // Main event loop: handle messages from signaling server
     loop {
         match from_sig_rx.recv().await {
+            Some(signaling::SignalingMessage::ViewerPending { viewer_id, remote_ip }) => {
+                info!("Viewer {} from {} requesting connection — auto-approving", viewer_id, remote_ip);
+                // Auto-approve: send Approve back to signaling via to_sig_tx
+                let approve = signaling::SignalingMessage::Approve { viewer_id };
+                if let Err(e) = to_sig_tx.send(approve).await {
+                    tracing::warn!("Failed to send approve: {}", e);
+                }
+            }
             Some(signaling::SignalingMessage::ViewerJoined { viewer_id }) => {
                 info!("Viewer {} joined — waiting for WebRTC offer", viewer_id);
             }
