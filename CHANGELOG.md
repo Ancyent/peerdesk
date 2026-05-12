@@ -1,0 +1,62 @@
+# Changelog
+
+All notable changes to PeerDesk are documented here.
+
+## [0.0.1-Alpha] — 2026-05-12
+
+Initial alpha release implementing the core P2P remote desktop loop.
+
+### Added
+
+#### Signaling Server (`server/signaling/`)
+- FastAPI + WebSocket signaling server that brokers WebRTC handshakes between host agents and browser viewers
+- `ConnectionState` in-memory session registry (agent connections, viewer connections, bidirectional cross-refs)
+- `register_agent` — registers a host agent with bcrypt password hash in Redis (TTL 3600s)
+- `unregister_agent` — removes agent, notifies connected viewer with `agent_disconnected` event, cleans up cross-refs
+- `handle_join` — validates viewer password against stored bcrypt hash, creates viewer session, notifies agent
+- `forward_to_peer` — routes SDP offer/answer and ICE candidates between agent and viewer WebSocket connections
+- `GET /health` — health check endpoint
+- `WebSocket /ws` — single endpoint handling `register`, `join`, `offer`, `answer`, `ice_candidate` message types
+- Graceful JSON parse error handling (responds with `{"type":"error","code":"invalid_json"}` and continues)
+- Graceful missing-field handling (`{"type":"error","code":"missing_field:<key>"}`)
+- Redis client null guard at WebSocket startup
+- Viewer disconnect cleanup using O(1) `viewer_to_agent` reverse lookup
+
+#### Rust Agent (`agent/`)
+- `config` module — 9-digit numeric peer ID generation, bcrypt password hashing, JSON config file load/save with 0o600 permissions (Unix), TOCTOU-safe load-or-create
+- `capture` module — screen capture loop using `scrap` crate (X11/Wayland), sends raw BGRA frames via Tokio channel, WouldBlock retry with 16ms sleep
+- `encode` module — H.264 encoding via `openh264` (BgraSliceU8 → YUV420 → H.264 Annex B), validates buffer length and even dimensions before encoding
+- `input` module — keyboard/mouse/scroll injection via `enigo` crate, full web key name mapping (Enter, Escape, Backspace, Tab, Space, Delete, Home, End, PageUp, PageDown, arrows, modifiers), left/right/middle mouse button support, horizontal scroll, unknown keys are no-op
+- `signaling` module — WebSocket client using `tokio-tungstenite`, sends `register` on connect, select! loop forwarding messages bidirectionally, handles WS close/non-text frames gracefully, logs unknown message types instead of crashing
+- `webrtc_peer` module — RTCPeerConnection with Google STUN, H.264 video track (TrackLocalStaticSample), input data channel handler, ICE candidate forwarding, SDP offer/answer handling, graceful H264Encoder init failure
+- `main` binary — wires all modules, capture runs on dedicated OS thread (scrap is `!Send`), event loop handles ViewerJoined/Offer/IceCandidate/Error messages cleanly
+
+#### Browser Viewer (`web/`)
+- `SignalingMessage` TypeScript discriminated union for all signaling protocol messages
+- `useSignaling` hook — stable WebSocket connection with ref-stabilized callback, auto-close on unmount
+- `useWebRTC` hook — RTCPeerConnection lifecycle management, `startOffer` (creates PC + data channel + sends offer), `handleAnswer`, `handleIceCandidate`, `sendInput`, `disconnect`, closes stale PC before reconnecting, awaits `setLocalDescription` before sending offer
+- `ConnectForm` component — 9-digit numeric ID field (digits-only filter), password field, disabled submit until 9 digits entered
+- `Viewer` component — `<video>` element with transparent overlay, cursor:none, auto-focus on mouse enter for keyboard capture, scaled mouse coordinates (maps overlay pixels to video resolution), all mouse buttons forwarded, scroll (both axes), prevents browser context menu and default key actions
+- `App` state machine — `idle → connecting → connected → error` transitions, handles `joined/answer/ice_candidate/error/agent_disconnected` signaling messages, error cleared on reconnect
+
+#### Infrastructure (`deploy/`, `server/signaling/`)
+- `server/signaling/Dockerfile` — python:3.12-slim image
+- `deploy/docker-compose.dev.yml` — Redis 7 (with healthcheck) + signaling server (hot-reload via uvicorn --reload, volume mount)
+
+### Technical Stack
+
+| Component | Technology |
+|---|---|
+| Signaling server | Python 3.12, FastAPI 0.115, uvicorn, redis.asyncio, passlib[bcrypt] |
+| Rust agent | Rust 1.95, tokio 1, scrap 0.5, openh264 0.6, webrtc 0.11, enigo 0.2, tokio-tungstenite 0.23 |
+| Browser viewer | TypeScript 5, React 19, Vite 6 |
+| Infrastructure | Docker Compose, Redis 7 |
+
+### Known Limitations (Post-Alpha)
+
+- No user accounts or machine registry (Phase 2)
+- No TURN relay fallback — P2P only, may fail through strict NATs (Phase 5)
+- No clipboard sync (Phase 4)
+- No native desktop client (Phase 4)
+- No TLS / production deployment (Phase 3)
+- No file transfer, audio, or session recording (post-MVP)
