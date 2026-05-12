@@ -9,6 +9,7 @@ pub struct H264Encoder {
     encoder: Encoder,
     width: u32,
     height: u32,
+    frame_count: u32,
 }
 
 impl H264Encoder {
@@ -24,7 +25,7 @@ impl H264Encoder {
             .set_bitrate_bps(1_500_000)
             .debug(false);
         let encoder = Encoder::with_api_config(api, config)?;
-        Ok(Self { encoder, width, height })
+        Ok(Self { encoder, width, height, frame_count: 0 })
     }
 
     pub fn encode_bgra(&mut self, bgra: &[u8]) -> Result<Vec<u8>> {
@@ -38,6 +39,11 @@ impl H264Encoder {
             bgra.len(),
             expected
         );
+        // Force IDR keyframe every 60 frames so browsers can start decoding quickly
+        if self.frame_count % 60 == 0 {
+            self.encoder.force_intra_frame();
+        }
+        self.frame_count += 1;
         let src = BgraSliceU8::new(bgra, (self.width as usize, self.height as usize));
         let yuv = YUVBuffer::from_rgb_source(src);
         let bitstream = self.encoder.encode(&yuv)?;
