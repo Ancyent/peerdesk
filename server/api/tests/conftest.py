@@ -42,5 +42,6 @@ async def auth_client(client):
     r = await client.post("/auth/login", json={
         "email": "user@test.com", "password": "Test1234!"
     })
+    assert r.status_code == 200, f"Login failed: {r.text}"
     client.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
     return client
