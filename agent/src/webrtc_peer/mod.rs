@@ -19,7 +19,7 @@ use webrtc::{
 };
 
 pub struct PeerConnection {
-    pub pc: Arc<RTCPeerConnection>,
+    pc: Arc<RTCPeerConnection>,
     pub to_signaling_tx: Sender<SignalingMessage>,
     pub from_signaling_rx: Option<Receiver<SignalingMessage>>,
 }
@@ -92,8 +92,7 @@ impl PeerConnection {
         let track = Arc::clone(&video_track);
         tokio::spawn(async move { send_video_frames(frame_rx, track).await });
 
-        let (to_sig_tx, _to_sig_rx) = tokio::sync::mpsc::channel::<SignalingMessage>(32);
-        let (_from_sig_tx, from_sig_rx) = tokio::sync::mpsc::channel::<SignalingMessage>(32);
+        let (to_sig_tx, to_sig_rx) = tokio::sync::mpsc::channel::<SignalingMessage>(32);
 
         // Forward ICE candidates to signaling
         let to_sig = to_sig_tx.clone();
@@ -114,7 +113,7 @@ impl PeerConnection {
         Ok(Self {
             pc,
             to_signaling_tx: to_sig_tx,
-            from_signaling_rx: Some(from_sig_rx),
+            from_signaling_rx: Some(to_sig_rx),  // receiver for ICE+Answer outbound to signaling
         })
     }
 
@@ -143,9 +142,16 @@ async fn send_video_frames(
 ) {
     let mut encoder: Option<H264Encoder> = None;
     while let Some(frame) = frame_rx.recv().await {
-        let enc = encoder.get_or_insert_with(|| {
-            H264Encoder::new(frame.width, frame.height, 30).expect("H264Encoder init")
-        });
+        if encoder.is_none() {
+            match H264Encoder::new(frame.width, frame.height, 30) {
+                Ok(enc) => { encoder = Some(enc); }
+                Err(e) => {
+                    tracing::error!("H264Encoder init failed: {}", e);
+                    continue;
+                }
+            }
+        }
+        let enc = encoder.as_mut().unwrap();
         if let Ok(h264) = enc.encode_bgra(&frame.data) {
             if !h264.is_empty() {
                 let _ = track
