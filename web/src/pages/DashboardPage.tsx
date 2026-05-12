@@ -5,9 +5,10 @@ import type { MachineOut } from '../api/client';
 
 interface Props {
   onConnect: (peerId: string) => void;
+  onBranding: () => void;
 }
 
-export function DashboardPage({ onConnect }: Props) {
+export function DashboardPage({ onConnect, onBranding }: Props) {
   const { user, accessToken, logout } = useAuth();
   const [machines, setMachines] = useState<MachineOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,10 @@ export function DashboardPage({ onConnect }: Props) {
         <h1 style={{ margin:0, fontSize:22 }}>PeerDesk</h1>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <span style={{ color:'#666', fontSize:14 }}>{user?.name}</span>
+          <button onClick={onBranding}
+            style={{ padding:'6px 14px', borderRadius:6, border:'1px solid #d1d5db', background:'#fff', cursor:'pointer', fontSize:14 }}>
+            Branding
+          </button>
           <button onClick={logout}
             style={{ padding:'6px 14px', borderRadius:6, border:'1px solid #d1d5db', background:'#fff', cursor:'pointer', fontSize:14 }}>
             Logout

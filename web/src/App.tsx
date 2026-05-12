@@ -3,6 +3,7 @@ import { useAuth } from './auth/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { BrandingPage } from './pages/BrandingPage';
 import { ConnectForm } from './components/ConnectForm';
 import { Viewer } from './components/Viewer';
 import { FileTransferBar } from './components/FileTransferBar';
@@ -16,7 +17,7 @@ import type { SignalingMessage } from './types/messages';
 const SIGNALING_URL = (import.meta.env.VITE_SIGNALING_URL as string | undefined)
   ?? 'ws://localhost:8001/ws';
 
-type AppPage = 'login' | 'register' | 'dashboard' | 'connect' | 'viewer';
+type AppPage = 'login' | 'register' | 'dashboard' | 'connect' | 'viewer' | 'branding';
 type ViewerState = 'idle' | 'connecting' | 'connected' | 'error';
 
 export default function App() {
@@ -151,6 +152,11 @@ export default function App() {
     return <ConnectForm onConnect={handleConnect} initialPeerId={connectPeerId} error={errMsg || undefined} />;
   }
 
+  // Branding
+  if (page === 'branding') {
+    return <BrandingPage onBack={() => setPage('dashboard')} />;
+  }
+
   // Dashboard (default)
-  return <DashboardPage onConnect={handleDashboardConnect} />;
+  return <DashboardPage onConnect={handleDashboardConnect} onBranding={() => setPage('branding')} />;
 }
