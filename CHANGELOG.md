@@ -2,6 +2,58 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.0.2-Alpha] — 2026-05-12
+
+Phase 2: user accounts, machine registry, and web dashboard.
+
+### Added
+
+#### Auth & API Server (`server/api/`)
+- FastAPI async REST API server on port 8000
+- PostgreSQL 16 database via SQLAlchemy 2.x async + asyncpg
+- Alembic async migrations — `users` and `machines` tables
+- `POST /auth/register` — create account, returns JWT access + refresh tokens
+- `POST /auth/login` — email + password login
+- `POST /auth/refresh` — exchange refresh token for new access token (7-day refresh, 15-min access)
+- `GET /users/me` — return current authenticated user
+- `GET /machines` — list machines owned by current user
+- `POST /machines` — register a new machine (peer_id + name + os)
+- `GET /machines/{id}` — get machine by ID
+- `PATCH /machines/{peer_id}/heartbeat` — agent updates online status (no auth required)
+- CORS enabled for all origins (dev mode)
+- 15 integration tests using SQLite in-memory (pytest-asyncio)
+
+#### Browser Dashboard (`web/`)
+- `LoginPage` — email + password sign-in with error handling
+- `RegisterPage` — name + email + password registration (min 8 char password)
+- `DashboardPage` — machine list with online/offline status indicators, connect button (disabled when offline)
+- `AuthContext` — React context with login/register/logout, localStorage token persistence, on-mount token validation
+- `useAuth` hook — typed access to auth context
+- `api/client.ts` — typed fetch wrapper for all API endpoints
+- App routing updated: `loading → login/register → dashboard → connect → viewer`
+- `ConnectForm` updated to accept `initialPeerId` prop (pre-filled from dashboard)
+
+#### Rust Agent (`agent/`)
+- Optional API registration on startup: if `API_TOKEN` env var is set, agent POSTs to `API_URL/machines` with its peer_id, name, and OS
+- `send_heartbeat()` function for future online status updates
+- API registration is non-fatal — agent works in standalone mode without `API_TOKEN`
+
+#### Infrastructure (`deploy/`)
+- `docker-compose.dev.yml` updated: added `postgres:16-alpine` (with healthcheck) and `api` service
+- Named volume `postgres_data` for persistent DB storage
+
+### Technical Stack additions
+
+| Component | Technology |
+|---|---|
+| API server | Python 3.12, FastAPI 0.115, SQLAlchemy 2.0, asyncpg, Alembic 1.14 |
+| Auth | python-jose (JWT), passlib[bcrypt] |
+| Validation | Pydantic 2.10 |
+| Database | PostgreSQL 16-alpine |
+| Agent HTTP | reqwest 0.12 (rustls-tls) |
+
+---
+
 ## [0.0.1-Alpha] — 2026-05-12
 
 Initial alpha release implementing the core P2P remote desktop loop.
