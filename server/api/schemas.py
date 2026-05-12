@@ -44,6 +44,9 @@ class MachineOut(BaseModel):
     is_online: bool
     last_seen_at: Optional[datetime]
     created_at: datetime
+    company_id: Optional[str] = None
+    location_id: Optional[str] = None
+    group_id: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -93,3 +96,79 @@ class BrandingUpdate(BaseModel):
     brand_name: Optional[str] = None
     logo_data_url: Optional[str] = None
     accent_color: Optional[str] = None
+
+
+class CompanyCreate(BaseModel):
+    name: str
+
+
+class CompanyOut(BaseModel):
+    id: str
+    name: str
+    owner_id: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class LocationCreate(BaseModel):
+    name: str
+
+
+class LocationOut(BaseModel):
+    id: str
+    name: str
+    company_id: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class GroupCreate(BaseModel):
+    name: str
+
+
+class GroupOut(BaseModel):
+    id: str
+    name: str
+    location_id: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class MachinePlacement(BaseModel):
+    company_id: Optional[str] = None
+    location_id: Optional[str] = None
+    group_id: Optional[str] = None
+
+
+class RegistrationTokenCreate(BaseModel):
+    company_id: Optional[str] = None
+    location_id: Optional[str] = None
+    group_id: Optional[str] = None
+
+
+class RegistrationTokenOut(BaseModel):
+    id: str
+    token: str
+    expires_at: datetime
+    used_at: Optional[datetime]
+    company_id: Optional[str]
+    location_id: Optional[str]
+    group_id: Optional[str]
+    model_config = {"from_attributes": True}
+
+
+class TokenRedeemRequest(BaseModel):
+    token: str
+    peer_id: str
+    name: str = "My Machine"
+    os: Optional[str] = None
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
