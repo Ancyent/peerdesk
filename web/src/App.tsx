@@ -13,9 +13,9 @@ import { useWebRTC } from './hooks/useWebRTC';
 import { useClipboard } from './hooks/useClipboard';
 import { useFileTransfer } from './hooks/useFileTransfer';
 import type { SignalingMessage } from './types/messages';
+import { getConfig } from './config';
 
-const SIGNALING_URL = (import.meta.env.VITE_SIGNALING_URL as string | undefined)
-  ?? 'ws://localhost:8001/ws';
+const SIGNALING_URL = getConfig().signalingUrl;
 
 type AppPage = 'login' | 'register' | 'dashboard' | 'connect' | 'viewer' | 'branding';
 type ViewerState = 'idle' | 'connecting' | 'connected' | 'error';

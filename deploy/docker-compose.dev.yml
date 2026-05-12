@@ -68,7 +68,24 @@ services:
         condition: service_healthy
     volumes:
       - ../server/api:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../web:/app
+      - /app/node_modules
+      - ./config.json:/deploy/config.json:ro
+    environment:
+      VITE_PROXY_API: http://api:8000
+      VITE_PROXY_WS: ws://signaling:8001
+    depends_on:
+      - api
+      - signaling
 
 volumes:
   postgres_data:

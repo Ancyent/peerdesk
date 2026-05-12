@@ -4,10 +4,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-ARG VITE_SIGNALING_URL=ws://localhost/ws
-ARG VITE_API_URL=http://localhost/api
-ENV VITE_SIGNALING_URL=$VITE_SIGNALING_URL
-ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Stage 2: serve with nginx

@@ -2,25 +2,61 @@
 
 Open-source remote desktop platform — alternative to RustDesk / AnyDesk.
 
-**Browser-based viewer (no install) · P2P via WebRTC · Self-hostable in one command · White-label support**
+**Browser-based viewer (no install) · P2P via WebRTC · Self-hostable · White-label support**
 
 ---
 
-## Download
+## Self-Host — Quick Start
 
-Pre-built installers are available on the [Releases page](https://github.com/Ancyent/peerdesk/releases).
+**Cerință:** Docker instalat. Atât.
 
-| Platform | Package | Notes |
+```bash
+git clone https://github.com/Ancyent/peerdesk
+cd peerdesk/deploy
+bash install.sh
+```
+
+Wizard-ul întreabă 2-3 întrebări (domeniu, HTTPS?) și face tot restul:
+- construiește imaginile Docker
+- generează secrete random (DB, JWT, TURN)
+- rulează migrările bazei de date
+- pornește toate serviciile
+- afișează URL-ul dashboard-ului
+
+**Dev local (hot reload):**
+```bash
+bash install.sh --dev
+```
+
+**Fără interacțiune (CI/scripting):**
+```bash
+# Prod cu HTTPS
+bash install.sh --domain peerdesk.example.com --tls --email admin@example.com
+
+# Prod HTTP simplu
+bash install.sh --domain 192.168.1.10
+
+# Fără nginx intern (proxy extern: Traefik/Caddy)
+bash install.sh --no-nginx --domain 192.168.1.10
+```
+
+> Ghid complet, moduri de deployment și troubleshooting: **[docs/deploy-guide.md](docs/deploy-guide.md)**
+
+---
+
+## Download agent
+
+Pre-built installers pe [Releases page](https://github.com/Ancyent/peerdesk/releases).
+
+| Platform | Package | Note |
 |---|---|---|
 | **Linux** | `.deb` (Debian/Ubuntu) | `sudo dpkg -i peerdesk_*.deb` |
 | **Linux** | `.AppImage` | `chmod +x peerdesk_*.AppImage && ./peerdesk_*.AppImage` |
-| **Windows** | `.msi` installer | Requires WebView2 Runtime (included) |
-| **Windows** | `.exe` (NSIS) | Portable installer |
+| **Windows** | `.msi` installer | Include WebView2 Runtime |
+| **Windows** | `.exe` (NSIS) | Portable |
 | **macOS** | `.dmg` (Universal) | Intel + Apple Silicon |
-| **Android** | `.apk` | Enable "Install from unknown sources" in Settings |
+| **Android** | `.apk` | Activează "surse necunoscute" în Setări |
 | **iOS** | — | Coming soon |
-
-> **Build from source:** See [Building](#building) section below.
 
 ---
 
@@ -190,33 +226,30 @@ cargo tauri build    # produces .deb / .AppImage
 - Docker + Docker Compose v2
 - System deps: `libx11-dev libxcb1-dev libssl-dev clang libxdo-dev libasound2-dev`
 
-### Dev stack (signaling + api + postgres + redis)
+### Dev stack — tot în Docker
 
 ```bash
 cd deploy
-docker compose -f docker-compose.dev.yml up -d
-
-# First time: run migrations
-docker compose -f docker-compose.dev.yml exec -T api alembic upgrade head
+bash install.sh --dev
+# sau direct:
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-### Run everything locally
+Migrările rulează automat. Hot reload activ pentru web și API.
+
+### Agent local (pentru testare WebRTC)
 
 ```bash
-# 1. Virtual display (Linux)
+# Display virtual (server fără monitor)
 Xvfb :99 -screen 0 1280x720x24 &
 DISPLAY=:99 fluxbox &
-DISPLAY=:99 xterm &
 
-# 2. Agent
-DISPLAY=:99 PEERDESK_PASSWORD=test123 SIGNALING_URL=ws://localhost:8001/ws \
+# Agent
+DISPLAY=:99 PEERDESK_PASSWORD=test123 \
+  SIGNALING_URL=ws://localhost:8001/ws \
   cargo run -p peerdesk-agent
 
-# 3. Web viewer
-cd web && npm run dev -- --host 0.0.0.0
-
-# 4. Open http://localhost:5173
-#    Register → Dashboard → Connect (or enter 9-digit ID + password)
+# Deschide http://localhost:5173 → Register → Connect
 ```
 
 ---

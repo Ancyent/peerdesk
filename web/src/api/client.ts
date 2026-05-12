@@ -1,4 +1,4 @@
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
+import { getConfig } from '../config';
 
 export class ApiError extends Error {
   status: number;
@@ -9,7 +9,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${getConfig().apiUrl}${path}`, {
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
   });

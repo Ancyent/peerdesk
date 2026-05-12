@@ -1,3 +1,13 @@
+# PeerDesk — production fără nginx proxy extern
+# Folosește asta când rulezi în spatele unui alt reverse proxy (Traefik, Caddy, nginx extern etc.)
+# sau direct pe porturi publice fără proxy.
+#
+# config.json pentru acest mod:
+#   { "apiUrl": "http://IP-sau-domeniu:8000", "signalingUrl": "ws://IP-sau-domeniu:8001/ws" }
+#
+# Usage:
+#   docker compose -f docker-compose.no-nginx.yml up -d
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -48,6 +58,8 @@ services:
     build:
       context: ../server/api
     restart: unless-stopped
+    ports:
+      - "8000:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-peerdesk}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-peerdesk}
       JWT_SECRET: ${JWT_SECRET}
@@ -61,6 +73,8 @@ services:
     build:
       context: ../server/signaling
     restart: unless-stopped
+    ports:
+      - "8001:8001"
     environment:
       REDIS_URL: redis://redis:6379
     depends_on:
@@ -72,27 +86,14 @@ services:
   web:
     build:
       context: ../web
-      args:
-        VITE_SIGNALING_URL: ${VITE_SIGNALING_URL:-ws://localhost/ws}
-        VITE_API_URL: ${VITE_API_URL:-http://localhost/api}
-    restart: unless-stopped
-    networks:
-      - internal
-
-  nginx:
-    image: nginx:alpine
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
       - ./config.json:/etc/peerdesk/config.json:ro
     depends_on:
       - api
       - signaling
-      - web
     networks:
       - internal
 
