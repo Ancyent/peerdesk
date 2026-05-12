@@ -1,3 +1,4 @@
+mod api_client;
 mod capture;
 mod config;
 mod encode;
@@ -16,6 +17,19 @@ async fn main() -> Result<()> {
     let cfg = config::Config::load_or_create(&password)?;
 
     info!("PeerDesk agent — peer_id={}", cfg.peer_id);
+
+    // Optional: register with API server if API_TOKEN is set
+    let api_url = std::env::var("API_URL").unwrap_or_else(|_| "http://localhost:8000".into());
+    let api_token = std::env::var("API_TOKEN").unwrap_or_default();
+    if !api_token.is_empty() {
+        match api_client::register_machine(&api_url, &api_token, &cfg.peer_id).await {
+            Ok(m) => info!("Registered with API — machine_id={}", m.id),
+            Err(e) => tracing::warn!("API registration failed (non-fatal): {}", e),
+        }
+    } else {
+        info!("API_TOKEN not set — running in standalone mode (no account required)");
+    }
+
     info!("Password set. Waiting for connections...");
 
     let (frame_tx, frame_rx) = tokio::sync::mpsc::channel(2);
