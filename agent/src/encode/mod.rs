@@ -22,7 +22,8 @@ impl H264Encoder {
         let api = OpenH264API::from_source();
         let config = EncoderConfig::new()
             .max_frame_rate(fps as f32)
-            .set_bitrate_bps(1_500_000)
+            .set_bitrate_bps(800_000)
+            .enable_skip_frame(true)
             .debug(false);
         let encoder = Encoder::with_api_config(api, config)?;
         Ok(Self { encoder, width, height, frame_count: 0 })

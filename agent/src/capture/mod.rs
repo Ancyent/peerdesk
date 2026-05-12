@@ -35,8 +35,13 @@ pub async fn run(tx: Sender<FrameData>) -> Result<()> {
         match capturer.frame() {
             Ok(frame) => {
                 let fd = FrameData { width: w, height: h, data: frame.to_vec() };
-                if tx.send(fd).await.is_err() {
-                    break;
+                // try_send drops the frame if encoder is busy — prevents latency buildup
+                match tx.try_send(fd) {
+                    Ok(_) => {}
+                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                        // encoder backpressure — skip frame to stay live
+                    }
+                    Err(_) => break,
                 }
             }
             Err(e) if e.kind() == ErrorKind::WouldBlock => {

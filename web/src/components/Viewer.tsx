@@ -15,10 +15,22 @@ export function Viewer({ stream, onMouseMove, onMouseDown, onMouseUp, onKeyDown,
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(console.error);
-    }
+    const video = videoRef.current;
+    if (!video || !stream) return;
+    video.srcObject = stream;
+    video.play().catch(console.error);
+
+    // Periodically sync to live position to drain jitter buffer buildup
+    const syncInterval = setInterval(() => {
+      if (video.buffered.length > 0) {
+        const liveEdge = video.buffered.end(video.buffered.length - 1);
+        if (liveEdge - video.currentTime > 0.5) {
+          video.currentTime = liveEdge - 0.1;
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(syncInterval);
   }, [stream]);
 
   const relPos = (e: React.MouseEvent) => {
