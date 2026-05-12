@@ -25,6 +25,22 @@ services:
       timeout: 3s
       retries: 5
 
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host
+    command: >
+      -n
+      --log-file=stdout
+      --use-auth-secret
+      --static-auth-secret=${TURN_SECRET:-dev-turn-secret}
+      --realm=peerdesk
+      --min-port=49152
+      --max-port=65535
+      --no-stun
+      --fingerprint
+      --no-loopback-peers
+      --no-multicast-peers
+
   signaling:
     build:
       context: ../server/signaling

@@ -80,9 +80,10 @@ generate_env() {
         return
     fi
 
-    local pg_pass jwt_secret scheme ws_scheme
+    local pg_pass jwt_secret turn_secret scheme ws_scheme
     pg_pass=$(openssl rand -hex 24)
     jwt_secret=$(openssl rand -hex 32)
+    turn_secret=$(openssl rand -hex 24)
 
     if [[ "$USE_TLS" =~ ^[Yy]$ ]]; then
         scheme="https"; ws_scheme="wss"
@@ -97,11 +98,13 @@ POSTGRES_DB=peerdesk
 JWT_SECRET=${jwt_secret}
 VITE_SIGNALING_URL=${ws_scheme}://${DOMAIN}/ws
 VITE_API_URL=${scheme}://${DOMAIN}/api
+TURN_SECRET=${turn_secret}
 EOF
 
     info ".env generated with random secrets."
-    info "  DB password: ${pg_pass:0:8}... (full value in .env)"
-    info "  JWT secret:  ${jwt_secret:0:8}... (full value in .env)"
+    info "  DB password:  ${pg_pass:0:8}... (full value in .env)"
+    info "  JWT secret:   ${jwt_secret:0:8}... (full value in .env)"
+    info "  TURN secret:  ${turn_secret:0:8}... (full value in .env)"
 
     # Export for use below
     # shellcheck disable=SC1091

@@ -27,6 +27,23 @@ services:
     networks:
       - internal
 
+  coturn:
+    image: coturn/coturn:latest
+    restart: unless-stopped
+    network_mode: host
+    command: >
+      -n
+      --log-file=stdout
+      --use-auth-secret
+      --static-auth-secret=${TURN_SECRET}
+      --realm=peerdesk
+      --min-port=49152
+      --max-port=65535
+      --no-stun
+      --fingerprint
+      --no-loopback-peers
+      --no-multicast-peers
+
   api:
     build:
       context: ../server/api
