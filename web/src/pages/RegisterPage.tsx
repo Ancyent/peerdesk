@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { ApiError } from '../api/client';
+import { useBrandingContext } from '../branding/BrandingContext';
 
 interface Props {
   onGoLogin: () => void;
@@ -8,6 +9,7 @@ interface Props {
 
 export function RegisterPage({ onGoLogin }: Props) {
   const { register } = useAuth();
+  const { brand_name, logo_data_url } = useBrandingContext();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +31,10 @@ export function RegisterPage({ onGoLogin }: Props) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', gap:16, fontFamily:'sans-serif' }}>
-      <h1 style={{ margin:0 }}>PeerDesk</h1>
+      {logo_data_url
+        ? <img src={logo_data_url} alt={brand_name} style={{ height: 48, objectFit: 'contain', maxWidth: 200 }} />
+        : <h1 style={{ margin:0 }}>{brand_name}</h1>
+      }
       <p style={{ color:'#666', margin:0 }}>Create your account</p>
       {error && <p style={{ color:'red', margin:0, fontSize:14 }}>{error}</p>}
       <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12, width:300 }}>

@@ -1,5 +1,6 @@
 // web/src/components/ConnectForm.tsx
 import { useState } from 'react';
+import { useBrandingContext } from '../branding/BrandingContext';
 
 interface Props {
   onConnect: (peerId: string, password: string) => void;
@@ -10,13 +11,17 @@ interface Props {
 export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
   const [peerId, setPeerId] = useState(initialPeerId ?? '');
   const [password, setPassword] = useState('');
+  const { brand_name, logo_data_url } = useBrandingContext();
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', height: '100vh', gap: 16, fontFamily: 'sans-serif'
     }}>
-      <h1 style={{ margin: 0 }}>PeerDesk</h1>
+      {logo_data_url
+        ? <img src={logo_data_url} alt={brand_name} style={{ height: 48, objectFit: 'contain', maxWidth: 200 }} />
+        : <h1 style={{ margin: 0 }}>{brand_name}</h1>
+      }
       <p style={{ color: '#666', margin: 0 }}>Enter the remote machine ID</p>
       {error && <p style={{ color: 'red', margin: 0 }}>{error}</p>}
       <form
