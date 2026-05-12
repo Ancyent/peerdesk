@@ -29,3 +29,12 @@ async def test_change_password_wrong_current(auth_client):
         "current_password": "WRONG", "new_password": "NewPass5678!"
     })
     assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_email_duplicate(client, auth_client):
+    await client.post("/auth/register", json={
+        "email": "user2@test.com", "name": "User 2", "password": "Test1234!"
+    })
+    r = await auth_client.patch("/users/me", json={"email": "user2@test.com"})
+    assert r.status_code == 409
