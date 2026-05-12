@@ -18,6 +18,8 @@ pub enum SignalingMessage {
     Answer { sdp: String },
     IceCandidate { candidate: serde_json::Value },
     Error { code: String },
+    SwitchDisplay { index: usize },
+    DisplayList { displays: Vec<crate::capture::DisplayInfo> },
 }
 
 pub async fn run(
@@ -110,5 +112,22 @@ mod tests {
         let msg = SignalingMessage::Approve { viewer_id: "abc".into() };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("\"type\":\"approve\""));
+    }
+
+    #[test]
+    fn serializes_display_list_message() {
+        use crate::capture::DisplayInfo;
+        let msg = SignalingMessage::DisplayList {
+            displays: vec![DisplayInfo { index: 0, width: 1920, height: 1080, is_primary: true }],
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains("\"type\":\"display_list\""));
+    }
+
+    #[test]
+    fn deserializes_switch_display() {
+        let json = r#"{"type":"switch_display","index":1}"#;
+        let msg: SignalingMessage = serde_json::from_str(json).unwrap();
+        assert!(matches!(msg, SignalingMessage::SwitchDisplay { index: 1 }));
     }
 }

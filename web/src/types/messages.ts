@@ -10,4 +10,6 @@ export type SignalingMessage =
   | { type: 'agent_disconnected' }
   | { type: 'viewer_pending'; viewer_id: string; remote_ip: string }
   | { type: 'approved' }
-  | { type: 'denied'; reason: string };
+  | { type: 'denied'; reason: string }
+  | { type: 'switch_display'; index: number }
+  | { type: 'display_list'; displays: Array<{ index: number; width: number; height: number; is_primary: boolean }> };

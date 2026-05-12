@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ConnectForm } from './components/ConnectForm';
 import { Viewer } from './components/Viewer';
 import { FileTransferBar } from './components/FileTransferBar';
+import { DisplaySelector } from './components/DisplaySelector';
 import { useSignaling } from './hooks/useSignaling';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useClipboard } from './hooks/useClipboard';
@@ -25,6 +26,8 @@ export default function App() {
   const [viewerState, setViewerState] = useState<ViewerState>('idle');
   const [errMsg, setErrMsg] = useState('');
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
+  const [displays, setDisplays] = useState<Array<{index: number; width: number; height: number; is_primary: boolean}>>([]);
+  const [currentDisplay, setCurrentDisplay] = useState(0);
 
   // Temporary ref for clipboard receive — set after useClipboard is called
   const clipboardReceiveRef = useRef<((text: string) => void) | null>(null);
@@ -71,6 +74,8 @@ export default function App() {
       setErrMsg(msg.reason ?? 'Connection denied by host');
       setViewerState('error');
       setPage('connect');
+    } else if (msg.type === 'display_list') {
+      setDisplays(msg.displays);
     }
   });
   sendRef.current = send;
@@ -88,6 +93,11 @@ export default function App() {
     setViewerState('idle');
     setPage('connect');
   };
+
+  const handleDisplaySwitch = useCallback((index: number) => {
+    setCurrentDisplay(index);
+    send({ type: 'switch_display', index });
+  }, [send]);
 
   // Loading screen while checking stored token
   if (loading) {
@@ -115,7 +125,7 @@ export default function App() {
     }
     if (viewerState === 'connected') {
       return (
-        <div style={{ width:'100vw', height:'100vh', background:'#000' }}>
+        <div style={{ width:'100vw', height:'100vh', background:'#000', position: 'relative' }}>
           <Viewer
             stream={webrtc.stream}
             onMouseMove={(x, y) => webrtc.sendInput({ type:'mouse_move', x, y })}
@@ -124,6 +134,11 @@ export default function App() {
             onKeyDown={(key) => webrtc.sendInput({ type:'key_down', key })}
             onKeyUp={(key) => webrtc.sendInput({ type:'key_up', key })}
             onScroll={(dx, dy) => webrtc.sendInput({ type:'scroll', delta_x: dx, delta_y: dy })}
+          />
+          <DisplaySelector
+            displays={displays}
+            current={currentDisplay}
+            onChange={handleDisplaySwitch}
           />
           <FileTransferBar transfer={transfer} onSendFile={sendFile} />
         </div>

@@ -11,6 +11,33 @@ pub struct FrameData {
     pub data: Vec<u8>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DisplayInfo {
+    pub index: usize,
+    pub width: u32,
+    pub height: u32,
+    pub is_primary: bool,
+}
+
+pub fn list_displays() -> Vec<DisplayInfo> {
+    match scrap::Display::all() {
+        Ok(displays) => displays
+            .into_iter()
+            .enumerate()
+            .map(|(i, d)| DisplayInfo {
+                index: i,
+                width: d.width() as u32,
+                height: d.height() as u32,
+                is_primary: i == 0,
+            })
+            .collect(),
+        Err(e) => {
+            tracing::warn!("Could not enumerate displays: {}", e);
+            vec![]
+        }
+    }
+}
+
 pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
     let display = Display::primary()?;
     let (w, h) = (display.width(), display.height());
@@ -26,8 +53,15 @@ pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
     }
 }
 
-pub async fn run(tx: Sender<FrameData>) -> Result<()> {
-    let display = Display::primary()?;
+pub async fn run(tx: Sender<FrameData>, display_index: usize) -> Result<()> {
+    let display = {
+        let mut all = scrap::Display::all()?;
+        if display_index < all.len() {
+            all.remove(display_index)
+        } else {
+            scrap::Display::primary()?
+        }
+    };
     let (w, h) = (display.width() as u32, display.height() as u32);
     let mut capturer = Capturer::new(display)?;
 
@@ -64,5 +98,16 @@ mod tests {
         let (width, height, frame) = super::capture_one_frame().expect("capture failed");
         assert!(width > 0 && height > 0);
         assert_eq!(frame.len(), (width * height * 4) as usize);
+    }
+
+    #[test]
+    fn list_displays_returns_slice() {
+        if std::env::var("DISPLAY").is_err() {
+            eprintln!("skip: no DISPLAY");
+            return;
+        }
+        let displays = super::list_displays();
+        assert!(!displays.is_empty());
+        assert!(displays[0].is_primary);
     }
 }

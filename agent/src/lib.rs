@@ -20,6 +20,7 @@ pub struct AgentConfig {
     pub signaling_url: String,
     pub api_url: Option<String>,
     pub api_token: Option<String>,
+    pub display_index: usize,
 }
 
 impl Default for AgentConfig {
@@ -33,6 +34,10 @@ impl Default for AgentConfig {
             api_token: std::env::var("API_TOKEN")
                 .ok()
                 .filter(|s| !s.is_empty()),
+            display_index: std::env::var("DISPLAY_INDEX")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
         }
     }
 }
@@ -68,12 +73,13 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     // capture::run uses scrap::Capturer which is !Send, so run it on a
     // dedicated OS thread with its own single-threaded tokio runtime.
+    let capture_display_index = agent_cfg.display_index;
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("capture runtime");
-        if let Err(e) = rt.block_on(capture::run(frame_tx)) {
+        if let Err(e) = rt.block_on(capture::run(frame_tx, capture_display_index)) {
             tracing::error!("Capture error: {}", e);
         }
     });
@@ -131,6 +137,9 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
             }
             Some(signaling::SignalingMessage::ViewerJoined { viewer_id }) => {
                 info!("Viewer {} joined — waiting for WebRTC offer", viewer_id);
+                let displays = capture::list_displays();
+                let msg = signaling::SignalingMessage::DisplayList { displays };
+                let _ = to_sig_tx.send(msg).await;
             }
             Some(signaling::SignalingMessage::Offer { sdp }) => {
                 info!("Got offer — creating answer");
@@ -145,6 +154,11 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
             }
             Some(signaling::SignalingMessage::Error { code }) => {
                 tracing::warn!("Signaling error from server: {}", code);
+            }
+            Some(signaling::SignalingMessage::SwitchDisplay { index }) => {
+                info!("Viewer requested display switch to index {}", index);
+                // TODO: restart capture thread with new display_index
+                // For now, log and acknowledge
             }
             Some(_) => {} // Registered, Answer, etc. — ignore in main loop
             None => {
