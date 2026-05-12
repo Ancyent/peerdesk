@@ -1,35 +1,46 @@
 import pytest
-import pytest_asyncio
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from database import Base
+from deps import get_db
+from main import app
 import models  # noqa
 
-TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+TEST_DB = "sqlite+aiosqlite:///:memory:"
 
 
-@pytest_asyncio.fixture
-async def db_session():
-    engine = create_async_engine(TEST_DB_URL)
+@pytest.fixture
+async def db():
+    engine = create_async_engine(TEST_DB)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with session_factory() as session:
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
         yield session
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 
-@pytest_asyncio.fixture
-async def client(db_session):
-    from main import app
-    from deps import get_db
-
-    async def override_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_db
+@pytest.fixture
+async def client(db):
+    async def override():
+        yield db
+    app.dependency_overrides[get_db] = override
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def auth_client(client):
+    await client.post("/auth/register", json={
+        "email": "user@test.com", "name": "Test User", "password": "Test1234!"
+    })
+    r = await client.post("/auth/login", json={
+        "email": "user@test.com", "password": "Test1234!"
+    })
+    client.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
+    return client
