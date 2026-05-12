@@ -1,5 +1,6 @@
 mod api_client;
 mod capture;
+mod clipboard;
 mod config;
 mod encode;
 mod input;

@@ -22,6 +22,8 @@ pub struct PeerConnection {
     pc: Arc<RTCPeerConnection>,
     pub to_signaling_tx: Sender<SignalingMessage>,
     pub from_signaling_rx: Option<Receiver<SignalingMessage>>,
+    pub clipboard_in_rx: Option<tokio::sync::mpsc::Receiver<String>>,  // from viewer → agent writes to clipboard
+    pub clipboard_out_tx: tokio::sync::mpsc::Sender<String>,           // from agent clipboard → viewer
 }
 
 impl PeerConnection {
@@ -67,23 +69,42 @@ impl PeerConnection {
         )
         .await?;
 
-        // Handle incoming data channel from viewer (input events)
+        // Handle incoming data channels from viewer (input events, clipboard)
         let input_tx_clone = input_tx.clone();
+        let (clipboard_in_tx, clipboard_in_rx) = tokio::sync::mpsc::channel::<String>(16);
+        let (clipboard_out_tx, clipboard_out_rx) = tokio::sync::mpsc::channel::<String>(16);
+        let _ = clipboard_out_rx; // receiver wired in main.rs when needed
+        let clipboard_in_tx_clone = clipboard_in_tx.clone();
         pc.on_data_channel(Box::new(move |dc| {
-            let tx = input_tx_clone.clone();
+            let input_tx = input_tx_clone.clone();
+            let clipboard_tx = clipboard_in_tx_clone.clone();
             Box::pin(async move {
-                if dc.label() == "input" {
-                    dc.on_message(Box::new(move |msg| {
-                        let tx = tx.clone();
-                        let data = msg.data.to_vec();
-                        Box::pin(async move {
-                            if let Ok(text) = std::str::from_utf8(&data) {
-                                if let Ok(event) = serde_json::from_str::<InputEvent>(text) {
-                                    let _ = tx.send(event).await;
+                match dc.label() {
+                    "input" => {
+                        dc.on_message(Box::new(move |msg| {
+                            let tx = input_tx.clone();
+                            let data = msg.data.to_vec();
+                            Box::pin(async move {
+                                if let Ok(text) = std::str::from_utf8(&data) {
+                                    if let Ok(event) = serde_json::from_str::<InputEvent>(text) {
+                                        let _ = tx.send(event).await;
+                                    }
                                 }
-                            }
-                        })
-                    }));
+                            })
+                        }));
+                    }
+                    "clipboard" => {
+                        dc.on_message(Box::new(move |msg| {
+                            let tx = clipboard_tx.clone();
+                            let data = msg.data.to_vec();
+                            Box::pin(async move {
+                                if let Ok(text) = std::str::from_utf8(&data) {
+                                    let _ = tx.send(text.to_string()).await;
+                                }
+                            })
+                        }));
+                    }
+                    _ => {}
                 }
             })
         }));
@@ -114,6 +135,8 @@ impl PeerConnection {
             pc,
             to_signaling_tx: to_sig_tx,
             from_signaling_rx: Some(to_sig_rx),  // receiver for ICE+Answer outbound to signaling
+            clipboard_in_rx: Some(clipboard_in_rx),
+            clipboard_out_tx,
         })
     }
 
