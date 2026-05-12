@@ -2,6 +2,47 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.1.0-Beta] — 2026-05-12
+
+First feature-complete beta release. All post-MVP features implemented.
+
+### Added
+
+#### File Transfer
+- **Agent** (`agent/src/file_transfer/mod.rs`) — receives files via WebRTC `"filetransfer"` data channel; JSON control protocol (`ft_offer`/`ft_accept`/`ft_reject`/`ft_cancel`/`ft_done`); binary chunks reassembled and saved to `~/Downloads/` (or `/tmp/peerdesk-transfers/`); 1 GB size limit; progress events every ~1 MB
+- **Browser** (`web/src/hooks/useFileTransfer.ts`) — sends files in 64 KB chunks with back-pressure; offer/accept handshake with 15s timeout; progress state tracking
+- **Browser** (`web/src/components/FileTransferBar.tsx`) — fixed bottom bar with "Send File" button, filename, progress bar (%), done/error status
+
+#### Audio Streaming
+- **Agent** (`agent/src/audio/mod.rs`) — captures from default audio input device using `cpal` crate; f32→i16 PCM conversion; runs on dedicated OS thread (cpal is `!Send`); gracefully skips if no audio device available
+- **Browser** (`web/src/components/Viewer.tsx`) — hidden `<audio>` element receives stream; mute/unmute toggle button overlay (`🔇`/`🔊`)
+
+#### Multi-Monitor Support
+- **Agent** — `capture::list_displays()` enumerates all displays via `scrap::Display::all()`; `capture::run()` accepts `display_index` parameter; sends `display_list` message to viewer on `ViewerJoined`; handles `switch_display` message (index switch logged, restart is a TODO)
+- **Agent** (`agent/src/signaling/mod.rs`) — new `SignalingMessage` variants: `SwitchDisplay { index }`, `DisplayList { displays }`
+- **Agent** — `AgentConfig` gains `display_index: usize` (env `DISPLAY_INDEX`, default 0)
+- **Browser** (`web/src/components/DisplaySelector.tsx`) — dropdown overlay showing all monitors with resolution; hidden when only one monitor available; primary monitor marked with ★
+- **Browser** (`web/src/App.tsx`) — sends `switch_display` on selection change; receives `display_list` on connect
+
+#### 2FA TOTP
+- **API** (`server/api/routers/totp.py`) — `POST /auth/2fa/enable` (generates TOTP secret + QR URI for authenticator apps), `POST /auth/2fa/confirm` (validates first code to activate), `POST /auth/2fa/disable` (validates code to deactivate)
+- **API** — login flow updated: `POST /auth/login` returns `requires_2fa: true` + `temp_token` when 2FA is enabled; `POST /auth/login/2fa` validates TOTP code + temp token and returns full JWT tokens
+- **API** — `User` model gains `totp_secret: str | None` and `totp_enabled: bool`; Alembic migration `0003_totp`
+- `pyotp==2.9.0` added to requirements
+
+#### Unattended Access
+- `deploy/systemd/peerdesk-agent.service` — systemd unit template: `After=network-online.target`, `EnvironmentFile=/etc/peerdesk-agent.env`, `Restart=always`, security hardening (`NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`)
+- `scripts/install-agent.sh` — interactive installer: prompts server URL + agent password + API token; creates `peerdesk` system user; installs binary to `/usr/local/bin`; writes `/etc/peerdesk-agent.env` (mode 600); deploys and starts systemd service; extracts peer_id from journal
+
+### Planned (post-Beta)
+- **White-label client** — generate custom-branded client (logo + accent color) from the admin dashboard; CSS variable theming at runtime; branded Tauri package download
+- **Hardware-accelerated encoding** — NVENC (NVIDIA), VAAPI (Linux), VideoToolbox (macOS)
+- **SSO / OIDC** — oauth2-proxy in front of API
+- **Mobile viewer** — React Native or Flutter
+- **Session recording** — server-side or client-side MP4
+- **SaaS billing** — Stripe integration, per-seat pricing
+- **Wake-on-LAN** support
+
 ## [0.0.5-Alpha] — 2026-05-12
 
 Phase 5: coturn TURN relay, TURN credentials API, signaling rate limiting, connection approval flow, and session audit logging.
