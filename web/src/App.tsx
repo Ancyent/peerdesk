@@ -7,6 +7,7 @@ import { ConnectForm } from './components/ConnectForm';
 import { Viewer } from './components/Viewer';
 import { useSignaling } from './hooks/useSignaling';
 import { useWebRTC } from './hooks/useWebRTC';
+import { useClipboard } from './hooks/useClipboard';
 import type { SignalingMessage } from './types/messages';
 
 const SIGNALING_URL = (import.meta.env.VITE_SIGNALING_URL as string | undefined)
@@ -23,9 +24,18 @@ export default function App() {
   const [errMsg, setErrMsg] = useState('');
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
 
+  // Temporary ref for clipboard receive — set after useClipboard is called
+  const clipboardReceiveRef = useRef<((text: string) => void) | null>(null);
+
   const webrtc = useWebRTC(
-    useCallback((m: SignalingMessage) => { sendRef.current?.(m); }, [])
+    useCallback((m: SignalingMessage) => { sendRef.current?.(m); }, []),
+    useCallback((text: string) => { clipboardReceiveRef.current?.(text); }, [])
   );
+
+  const { receiveFromAgent } = useClipboard(
+    webrtc.stream ? webrtc.sendClipboard : null  // only sync when connected
+  );
+  clipboardReceiveRef.current = receiveFromAgent;
 
   const { send } = useSignaling(SIGNALING_URL, async (msg) => {
     if (msg.type === 'joined') {
