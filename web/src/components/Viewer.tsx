@@ -1,8 +1,9 @@
 // web/src/components/Viewer.tsx
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Props {
   stream: MediaStream | null;
+  audioStream?: MediaStream | null;
   onMouseMove: (x: number, y: number) => void;
   onMouseDown: (button: number) => void;
   onMouseUp: (button: number) => void;
@@ -11,8 +12,10 @@ interface Props {
   onScroll: (dx: number, dy: number) => void;
 }
 
-export function Viewer({ stream, onMouseMove, onMouseDown, onMouseUp, onKeyDown, onKeyUp, onScroll }: Props) {
+export function Viewer({ stream, audioStream, onMouseMove, onMouseDown, onMouseUp, onKeyDown, onKeyUp, onScroll }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [audioMuted, setAudioMuted] = useState(true);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -32,6 +35,13 @@ export function Viewer({ stream, onMouseMove, onMouseDown, onMouseUp, onKeyDown,
 
     return () => clearInterval(syncInterval);
   }, [stream]);
+
+  useEffect(() => {
+    if (audioRef.current && audioStream) {
+      audioRef.current.srcObject = audioStream;
+      audioRef.current.play().catch(() => { /* autoplay policy */ });
+    }
+  }, [audioStream]);
 
   // Calculate mouse position relative to the actual rendered video area,
   // accounting for letterbox bars added by object-fit: contain.
@@ -90,6 +100,22 @@ export function Viewer({ stream, onMouseMove, onMouseDown, onMouseUp, onKeyDown,
           onMouseEnter={(e) => (e.currentTarget as HTMLDivElement).focus()}
           onContextMenu={(e) => e.preventDefault()}
         />
+        {audioStream && (
+          <>
+            <audio ref={audioRef} autoPlay muted={audioMuted} style={{ display: 'none' }} />
+            <button
+              onClick={() => setAudioMuted(m => !m)}
+              style={{
+                position: 'absolute', top: 8, right: 8, zIndex: 5,
+                padding: '4px 10px', borderRadius: 4,
+                background: 'rgba(0,0,0,0.6)', color: '#fff',
+                border: 'none', cursor: 'pointer', fontSize: 12,
+              }}
+            >
+              {audioMuted ? '🔇 Unmute' : '🔊 Mute'}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

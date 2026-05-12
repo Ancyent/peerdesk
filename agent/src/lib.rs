@@ -1,4 +1,5 @@
 pub mod api_client;
+pub mod audio;
 pub mod capture;
 pub mod clipboard;
 pub mod config;
@@ -78,6 +79,19 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     });
 
     tokio::spawn(input::run(input_rx));
+
+    // Audio streaming (non-fatal if no device)
+    // cpal::Stream is !Send, so run on a dedicated OS thread with its own runtime.
+    let (audio_tx, _audio_rx) = tokio::sync::mpsc::channel::<audio::AudioFrame>(8);
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("audio runtime");
+        if let Err(e) = rt.block_on(audio::run(audio_tx)) {
+            tracing::warn!("Audio capture ended: {}", e);
+        }
+    });
 
     let peer_id = cfg.peer_id.clone();
     let pw_hash = cfg.password_hash.clone();
