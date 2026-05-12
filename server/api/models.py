@@ -1,4 +1,6 @@
 import uuid
+import secrets
+import string
 from datetime import datetime, timezone
 from sqlalchemy import String, Boolean, ForeignKey, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -170,4 +172,32 @@ class Group(Base):
             kwargs["id"] = str(uuid.uuid4())
         if "created_at" not in kwargs:
             kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)
+
+
+def _gen_token() -> str:
+    chars = string.ascii_uppercase + string.digits
+    return (''.join(secrets.choice(chars) for _ in range(4)) + '-' +
+            ''.join(secrets.choice(chars) for _ in range(4)))
+
+
+class RegistrationToken(Base):
+    __tablename__ = "registration_tokens"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    token: Mapped[str] = mapped_column(String(9), unique=True, nullable=False, default=_gen_token)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    company_id: Mapped[str | None] = mapped_column(String, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
+    location_id: Mapped[str | None] = mapped_column(String, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
+    group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "token" not in kwargs:
+            kwargs["token"] = _gen_token()
+        if "used_at" not in kwargs:
+            kwargs["used_at"] = None
         super().__init__(**kwargs)

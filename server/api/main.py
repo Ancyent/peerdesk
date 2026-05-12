@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, machines, users, turn, sessions, totp, branding, companies, locations, groups
+from routers import auth, machines, users, turn, sessions, totp, branding, companies, locations, groups, tokens
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ app.include_router(branding.router)
 app.include_router(companies.router)
 app.include_router(locations.router)
 app.include_router(groups.router)
+app.include_router(tokens.router)
 
 
 @app.get("/health")
