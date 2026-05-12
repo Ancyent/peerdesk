@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-- [ ] Ubuntu 24.04 LXC cu Docker, Rust 1.95+, Node.js 20 instalat
-- [ ] Portul 8001 (signaling) și 5173 (web) accesibile din rețea
-- [ ] Dacă testezi de pe alt PC: înlocuiește `localhost` cu IP-ul serverului
+- [x] Ubuntu 24.04 LXC cu Docker, Rust 1.95+, Node.js 20 instalat
+- [x] Portul 8001 (signaling) și 5173 (web) accesibile din rețea
+- [x] Dacă testezi de pe alt PC: înlocuiește `localhost` cu IP-ul serverului
 
 ---
 
@@ -15,7 +15,7 @@ cd /root/peerdesk/deploy
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-- [ ] Verifică că serviciile sunt healthy:
+- [x] Verifică că serviciile sunt healthy:
   ```bash
   docker compose -f docker-compose.dev.yml ps
   curl -s http://localhost:8001/health
@@ -40,8 +40,8 @@ sleep 1
 DISPLAY=:99 xterm &
 ```
 
-- [ ] Xvfb pornit fără erori `Fatal server error`
-- [ ] xterm deschis pe display-ul :99 (nu trebuie să fie vizibil local)
+- [x] Xvfb pornit fără erori `Fatal server error`
+- [x] xterm deschis pe display-ul :99 (nu trebuie să fie vizibil local)
 
 ---
 
@@ -60,9 +60,9 @@ sleep 4
 grep "peer_id=" /tmp/agent.log
 ```
 
-- [ ] Log apare: `PeerDesk agent — peer_id=XXXXXXXXX`
-- [ ] Log apare: `Registered with signaling server, peer_id=XXXXXXXXX`
-- [ ] **Notează peer_id-ul** (9 cifre) — vei avea nevoie la pasul următor
+- [x] Log apare: `PeerDesk agent — peer_id=XXXXXXXXX`
+- [x] Log apare: `Registered with signaling server, peer_id=XXXXXXXXX`
+- [x] **Notează peer_id-ul** (9 cifre) — vei avea nevoie la pasul următor
 
 ---
 
@@ -74,7 +74,7 @@ cd /root/peerdesk/web
 npm run dev -- --host 0.0.0.0
 ```
 
-- [ ] Output conține: `Local: http://localhost:5173` sau `Network: http://<IP>:5173`
+- [x] Output conține: `Local: http://localhost:5173` sau `Network: http://<IP>:5173`
 
 > **De pe alt PC:** folosește adresa `Network:` în browser
 
@@ -84,11 +84,11 @@ npm run dev -- --host 0.0.0.0
 
 Deschide `http://localhost:5173` (sau `http://<IP-SERVER>:5173` de pe alt PC).
 
-- [ ] Pagina PeerDesk se încarcă cu formularul de conectare
-- [ ] Introdu peer_id-ul de la Pasul 3 (9 cifre)
-- [ ] Introdu parola: `testpass123`
-- [ ] Apasă **Connect**
-- [ ] Aplicația trece la starea „Connecting…"
+- [x] Pagina PeerDesk se încarcă cu formularul de conectare
+- [x] Introdu peer_id-ul de la Pasul 3 (9 cifre)
+- [x] Introdu parola: `testpass123`
+- [x] Apasă **Connect**
+- [x] Aplicația trece la starea „Connecting…"
 
 ---
 
@@ -96,18 +96,18 @@ Deschide `http://localhost:5173` (sau `http://<IP-SERVER>:5173` de pe alt PC).
 
 În log-urile agentului (`/tmp/agent.log` sau terminalul unde rulează):
 
-- [ ] `Viewer XXXXXXXX joined — waiting for WebRTC offer`
-- [ ] `Got offer — creating answer`
-- [ ] `ICE connection state changed: connected`
-- [ ] `peer connection state changed: connected`
+- [x] `Viewer XXXXXXXX joined — waiting for WebRTC offer`
+- [x] `Got offer — creating answer`
+- [x] `ICE connection state changed: connected`
+- [x] `peer connection state changed: connected`
 
 ---
 
 ## Pasul 7 — Verifică video-ul
 
-- [ ] Browser-ul afișează un ecran (nu mai e „Connecting…")
-- [ ] Video-ul arată display-ul virtual (fundal negru cu xterm deschis)
-- [ ] Rezoluția video e clară (nu pixelat sau înghețat)
+- [x] Browser-ul afișează un ecran (nu mai e „Connecting…")
+- [x] Video-ul arată display-ul virtual (fundal negru cu xterm deschis)
+- [x] Rezoluția video e clară (nu pixelat sau înghețat)
 
 ---
 
@@ -115,24 +115,24 @@ Deschide `http://localhost:5173` (sau `http://<IP-SERVER>:5173` de pe alt PC).
 
 Mișcă mouse-ul **deasupra** video-ului din browser:
 
-- [ ] Cursorul devine invizibil pe overlay (cursor:none activ)
-- [ ] Cursorul se mișcă pe display-ul remote (vizibil în xterm dacă e focusat)
+- [x] Cursorul devine invizibil pe overlay (cursor:none activ)
+- [x] Cursorul se mișcă pe display-ul remote (vizibil în xterm dacă e focusat)
 
 Apasă o tastă (ex: `a`, `b`, `Enter`):
 
-- [ ] Caracterele apar în xterm-ul de pe display-ul remote
+- [x] Caracterele apar în xterm-ul de pe display-ul remote
 
 Click stânga în xterm:
 
-- [ ] xterm primește focusul
+- [x] xterm primește focusul
 
 Click dreapta:
 
-- [ ] Meniul contextual al xterm-ului apare pe display-ul remote (nu în browser)
+- [x] Meniul contextual al xterm-ului apare pe display-ul remote (nu în browser)
 
 Scroll cu rotița mouse-ului:
 
-- [ ] Scroll funcționează în xterm
+- [x] Scroll funcționează în xterm
 
 ---
 
