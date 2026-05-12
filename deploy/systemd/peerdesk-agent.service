@@ -1,0 +1,28 @@
+[Unit]
+Description=PeerDesk Remote Desktop Agent
+Documentation=https://github.com/your-org/peerdesk
+After=network-online.target graphical-session.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=peerdesk
+Group=peerdesk
+EnvironmentFile=/etc/peerdesk-agent.env
+ExecStart=/usr/local/bin/peerdesk-agent
+Restart=always
+RestartSec=10
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=peerdesk-agent
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/peerdesk /tmp
+
+[Install]
+WantedBy=graphical-session.target
