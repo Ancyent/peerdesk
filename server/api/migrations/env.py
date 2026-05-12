@@ -33,7 +33,7 @@ def run_migrations_offline() -> None:
 
 async def run_async_migrations() -> None:
     engine = create_async_engine(DATABASE_URL)
-    async with engine.connect() as conn:
+    async with engine.begin() as conn:
         await conn.run_sync(
             lambda sync_conn: context.configure(
                 connection=sync_conn,
