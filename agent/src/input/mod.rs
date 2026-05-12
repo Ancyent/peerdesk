@@ -18,13 +18,18 @@ pub enum InputEvent {
     Scroll { delta_x: i32, delta_y: i32 },
 }
 
-fn web_key_to_enigo(key: &str) -> Key {
-    match key {
+fn web_key_to_enigo(key: &str) -> Option<Key> {
+    Some(match key {
         "Enter" => Key::Return,
         "Escape" => Key::Escape,
         "Backspace" => Key::Backspace,
         "Tab" => Key::Tab,
         " " => Key::Space,
+        "Delete" => Key::Delete,
+        "Home" => Key::Home,
+        "End" => Key::End,
+        "PageUp" => Key::PageUp,
+        "PageDown" => Key::PageDown,
         "ArrowLeft" => Key::LeftArrow,
         "ArrowRight" => Key::RightArrow,
         "ArrowUp" => Key::UpArrow,
@@ -34,8 +39,8 @@ fn web_key_to_enigo(key: &str) -> Key {
         "Alt" => Key::Alt,
         "Meta" => Key::Meta,
         k if k.len() == 1 => Key::Unicode(k.chars().next().unwrap()),
-        _ => Key::Unicode(' '),
-    }
+        _ => return None,
+    })
 }
 
 pub async fn run(mut rx: Receiver<InputEvent>) -> Result<()> {
@@ -48,19 +53,47 @@ pub async fn run(mut rx: Receiver<InputEvent>) -> Result<()> {
             InputEvent::MouseDown { button: 0 } => enigo
                 .button(enigo::Button::Left, Press)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
+            InputEvent::MouseDown { button: 1 } => enigo
+                .button(enigo::Button::Right, Press)
+                .map_err(|e| anyhow::anyhow!("{e:?}")),
+            InputEvent::MouseDown { button: 2 } => enigo
+                .button(enigo::Button::Middle, Press)
+                .map_err(|e| anyhow::anyhow!("{e:?}")),
+            InputEvent::MouseDown { .. } => Ok(()),
             InputEvent::MouseUp { button: 0 } => enigo
                 .button(enigo::Button::Left, Release)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
-            InputEvent::KeyDown { ref key } => enigo
-                .key(web_key_to_enigo(key), Press)
+            InputEvent::MouseUp { button: 1 } => enigo
+                .button(enigo::Button::Right, Release)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
-            InputEvent::KeyUp { ref key } => enigo
-                .key(web_key_to_enigo(key), Release)
+            InputEvent::MouseUp { button: 2 } => enigo
+                .button(enigo::Button::Middle, Release)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
-            InputEvent::Scroll { delta_y, .. } => enigo
-                .scroll(delta_y, enigo::Axis::Vertical)
-                .map_err(|e| anyhow::anyhow!("{e:?}")),
-            _ => Ok(()),
+            InputEvent::MouseUp { .. } => Ok(()),
+            InputEvent::KeyDown { ref key } => {
+                if let Some(k) = web_key_to_enigo(key) {
+                    enigo.key(k, Press).map_err(|e| anyhow::anyhow!("{e:?}"))
+                } else {
+                    Ok(())
+                }
+            }
+            InputEvent::KeyUp { ref key } => {
+                if let Some(k) = web_key_to_enigo(key) {
+                    enigo.key(k, Release).map_err(|e| anyhow::anyhow!("{e:?}"))
+                } else {
+                    Ok(())
+                }
+            }
+            InputEvent::Scroll { delta_x, delta_y } => {
+                if delta_x != 0 {
+                    let _ = enigo
+                        .scroll(delta_x, enigo::Axis::Horizontal)
+                        .map_err(|e| anyhow::anyhow!("{e:?}"));
+                }
+                enigo
+                    .scroll(delta_y, enigo::Axis::Vertical)
+                    .map_err(|e| anyhow::anyhow!("{e:?}"))
+            }
         };
     }
     Ok(())
