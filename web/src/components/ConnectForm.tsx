@@ -4,10 +4,11 @@ import { useState } from 'react';
 interface Props {
   onConnect: (peerId: string, password: string) => void;
   error?: string;
+  initialPeerId?: string;
 }
 
-export function ConnectForm({ onConnect, error }: Props) {
-  const [peerId, setPeerId] = useState('');
+export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
+  const [peerId, setPeerId] = useState(initialPeerId ?? '');
   const [password, setPassword] = useState('');
 
   return (

@@ -1,5 +1,8 @@
-// web/src/App.tsx
-import { useCallback, useRef, useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { useAuth } from './auth/useAuth';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { DashboardPage } from './pages/DashboardPage';
 import { ConnectForm } from './components/ConnectForm';
 import { Viewer } from './components/Viewer';
 import { useSignaling } from './hooks/useSignaling';
@@ -9,12 +12,15 @@ import type { SignalingMessage } from './types/messages';
 const SIGNALING_URL = (import.meta.env.VITE_SIGNALING_URL as string | undefined)
   ?? 'ws://localhost:8001/ws';
 
-type State = 'idle' | 'connecting' | 'connected' | 'error';
+type AppPage = 'login' | 'register' | 'dashboard' | 'connect' | 'viewer';
+type ViewerState = 'idle' | 'connecting' | 'connected' | 'error';
 
 export default function App() {
-  const [appState, setAppState] = useState<State>('idle');
+  const { user, loading } = useAuth();
+  const [page, setPage] = useState<AppPage>('dashboard');
+  const [connectPeerId, setConnectPeerId] = useState('');
+  const [viewerState, setViewerState] = useState<ViewerState>('idle');
   const [errMsg, setErrMsg] = useState('');
-
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
 
   const webrtc = useWebRTC(
@@ -26,51 +32,82 @@ export default function App() {
       webrtc.startOffer();
     } else if (msg.type === 'answer') {
       await webrtc.handleAnswer(msg.sdp);
-      setAppState('connected');
+      setViewerState('connected');
     } else if (msg.type === 'ice_candidate') {
       await webrtc.handleIceCandidate(msg.candidate);
     } else if (msg.type === 'error') {
       setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found');
-      setAppState('error');
+      setViewerState('error');
+      setPage('connect');
     } else if (msg.type === 'agent_disconnected') {
       webrtc.disconnect();
       setErrMsg('Remote machine disconnected');
-      setAppState('error');
+      setViewerState('error');
+      setPage('dashboard');
     }
   });
-
-  // Sync send function into ref so webrtc hook can use it
   sendRef.current = send;
 
   const handleConnect = (peerId: string, password: string) => {
     setErrMsg('');
-    setAppState('connecting');
+    setViewerState('connecting');
+    setPage('viewer');
     send({ type: 'join', peer_id: peerId, password });
   };
 
-  if (appState === 'idle' || appState === 'error') {
-    return <ConnectForm onConnect={handleConnect} error={errMsg || undefined} />;
-  }
+  const handleDashboardConnect = (peerId: string) => {
+    setConnectPeerId(peerId);
+    setErrMsg('');
+    setViewerState('idle');
+    setPage('connect');
+  };
 
-  if (appState === 'connecting') {
+  // Loading screen while checking stored token
+  if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
-        Connecting…
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', fontFamily:'sans-serif', color:'#9ca3af' }}>
+        Loading…
       </div>
     );
   }
 
-  return (
-    <div style={{ width: '100vw', height: '100vh', background: '#000' }}>
-      <Viewer
-        stream={webrtc.stream}
-        onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
-        onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
-        onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
-        onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
-        onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
-        onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
-      />
-    </div>
-  );
+  // Auth gate
+  if (!user) {
+    if (page === 'register') return <RegisterPage onGoLogin={() => setPage('login')} />;
+    return <LoginPage onGoRegister={() => setPage('register')} />;
+  }
+
+  // Viewer
+  if (page === 'viewer') {
+    if (viewerState === 'connecting') {
+      return (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', fontFamily:'sans-serif', color:'#6b7280' }}>
+          Connecting to {connectPeerId}…
+        </div>
+      );
+    }
+    if (viewerState === 'connected') {
+      return (
+        <div style={{ width:'100vw', height:'100vh', background:'#000' }}>
+          <Viewer
+            stream={webrtc.stream}
+            onMouseMove={(x, y) => webrtc.sendInput({ type:'mouse_move', x, y })}
+            onMouseDown={(b) => webrtc.sendInput({ type:'mouse_down', button: b })}
+            onMouseUp={(b) => webrtc.sendInput({ type:'mouse_up', button: b })}
+            onKeyDown={(key) => webrtc.sendInput({ type:'key_down', key })}
+            onKeyUp={(key) => webrtc.sendInput({ type:'key_up', key })}
+            onScroll={(dx, dy) => webrtc.sendInput({ type:'scroll', delta_x: dx, delta_y: dy })}
+          />
+        </div>
+      );
+    }
+  }
+
+  // Connect form (manual ID entry or pre-filled from dashboard)
+  if (page === 'connect') {
+    return <ConnectForm onConnect={handleConnect} initialPeerId={connectPeerId} error={errMsg || undefined} />;
+  }
+
+  // Dashboard (default)
+  return <DashboardPage onConnect={handleDashboardConnect} />;
 }
