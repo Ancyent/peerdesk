@@ -65,7 +65,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         info!("Running in standalone mode (no API token)");
     }
 
-    info!("Password set. Waiting for connections...");
+    info!("Waiting for connections...");
 
     let (frame_tx, frame_rx) = tokio::sync::mpsc::channel(2);
     let (input_tx, input_rx) = tokio::sync::mpsc::channel(100);

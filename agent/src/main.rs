@@ -136,6 +136,15 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // Print connection info — user needs these to connect from the viewer
+    if !cli.silent {
+        println!("┌─────────────────────────────────┐");
+        println!("│  Peer ID : {:>21} │", cfg.peer_id);
+        println!("│  Password: {:>21} │", password);
+        println!("└─────────────────────────────────┘");
+    }
+    tracing::info!("peer_id={} — ready for connections", cfg.peer_id);
+
     // Run agent
     run_agent(AgentConfig {
         password: password.to_string(),
