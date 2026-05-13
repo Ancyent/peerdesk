@@ -14,8 +14,8 @@ struct Cli {
     server: Option<String>,
 
     /// Registration token from the PeerDesk web dashboard.
-    #[arg(long, env = "API_TOKEN")]
-    token: Option<String>,
+    #[arg(long, env = "API_KEY")]
+    api_key: Option<String>,
 
     /// Password for incoming connections (auto-generated on first run if omitted).
     #[arg(long, env = "PEERDESK_PASSWORD")]
@@ -52,8 +52,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Service management
     if cli.install_service {
-        // Persist server/token to config before installing so the service picks them up on start
-        if cli.server.is_some() || cli.token.is_some() {
+        // Persist server/key to config before installing so the service picks them up on start
+        if cli.server.is_some() || cli.api_key.is_some() {
             use rand::distributions::Alphanumeric;
             use rand::Rng;
             let generated_pw: String = rand::thread_rng()
@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
                 &config_path,
                 password,
                 cli.server.as_deref(),
-                cli.token.as_deref(),
+                cli.api_key.as_deref(),
             )?;
         }
         service::install_service()?;
@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
         &config_path,
         password,
         cli.server.as_deref(),
-        cli.token.as_deref(),
+        cli.api_key.as_deref(),
     )?;
 
     // One-shot commands
@@ -128,7 +128,7 @@ async fn main() -> anyhow::Result<()> {
             peer_id: cfg.peer_id.clone(),
             password_hash: hash,
             server_url: cfg.server_url.clone(),
-            api_token: cfg.api_token.clone(),
+            api_key: cfg.api_key.clone(),
         };
         updated.save(&config_path)?;
         println!("New password: {new_pw}");
@@ -149,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
     run_agent(AgentConfig {
         password: password.to_string(),
         server_url: cli.server.or(cfg.server_url),
-        api_token: cli.token.or(cfg.api_token),
+        api_key: cli.api_key.or(cfg.api_key),
         display_index: 0,
         portable: cli.portable,
         cast_only: false,

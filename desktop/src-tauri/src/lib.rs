@@ -42,7 +42,7 @@ async fn get_agent_status(
         let cfg = Config::load(&Config::config_path(false)).ok();
         let settings = AppSettings::load(&AppSettings::settings_path(false)).unwrap_or_default();
 
-        let approval_status = if cfg.as_ref().and_then(|c| c.api_token.as_deref()).is_some() {
+        let approval_status = if cfg.as_ref().and_then(|c| c.api_key.as_deref()).is_some() {
             "approved".to_string()
         } else {
             "standalone".to_string()
@@ -102,7 +102,7 @@ async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusRe
             &config_path,
             &generated,
             std::env::var("PEERDESK_SERVER").ok().as_deref(),
-            std::env::var("API_TOKEN")
+            std::env::var("API_KEY")
                 .ok()
                 .filter(|t| !t.is_empty())
                 .as_deref(),
@@ -117,12 +117,12 @@ async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusRe
         s.peer_id = peer_id.clone();
     }
 
-    let had_token = cfg.api_token.is_some();
+    let had_key = cfg.api_key.is_some();
     let cast_only = settings.access_mode == AccessMode::ViewOnly;
     let agent_cfg = AgentConfig {
         password: String::new(),
         server_url: cfg.server_url,
-        api_token: cfg.api_token,
+        api_key: cfg.api_key,
         display_index: 0,
         portable: false,
         cast_only,
@@ -147,7 +147,7 @@ async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusRe
     Ok(AgentStatusResponse {
         running: true,
         peer_id,
-        approval_status: if had_token { "approved" } else { "standalone" }.to_string(),
+        approval_status: if had_key { "approved" } else { "standalone" }.to_string(),
         server_url,
         access_mode,
     })
@@ -209,7 +209,7 @@ async fn apply_config_link(url: String) -> Result<(), String> {
             .ok_or_else(|| "Invalid config link — must start with peerdesk://setup?".to_string())?;
 
         let mut server: Option<String> = None;
-        let mut api_token: Option<String> = None;
+        let mut api_key: Option<String> = None;
         let mut password: Option<String> = None;
 
         for pair in stripped.split('&') {
@@ -221,7 +221,7 @@ async fn apply_config_link(url: String) -> Result<(), String> {
                     .replace("%3D", "=");
                 match k {
                     "server" => server = Some(decoded),
-                    "api_key" | "api_token" => api_token = Some(decoded),
+                    "api_key" | "api_token" => api_key = Some(decoded),
                     "password" => password = Some(decoded),
                     _ => {}
                 }
@@ -230,7 +230,7 @@ async fn apply_config_link(url: String) -> Result<(), String> {
 
         let config_path = Config::config_path(false);
         let pw = password.as_deref().unwrap_or("changeme");
-        Config::load_or_create(&config_path, pw, server.as_deref(), api_token.as_deref())
+        Config::load_or_create(&config_path, pw, server.as_deref(), api_key.as_deref())
             .map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -261,7 +261,7 @@ async fn reset_password() -> Result<String, String> {
             peer_id: cfg.peer_id,
             password_hash: hash,
             server_url: cfg.server_url,
-            api_token: cfg.api_token,
+            api_key: cfg.api_key,
         }
         .save(&config_path)
         .map_err(|e| e.to_string())?;

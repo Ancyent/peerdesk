@@ -21,7 +21,7 @@ pub struct AgentConfig {
     pub password: String,
     /// Single server URL — signaling WS and API REST are derived from this.
     pub server_url: Option<String>,
-    pub api_token: Option<String>,
+    pub api_key: Option<String>,
     pub display_index: usize,
     /// Store config next to exe instead of user config dir.
     pub portable: bool,
@@ -34,7 +34,7 @@ impl Default for AgentConfig {
         Self {
             password: std::env::var("PEERDESK_PASSWORD").unwrap_or_else(|_| "changeme".into()),
             server_url: std::env::var("PEERDESK_SERVER").ok(),
-            api_token: std::env::var("API_TOKEN").ok().filter(|s| !s.is_empty()),
+            api_key: std::env::var("API_KEY").ok().filter(|s| !s.is_empty()),
             display_index: std::env::var("DISPLAY_INDEX")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -51,21 +51,21 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         &config_path,
         &agent_cfg.password,
         agent_cfg.server_url.as_deref(),
-        agent_cfg.api_token.as_deref(),
+        agent_cfg.api_key.as_deref(),
     )?;
     info!("PeerDesk agent — peer_id={}", cfg.peer_id);
 
     let signaling_url = cfg.signaling_url();
     let api_url = cfg.api_url();
-    let effective_token = cfg.api_token.clone().or(agent_cfg.api_token);
+    let effective_key = cfg.api_key.clone().or(agent_cfg.api_key);
 
-    if let (Some(url), Some(token)) = (&api_url, &effective_token) {
-        match api_client::register_machine(url, token, &cfg.peer_id).await {
+    if let (Some(url), Some(key)) = (&api_url, &effective_key) {
+        match api_client::register_machine(url, key, &cfg.peer_id).await {
             Ok(m) => info!("Registered with API — machine_id={}", m.id),
             Err(e) => tracing::warn!("API registration failed (non-fatal): {}", e),
         }
     } else {
-        info!("Running in standalone mode (no API token)");
+        info!("Running in standalone mode (no API key)");
     }
 
     info!("Waiting for connections...");

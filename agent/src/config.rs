@@ -13,7 +13,7 @@ pub struct Config {
     pub server_url: Option<String>,
     /// Registration token for associating this machine with an account.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub api_token: Option<String>,
+    pub api_key: Option<String>,
 }
 
 impl Config {
@@ -87,12 +87,12 @@ impl Config {
     }
 
     /// Load existing config or create a new one.
-    /// `server_url` and `api_token` override saved values when provided.
+    /// `server_url` and `api_key` override saved values when provided.
     pub fn load_or_create(
         path: &Path,
         password: &str,
         server_url: Option<&str>,
-        api_token: Option<&str>,
+        api_key: Option<&str>,
     ) -> Result<Self> {
         let mut cfg = match Self::load(path) {
             Ok(existing) => existing,
@@ -108,7 +108,7 @@ impl Config {
                     peer_id: generate_peer_id(),
                     password_hash: bcrypt::hash(password, bcrypt::DEFAULT_COST)?,
                     server_url: None,
-                    api_token: None,
+                    api_key: None,
                 }
             }
         };
@@ -116,8 +116,8 @@ impl Config {
         if let Some(url) = server_url {
             cfg.server_url = Some(url.to_string());
         }
-        if let Some(tok) = api_token {
-            cfg.api_token = Some(tok.to_string());
+        if let Some(tok) = api_key {
+            cfg.api_key = Some(tok.to_string());
         }
 
         cfg.save(path)?;
@@ -259,7 +259,7 @@ mod tests {
             peer_id: "123456789".into(),
             password_hash: "$2b$12$abc".into(),
             server_url: Some("https://api.example.com".into()),
-            api_token: Some("tok123".into()),
+            api_key: Some("tok123".into()),
         };
         cfg.save(&path).unwrap();
         let loaded = Config::load(&path).unwrap();
@@ -268,7 +268,7 @@ mod tests {
             loaded.server_url.as_deref(),
             Some("https://api.example.com")
         );
-        assert_eq!(loaded.api_token.as_deref(), Some("tok123"));
+        assert_eq!(loaded.api_key.as_deref(), Some("tok123"));
     }
 
     #[test]
@@ -277,7 +277,7 @@ mod tests {
             peer_id: "x".into(),
             password_hash: "x".into(),
             server_url: Some("https://api.example.com".into()),
-            api_token: None,
+            api_key: None,
         };
         assert_eq!(cfg.signaling_url(), "wss://api.example.com/ws");
     }
@@ -288,7 +288,7 @@ mod tests {
             peer_id: "x".into(),
             password_hash: "x".into(),
             server_url: Some("http://localhost:8001".into()),
-            api_token: None,
+            api_key: None,
         };
         assert_eq!(cfg.signaling_url(), "ws://localhost:8001/ws");
     }
@@ -299,7 +299,7 @@ mod tests {
             peer_id: "x".into(),
             password_hash: "x".into(),
             server_url: None,
-            api_token: None,
+            api_key: None,
         };
         assert_eq!(cfg.signaling_url(), "ws://localhost:8001/ws");
     }
@@ -310,7 +310,7 @@ mod tests {
             peer_id: "x".into(),
             password_hash: "x".into(),
             server_url: Some("https://api.example.com/".into()),
-            api_token: None,
+            api_key: None,
         };
         assert_eq!(cfg.api_url(), Some("https://api.example.com".to_string()));
     }
