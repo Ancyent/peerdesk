@@ -3,6 +3,21 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+/// Deployment config file — loaded via --config=path, overridden by CLI flags.
+#[derive(Debug, serde::Deserialize, Default)]
+pub struct DeployConfig {
+    pub server: Option<String>,
+    pub api_key: Option<String>,
+    pub password: Option<String>,
+}
+
+impl DeployConfig {
+    pub fn load(path: &Path) -> Result<Self> {
+        let raw = std::fs::read_to_string(path)?;
+        Ok(serde_json::from_str(&raw)?)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub peer_id: String,
@@ -347,5 +362,16 @@ mod tests {
         };
         let json = serde_json::to_string(&s).unwrap();
         assert!(json.contains("view_only"));
+    }
+
+    #[test]
+    fn deploy_config_loads_from_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("deploy.json");
+        std::fs::write(&path, r#"{"server":"https://api.example.com","api_key":"pd_abc123"}"#).unwrap();
+        let dc = DeployConfig::load(&path).unwrap();
+        assert_eq!(dc.server.as_deref(), Some("https://api.example.com"));
+        assert_eq!(dc.api_key.as_deref(), Some("pd_abc123"));
+        assert!(dc.password.is_none());
     }
 }

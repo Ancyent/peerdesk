@@ -44,30 +44,53 @@ struct Cli {
     /// Remove the system service (requires root/Administrator).
     #[arg(long)]
     uninstall_service: bool,
+
+    /// Path to a deployment config JSON file.
+    /// Format: {"server":"URL","api_key":"pd_xxx","password":"pw"}
+    /// Explicit CLI flags take priority over values in this file.
+    #[arg(long)]
+    config: Option<std::path::PathBuf>,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    // Service management
-    if cli.install_service {
-        // Persist server/key to config before installing so the service picks them up on start
-        if cli.server.is_some() || cli.api_key.is_some() {
+    // Load deploy file; CLI flags override it
+    let deploy = match &cli.config {
+        Some(path) => peerdesk_agent::config::DeployConfig::load(path)
+            .map_err(|e| anyhow::anyhow!("--config {}: {}", path.display(), e))?,
+        None => peerdesk_agent::config::DeployConfig::default(),
+    };
+
+    let effective_server  = cli.server.as_deref().or(deploy.server.as_deref());
+    let effective_api_key = cli.api_key.as_deref().or(deploy.api_key.as_deref());
+    let generated_pw_storage;
+    let effective_password: &str = match cli.password.as_deref()
+        .or(deploy.password.as_deref()) {
+        Some(pw) => pw,
+        None => {
             use rand::distributions::Alphanumeric;
             use rand::Rng;
-            let generated_pw: String = rand::thread_rng()
+            generated_pw_storage = rand::thread_rng()
                 .sample_iter(&Alphanumeric)
                 .take(12)
                 .map(char::from)
-                .collect();
-            let password = cli.password.as_deref().unwrap_or(&generated_pw);
+                .collect::<String>();
+            &generated_pw_storage
+        }
+    };
+
+    // Service management
+    if cli.install_service {
+        // Persist server/key to config before installing so the service picks them up on start
+        if effective_server.is_some() || effective_api_key.is_some() {
             let config_path = Config::config_path(cli.portable);
             Config::load_or_create(
                 &config_path,
-                password,
-                cli.server.as_deref(),
-                cli.api_key.as_deref(),
+                effective_password,
+                effective_server,
+                effective_api_key,
             )?;
         }
         service::install_service()?;
@@ -87,26 +110,12 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Config
-    let generated_pw;
-    let password: &str = match cli.password.as_deref() {
-        Some(pw) => pw,
-        None => {
-            use rand::distributions::Alphanumeric;
-            use rand::Rng;
-            generated_pw = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(12)
-                .map(char::from)
-                .collect::<String>();
-            &generated_pw
-        }
-    };
     let config_path = Config::config_path(cli.portable);
     let cfg = Config::load_or_create(
         &config_path,
-        password,
-        cli.server.as_deref(),
-        cli.api_key.as_deref(),
+        effective_password,
+        effective_server,
+        effective_api_key,
     )?;
 
     // One-shot commands
@@ -140,16 +149,16 @@ async fn main() -> anyhow::Result<()> {
     if !cli.silent {
         println!("┌─────────────────────────────────┐");
         println!("│  Peer ID : {:>21} │", cfg.peer_id);
-        println!("│  Password: {:>21} │", password);
+        println!("│  Password: {:>21} │", effective_password);
         println!("└─────────────────────────────────┘");
     }
     tracing::info!("peer_id={} — ready for connections", cfg.peer_id);
 
     // Run agent
     run_agent(AgentConfig {
-        password: password.to_string(),
-        server_url: cli.server.or(cfg.server_url),
-        api_key: cli.api_key.or(cfg.api_key),
+        password: effective_password.to_string(),
+        server_url: effective_server.map(str::to_string).or(cfg.server_url),
+        api_key: effective_api_key.map(str::to_string).or(cfg.api_key),
         display_index: 0,
         portable: cli.portable,
         cast_only: false,
