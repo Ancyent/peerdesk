@@ -47,6 +47,8 @@ class MachineOut(BaseModel):
     company_id: Optional[str] = None
     location_id: Optional[str] = None
     group_id: Optional[str] = None
+    approval_status: str = "approved"
+    api_key_id: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -172,3 +174,31 @@ class UserUpdate(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
+
+
+class ApiKeyCreate(BaseModel):
+    name: str = "Default Key"
+    auto_approve: bool = False
+
+
+class ApiKeyOut(BaseModel):
+    id: str
+    key: str
+    name: str
+    auto_approve: bool
+    is_active: bool
+    created_at: datetime
+    last_used_at: Optional[datetime]
+
+    model_config = {"from_attributes": True}
+
+
+class MachineRegisterViaKey(BaseModel):
+    peer_id: str
+    name: str = "My Machine"
+    os: Optional[str] = None
+
+
+class MachineApprovalStatus(BaseModel):
+    peer_id: str
+    approval_status: str  # pending | approved | denied
