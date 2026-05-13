@@ -193,6 +193,18 @@ class ApiKeyOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ApiKeyListOut(BaseModel):
+    id: str
+    key_preview: str   # first 10 chars of key, e.g. "pd_abc123de..."
+    name: str
+    auto_approve: bool
+    is_active: bool
+    created_at: datetime
+    last_used_at: Optional[datetime]
+
+    model_config = {"from_attributes": False}
+
+
 class MachineRegisterViaKey(BaseModel):
     peer_id: str
     name: str = "My Machine"

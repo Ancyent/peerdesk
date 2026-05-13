@@ -62,6 +62,16 @@ export interface ApiKeyOut {
   last_used_at: string | null;
 }
 
+export interface ApiKeyListOut {
+  id: string;
+  key_preview: string;  // masked, e.g. "pd_abc123de••••••••••••••••"
+  name: string;
+  auto_approve: boolean;
+  is_active: boolean;
+  created_at: string;
+  last_used_at: string | null;
+}
+
 export interface CompanyOut {
   id: string; name: string; owner_id: string; created_at: string;
 }
@@ -143,7 +153,7 @@ export const api = {
   },
   apiKeys: {
     list: (token: string) =>
-      request<ApiKeyOut[]>('/api-keys', { headers: authHeaders(token) }),
+      request<ApiKeyListOut[]>('/api-keys', { headers: authHeaders(token) }),
     create: (token: string, name: string, autoApprove = false) =>
       request<ApiKeyOut>('/api-keys', {
         method: 'POST',

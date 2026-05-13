@@ -3,12 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user
 from models import User, ApiKey
-from schemas import ApiKeyCreate, ApiKeyOut
+from schemas import ApiKeyCreate, ApiKeyOut, ApiKeyListOut
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
 
-@router.get("", response_model=list[ApiKeyOut])
+@router.get("", response_model=list[ApiKeyListOut])
 async def list_api_keys(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -16,7 +16,19 @@ async def list_api_keys(
     result = await db.execute(
         select(ApiKey).where(ApiKey.created_by == user.id, ApiKey.is_active == True)
     )
-    return result.scalars().all()
+    keys = result.scalars().all()
+    return [
+        ApiKeyListOut(
+            id=k.id,
+            key_preview=k.key[:10] + "•" * 16,
+            name=k.name,
+            auto_approve=k.auto_approve,
+            is_active=k.is_active,
+            created_at=k.created_at,
+            last_used_at=k.last_used_at,
+        )
+        for k in keys
+    ]
 
 
 @router.post("", response_model=ApiKeyOut, status_code=201)

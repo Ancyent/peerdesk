@@ -42,13 +42,14 @@ pub async fn register_machine(api_url: &str, api_key: &str, peer_id: &str) -> Re
         .await?;
 
     if res.status().as_u16() == 409 {
-        tracing::info!("peer_id={} already registered", peer_id);
-        // Existing machines are assumed to already be approved
+        tracing::info!("peer_id={} already registered, checking current status", peer_id);
+        let status = check_approval_status(api_url, api_key, peer_id).await
+            .unwrap_or_else(|_| "approved".to_string());
         return Ok(MachineOut {
             id: String::new(),
             peer_id: peer_id.to_string(),
             name: body.name,
-            approval_status: "approved".to_string(),
+            approval_status: status,
         });
     }
 

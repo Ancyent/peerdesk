@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { api, type ApiKeyOut } from '../api/client';
+import { api, type ApiKeyListOut } from '../api/client';
 
 export function ApiKeysPage() {
   const { accessToken } = useAuth();
-  const [keys, setKeys] = useState<ApiKeyOut[]>([]);
+  const [keys, setKeys] = useState<ApiKeyListOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
   const [autoApprove, setAutoApprove] = useState(false);
@@ -118,12 +118,12 @@ export function ApiKeysPage() {
               </div>
               <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
                 <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>
-                  {k.key.slice(0, 10)}••••••••••••••••
+                  {k.key_preview}
                 </code>
                 {k.last_used_at && <span style={{ marginLeft: 8 }}>Last used: {new Date(k.last_used_at).toLocaleDateString()}</span>}
               </div>
             </div>
-            <button onClick={() => handleCopy(k.key)} style={{ padding: '5px 10px', fontSize: 12, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer' }}>Copy</button>
+            <span title="Copy the key when first created" style={{ padding: '5px 10px', fontSize: 12, color: '#94a3b8', cursor: 'default', userSelect: 'none' }}>••••</span>
             <button onClick={() => handleRevoke(k.id)} style={{ padding: '5px 10px', fontSize: 12, background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer' }}>Revoke</button>
           </div>
         ))}
