@@ -138,6 +138,7 @@ async fn main() -> anyhow::Result<()> {
             password_hash: hash,
             server_url: cfg.server_url.clone(),
             api_key: cfg.api_key.clone(),
+            hmac_key: Some(peerdesk_agent::config::derive_hmac_key(&new_pw)),
         };
         updated.save(&config_path)?;
         println!("New password: {new_pw}");

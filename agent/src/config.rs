@@ -1,7 +1,17 @@
 use anyhow::Result;
+use hmac::{Hmac, Mac};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use std::path::{Path, PathBuf};
+
+pub fn derive_hmac_key(password: &str) -> String {
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac = HmacSha256::new_from_slice(b"peerdesk-v1")
+        .expect("HMAC accepts any key size");
+    mac.update(password.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
 
 /// Deployment config file — loaded via --config=path, overridden by CLI flags.
 #[derive(Debug, serde::Deserialize, Default)]
@@ -29,6 +39,9 @@ pub struct Config {
     /// Registration token for associating this machine with an account.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+    /// HMAC key derived from the password; sent to signaling server at registration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hmac_key: Option<String>,
 }
 
 impl Config {
@@ -124,6 +137,7 @@ impl Config {
                     password_hash: bcrypt::hash(password, bcrypt::DEFAULT_COST)?,
                     server_url: None,
                     api_key: None,
+                    hmac_key: Some(derive_hmac_key(password)),
                 }
             }
         };
@@ -133,6 +147,10 @@ impl Config {
         }
         if let Some(tok) = api_key {
             cfg.api_key = Some(tok.to_string());
+        }
+        // Populate hmac_key if missing (upgrade path for existing configs)
+        if cfg.hmac_key.is_none() {
+            cfg.hmac_key = Some(derive_hmac_key(password));
         }
 
         cfg.save(path)?;
@@ -275,6 +293,7 @@ mod tests {
             password_hash: "$2b$12$abc".into(),
             server_url: Some("https://api.example.com".into()),
             api_key: Some("tok123".into()),
+            hmac_key: None,
         };
         cfg.save(&path).unwrap();
         let loaded = Config::load(&path).unwrap();
@@ -293,6 +312,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: Some("https://api.example.com".into()),
             api_key: None,
+            hmac_key: None,
         };
         assert_eq!(cfg.signaling_url(), "wss://api.example.com/ws");
     }
@@ -304,6 +324,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: Some("http://localhost:8001".into()),
             api_key: None,
+            hmac_key: None,
         };
         assert_eq!(cfg.signaling_url(), "ws://localhost:8001/ws");
     }
@@ -315,6 +336,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: None,
             api_key: None,
+            hmac_key: None,
         };
         assert_eq!(cfg.signaling_url(), "ws://localhost:8001/ws");
     }
@@ -326,6 +348,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: Some("https://api.example.com/".into()),
             api_key: None,
+            hmac_key: None,
         };
         assert_eq!(cfg.api_url(), Some("https://api.example.com".to_string()));
     }
@@ -362,6 +385,25 @@ mod tests {
         };
         let json = serde_json::to_string(&s).unwrap();
         assert!(json.contains("view_only"));
+    }
+
+    #[test]
+    fn hmac_key_derivation_is_deterministic() {
+        let k1 = derive_hmac_key("MyPassword");
+        let k2 = derive_hmac_key("MyPassword");
+        assert_eq!(k1, k2);
+        assert_eq!(k1.len(), 64); // 32 bytes hex
+    }
+
+    #[test]
+    fn different_passwords_give_different_keys() {
+        assert_ne!(derive_hmac_key("password1"), derive_hmac_key("password2"));
+    }
+
+    #[test]
+    fn hmac_key_never_equals_password() {
+        let pw = "MyPassword";
+        assert_ne!(derive_hmac_key(pw), pw);
     }
 
     #[test]

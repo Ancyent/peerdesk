@@ -10,6 +10,7 @@ pub enum SignalingMessage {
     Register {
         peer_id: String,
         password_hash: String,
+        hmac_key: String,
     },
     Registered {
         peer_id: String,
@@ -54,6 +55,7 @@ pub async fn run(
     signaling_url: &str,
     peer_id: &str,
     password_hash: &str,
+    hmac_key: &str,
     to_webrtc: Sender<SignalingMessage>,
     mut from_webrtc: Receiver<SignalingMessage>,
 ) -> Result<()> {
@@ -72,6 +74,7 @@ pub async fn run(
     let register = SignalingMessage::Register {
         peer_id: peer_id.to_string(),
         password_hash: password_hash.to_string(),
+        hmac_key: hmac_key.to_string(),
     };
     write
         .send(Message::Text(serde_json::to_string(&register)?))
@@ -126,6 +129,7 @@ mod tests {
         let msg = SignalingMessage::Register {
             peer_id: "123456789".into(),
             password_hash: "hash".into(),
+            hmac_key: "deadbeef".into(),
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("\"type\":\"register\""));

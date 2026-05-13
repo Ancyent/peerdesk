@@ -154,11 +154,12 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     let peer_id = cfg.peer_id.clone();
     let pw_hash = cfg.password_hash.clone();
+    let hmac_key = cfg.hmac_key.clone().unwrap_or_default();
     let sig_url = signaling_url;
 
     // Spawn signaling client
     tokio::spawn(async move {
-        if let Err(e) = signaling::run(&sig_url, &peer_id, &pw_hash, from_sig_tx, to_sig_rx).await {
+        if let Err(e) = signaling::run(&sig_url, &peer_id, &pw_hash, &hmac_key, from_sig_tx, to_sig_rx).await {
             tracing::error!("Signaling error: {}", e);
         }
     });
