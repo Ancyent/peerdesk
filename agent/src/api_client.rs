@@ -1,6 +1,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+pub const REGISTER_PATH: &str = "/machines/register";
+pub const STATUS_PATH: &str = "/machines/status";
+
 #[derive(Debug, Serialize)]
 struct MachineRegisterRequest {
     peer_id: String,
@@ -13,9 +16,16 @@ pub struct MachineOut {
     pub id: String,
     pub peer_id: String,
     pub name: String,
+    pub approval_status: String,  // "pending" | "approved" | "denied"
 }
 
-pub async fn register_machine(api_url: &str, token: &str, peer_id: &str) -> Result<MachineOut> {
+#[derive(Debug, Deserialize)]
+struct ApprovalStatusResponse {
+    approval_status: String,
+}
+
+/// Register machine via API key. Returns machine record with initial approval_status.
+pub async fn register_machine(api_url: &str, api_key: &str, peer_id: &str) -> Result<MachineOut> {
     let client = reqwest::Client::new();
     let os = std::env::consts::OS.to_string();
     let body = MachineRegisterRequest {
@@ -25,18 +35,20 @@ pub async fn register_machine(api_url: &str, token: &str, peer_id: &str) -> Resu
     };
 
     let res = client
-        .post(format!("{}/machines", api_url))
-        .bearer_auth(token)
+        .post(format!("{}{}", api_url, REGISTER_PATH))
+        .header("X-API-Key", api_key)
         .json(&body)
         .send()
         .await?;
 
     if res.status().as_u16() == 409 {
-        tracing::info!("Machine peer_id={} already registered with API", peer_id);
+        tracing::info!("peer_id={} already registered", peer_id);
+        // Existing machines are assumed to already be approved
         return Ok(MachineOut {
             id: String::new(),
             peer_id: peer_id.to_string(),
             name: body.name,
+            approval_status: "approved".to_string(),
         });
     }
 
@@ -47,6 +59,22 @@ pub async fn register_machine(api_url: &str, token: &str, peer_id: &str) -> Resu
     }
 
     Ok(res.json::<MachineOut>().await?)
+}
+
+/// Poll the server once for the current approval status of this machine.
+pub async fn check_approval_status(api_url: &str, api_key: &str, peer_id: &str) -> Result<String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get(format!("{}{}/{}", api_url, STATUS_PATH, peer_id))
+        .header("X-API-Key", api_key)
+        .send()
+        .await?;
+
+    if !res.status().is_success() {
+        return Err(anyhow::anyhow!("Status check failed: {}", res.status()));
+    }
+
+    Ok(res.json::<ApprovalStatusResponse>().await?.approval_status)
 }
 
 pub async fn send_heartbeat(api_url: &str, peer_id: &str, online: bool) -> Result<()> {
@@ -75,5 +103,15 @@ mod tests {
     fn hostname_not_empty() {
         let h = get_hostname();
         assert!(!h.is_empty());
+    }
+
+    #[test]
+    fn register_path_constant() {
+        assert_eq!(REGISTER_PATH, "/machines/register");
+    }
+
+    #[test]
+    fn status_path_constant() {
+        assert_eq!(STATUS_PATH, "/machines/status");
     }
 }

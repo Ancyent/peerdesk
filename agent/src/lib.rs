@@ -61,7 +61,35 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     if let (Some(url), Some(key)) = (&api_url, &effective_key) {
         match api_client::register_machine(url, key, &cfg.peer_id).await {
-            Ok(m) => info!("Registered with API — machine_id={}", m.id),
+            Ok(machine) => {
+                info!("Registered — machine_id={} status={}", machine.id, machine.approval_status);
+
+                if machine.approval_status == "pending" {
+                    info!("Waiting for admin approval (polling every 30s)...");
+                    println!("⏳ Pending approval — approve this machine in your dashboard.");
+                    loop {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+                        match api_client::check_approval_status(url, key, &cfg.peer_id).await {
+                            Ok(s) if s == "approved" => {
+                                info!("Machine approved — starting agent");
+                                println!("✓ Approved!");
+                                break;
+                            }
+                            Ok(s) if s == "denied" => {
+                                return Err(anyhow::anyhow!(
+                                    "Machine denied by admin. Contact your administrator."
+                                ));
+                            }
+                            Ok(_) => tracing::debug!("Still pending..."),
+                            Err(e) => tracing::warn!("Status poll error (retrying): {}", e),
+                        }
+                    }
+                } else if machine.approval_status == "denied" {
+                    return Err(anyhow::anyhow!(
+                        "Machine denied. Contact your administrator."
+                    ));
+                }
+            }
             Err(e) => tracing::warn!("API registration failed (non-fatal): {}", e),
         }
     } else {
