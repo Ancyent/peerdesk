@@ -53,8 +53,13 @@ class Machine(Base):
     company_id: Mapped[str | None] = mapped_column(String, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
     location_id: Mapped[str | None] = mapped_column(String, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
     group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
+    approval_status: Mapped[str] = mapped_column(String(10), default="approved")
+    api_key_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True
+    )
 
     owner: Mapped["User"] = relationship("User", back_populates="machines")
+    api_key_rel: Mapped["ApiKey | None"] = relationship("ApiKey", back_populates="machines")
 
     def __init__(self, **kwargs):
         if "id" not in kwargs:
@@ -71,6 +76,10 @@ class Machine(Base):
             kwargs["location_id"] = None
         if "group_id" not in kwargs:
             kwargs["group_id"] = None
+        if "approval_status" not in kwargs:
+            kwargs["approval_status"] = "approved"
+        if "api_key_id" not in kwargs:
+            kwargs["api_key_id"] = None
         super().__init__(**kwargs)
 
 
@@ -200,4 +209,36 @@ class RegistrationToken(Base):
             kwargs["token"] = _gen_token()
         if "used_at" not in kwargs:
             kwargs["used_at"] = None
+        super().__init__(**kwargs)
+
+
+def _gen_api_key() -> str:
+    return "pd_" + secrets.token_hex(16)
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    key: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, default=_gen_api_key)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, default="Default Key")
+    created_by: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    auto_approve: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    machines: Mapped[list["Machine"]] = relationship("Machine", back_populates="api_key_rel")
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "key" not in kwargs:
+            kwargs["key"] = _gen_api_key()
+        if "is_active" not in kwargs:
+            kwargs["is_active"] = True
+        if "auto_approve" not in kwargs:
+            kwargs["auto_approve"] = False
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = utcnow()
         super().__init__(**kwargs)
