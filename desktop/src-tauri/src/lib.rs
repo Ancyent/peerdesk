@@ -80,10 +80,11 @@ async fn get_agent_status(
 #[tauri::command]
 async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusResponse, String> {
     {
-        let s = state.lock().await;
+        let mut s = state.lock().await;
         if s.running {
             return Err("Agent is already running".into());
         }
+        s.running = true; // reserve the slot atomically
     }
 
     let settings = AppSettings::load(&AppSettings::settings_path(false)).unwrap_or_default();
@@ -113,7 +114,6 @@ async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusRe
     let server_url = cfg.server_url.clone();
     {
         let mut s = state.lock().await;
-        s.running = true;
         s.peer_id = peer_id.clone();
     }
 

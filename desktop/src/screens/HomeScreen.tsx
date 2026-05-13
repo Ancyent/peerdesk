@@ -25,7 +25,7 @@ export function HomeScreen({ onOpenSettings }: Props) {
   const [newPwd, setNewPwd] = useState<string | null>(null);
 
   const handleConnect = useCallback((peerId: string) => {
-    console.log('Connect to:', peerId); // TODO: open viewer window
+    // TODO: open viewer window
   }, []);
 
   const handleResetPwd = async () => {
