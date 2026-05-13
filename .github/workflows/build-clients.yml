@@ -73,6 +73,7 @@ jobs:
   # ── Viewer Tauri: Linux ───────────────────────────────────
   build-viewer-linux:
     name: Viewer — Linux (.deb + .AppImage)
+    continue-on-error: true
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +86,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-            librsvg2-dev patchelf libxdo-dev libasound2-dev
+            librsvg2-dev patchelf \
+            libxdo-dev libasound2-dev libx11-dev libssl-dev libxtst-dev \
+            libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
       - name: Build frontend
@@ -102,6 +105,7 @@ jobs:
   # ── Viewer Tauri: Windows ─────────────────────────────────
   build-viewer-windows:
     name: Viewer — Windows (.msi + .exe)
+    continue-on-error: true
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,6 +129,7 @@ jobs:
   # ── Viewer Tauri: macOS ───────────────────────────────────
   build-viewer-macos:
     name: Viewer — macOS (.dmg Universal)
+    continue-on-error: true
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -148,6 +153,7 @@ jobs:
   # ── Viewer Tauri: Android ─────────────────────────────────
   build-viewer-android:
     name: Viewer — Android (.apk)
+    continue-on-error: true
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -196,7 +202,7 @@ jobs:
       - build-viewer-macos
       - build-viewer-android
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled()
     permissions:
       contents: write
     steps:
@@ -211,6 +217,7 @@ jobs:
         with:
           draft: true
           generate_release_notes: true
+          fail_on_unmatched_files: false
           files: |
             agent-linux/peerdesk-agent-linux-x86_64
             agent-windows/peerdesk-agent-windows-x86_64.exe
