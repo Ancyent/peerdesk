@@ -47,3 +47,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   start_on_boot: false,
   minimize_to_tray: true,
 };
+
+export type SessionState = 'connecting' | 'negotiating' | 'connected' | 'error';
+
+export interface Session {
+  id: string;
+  state: SessionState;
+  error?: string;
+}
