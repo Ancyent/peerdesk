@@ -34,6 +34,7 @@ async fn get_agent_status(
     })
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 async fn start_agent(
     password: String,
@@ -47,7 +48,6 @@ async fn start_agent(
         }
     }
 
-    // Load (or create) config to get peer_id
     let cfg = peerdesk_agent::Config::load_or_create(&password)
         .map_err(|e| e.to_string())?;
 
@@ -81,8 +81,18 @@ async fn start_agent(
     Ok(AgentStatusResponse {
         running: true,
         peer_id,
-        password: String::new(), // don't echo password back
+        password: String::new(),
     })
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn start_agent(
+    _password: String,
+    _signaling_url: String,
+    _state: State<'_, SharedAgentState>,
+) -> Result<AgentStatusResponse, String> {
+    Err("Host mode is not supported on Android (viewer only)".into())
 }
 
 #[tauri::command]
