@@ -152,6 +152,7 @@ async fn main() -> anyhow::Result<()> {
         api_token: cli.token.or(cfg.api_token),
         display_index: 0,
         portable: cli.portable,
+        cast_only: false,
     })
     .await
 }

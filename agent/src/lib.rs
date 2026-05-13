@@ -25,6 +25,8 @@ pub struct AgentConfig {
     pub display_index: usize,
     /// Store config next to exe instead of user config dir.
     pub portable: bool,
+    /// If true, input injection disabled (view-only/cast mode).
+    pub cast_only: bool,
 }
 
 impl Default for AgentConfig {
@@ -38,6 +40,7 @@ impl Default for AgentConfig {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(0),
             portable: false,
+            cast_only: false,
         }
     }
 }
@@ -93,15 +96,20 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     });
 
     // enigo (input injection) is !Send on macOS, so run on a dedicated OS thread.
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("input runtime");
-        if let Err(e) = rt.block_on(input::run(input_rx)) {
-            tracing::warn!("Input error: {}", e);
-        }
-    });
+    if agent_cfg.cast_only {
+        drop(input_rx);
+        tracing::info!("Cast-only mode: input injection disabled");
+    } else {
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("input runtime");
+            if let Err(e) = rt.block_on(input::run(input_rx)) {
+                tracing::warn!("Input error: {}", e);
+            }
+        });
+    }
 
     // Audio streaming (non-fatal if no device)
     // cpal::Stream is !Send, so run on a dedicated OS thread with its own runtime.
