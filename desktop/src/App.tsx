@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { HomeScreen } from './screens/HomeScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { StatusBar } from './components/StatusBar';
@@ -10,9 +10,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'settings' | string>('home');
   const { status, start } = useAgent();
 
-  const signalingUrl = status.server_url
-    ? status.server_url.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + '/ws'
-    : 'ws://localhost:8001/ws';
+  const signalingUrl = useMemo(() =>
+    status.server_url
+      ? status.server_url.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + '/ws'
+      : 'ws://localhost:8001/ws',
+  [status.server_url]);
 
   const startedRef = useRef(false);
   useEffect(() => {
