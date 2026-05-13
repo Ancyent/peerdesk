@@ -33,7 +33,14 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
       </button>
 
       {sessions.map(s => (
-        <button key={s.id} style={tabStyle(s.id)} onClick={() => onTabSelect(s.id)}>
+        <div
+          key={s.id}
+          role="tab"
+          tabIndex={0}
+          onClick={() => onTabSelect(s.id)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onTabSelect(s.id); }}
+          style={tabStyle(s.id)}
+        >
           {s.id}
           <button
             type="button"
@@ -43,7 +50,7 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
           >
             ×
           </button>
-        </button>
+        </div>
       ))}
 
       <button
