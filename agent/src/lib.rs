@@ -55,7 +55,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     let signaling_url = cfg.signaling_url();
     let api_url = cfg.api_url();
-    let effective_token = cfg.api_token.clone().or_else(|| agent_cfg.api_token.clone());
+    let effective_token = cfg.api_token.clone().or(agent_cfg.api_token);
 
     if let (Some(url), Some(token)) = (&api_url, &effective_token) {
         match api_client::register_machine(url, token, &cfg.peer_id).await {

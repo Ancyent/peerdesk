@@ -92,11 +92,13 @@ impl Config {
     ) -> Result<Self> {
         let mut cfg = match Self::load(path) {
             Ok(existing) => existing,
-            Err(ref e) => {
-                let is_not_found = e.downcast_ref::<std::io::Error>()
-                    .map_or(false, |io| io.kind() == std::io::ErrorKind::NotFound);
+            Err(e) => {
+                let is_not_found = e
+                    .chain()
+                    .find_map(|cause| cause.downcast_ref::<std::io::Error>())
+                    .is_some_and(|io| io.kind() == std::io::ErrorKind::NotFound);
                 if !is_not_found {
-                    return Err(anyhow::anyhow!("{}", e));
+                    return Err(e);
                 }
                 Config {
                     peer_id: generate_peer_id(),

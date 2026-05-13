@@ -47,16 +47,13 @@ async fn start_agent(
         }
     }
 
-    let config_path = peerdesk_agent::Config::config_path(false);
-    let cfg = peerdesk_agent::Config::load_or_create(
-        &config_path,
-        &password,
-        std::env::var("PEERDESK_SERVER").ok().as_deref(),
-        std::env::var("API_TOKEN").ok().filter(|t| !t.is_empty()).as_deref(),
-    )
-    .map_err(|e| e.to_string())?;
-
-    let peer_id = cfg.peer_id.clone();
+    // Read peer_id without running bcrypt — run_agent handles full config init.
+    let peer_id = {
+        let config_path = peerdesk_agent::Config::config_path(false);
+        peerdesk_agent::Config::load(&config_path)
+            .map(|c| c.peer_id)
+            .unwrap_or_default()
+    };
 
     {
         let mut s = state.lock().await;
