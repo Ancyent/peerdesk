@@ -69,7 +69,20 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Config
-    let password = cli.password.as_deref().unwrap_or("changeme");
+    let generated_pw;
+    let password: &str = match cli.password.as_deref() {
+        Some(pw) => pw,
+        None => {
+            use rand::distributions::Alphanumeric;
+            use rand::Rng;
+            generated_pw = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(12)
+                .map(char::from)
+                .collect::<String>();
+            &generated_pw
+        }
+    };
     let config_path = Config::config_path(cli.portable);
     let cfg = Config::load_or_create(
         &config_path,
@@ -108,8 +121,8 @@ async fn main() -> anyhow::Result<()> {
     // Run agent
     run_agent(AgentConfig {
         password: password.to_string(),
-        server_url: cli.server.or(cfg.server_url.clone()),
-        api_token: cli.token.or(cfg.api_token.clone()),
+        server_url: cli.server.or(cfg.server_url),
+        api_token: cli.token.or(cfg.api_token),
         display_index: 0,
         portable: cli.portable,
     })
