@@ -12,10 +12,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from session import (
     ConnectionState,
     forward_to_peer,
+    generate_nonce,
     handle_approval,
     handle_join,
+    handle_viewer_authenticated,
     register_agent,
     unregister_agent,
+    verify_challenge_response,
 )
 
 def audit_log(event: str, peer_id: str, viewer_ip: str, outcome: str, **extra):
@@ -94,8 +97,40 @@ async def websocket_endpoint(ws: WebSocket):
             try:
                 if msg_type == "register":
                     peer_id = data["peer_id"]
-                    await register_agent(state, redis_client, peer_id, data["password_hash"], ws)
+                    await register_agent(state, redis_client, peer_id, data["password_hash"], ws, data.get("hmac_key", ""))
                     await ws.send_text(json.dumps({"type": "registered", "peer_id": peer_id}))
+
+                elif msg_type == "request_challenge":
+                    peer_id_req = data.get("peer_id", "")
+                    agent_data = await redis_client.hgetall(f"agent:{peer_id_req}")
+                    if not agent_data:
+                        await ws.send_json({"type": "error", "code": "agent_not_found"})
+                        continue
+                    nonce = generate_nonce()
+                    # One-time nonce, expires in 60s
+                    await redis_client.setex(f"nonce:{peer_id_req}:{id(ws)}", 60, nonce)
+                    await ws.send_json({"type": "challenge", "nonce": nonce})
+
+                elif msg_type == "auth_response":
+                    peer_id_req = data.get("peer_id", "")
+                    response = data.get("response", "")
+                    nonce_key = f"nonce:{peer_id_req}:{id(ws)}"
+                    nonce = await redis_client.get(nonce_key)
+                    if not nonce:
+                        await ws.send_json({"type": "error", "code": "nonce_expired_or_not_issued"})
+                        continue
+                    await redis_client.delete(nonce_key)  # delete immediately — one-time use
+                    nonce_str = nonce.decode() if isinstance(nonce, bytes) else nonce
+                    agent_data = await redis_client.hgetall(f"agent:{peer_id_req}")
+                    raw_key = agent_data.get(b"hmac_key") or agent_data.get("hmac_key", b"")
+                    stored_key = raw_key.decode() if isinstance(raw_key, bytes) else raw_key
+                    viewer_ip = ws.client.host if ws.client else "unknown"
+                    if stored_key and verify_challenge_response(nonce_str, response, stored_key):
+                        audit_log("connection_attempt", peer_id_req, viewer_ip, "approved", method="hmac")
+                        viewer_id = await handle_viewer_authenticated(state, redis_client, peer_id_req, ws)
+                    else:
+                        audit_log("connection_attempt", peer_id_req, viewer_ip, "auth_failed", method="hmac")
+                        await ws.send_json({"type": "error", "code": "auth_failed"})
 
                 elif msg_type == "join":
                     viewer_id = await handle_join(

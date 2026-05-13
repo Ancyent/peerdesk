@@ -1,3 +1,6 @@
+import hashlib
+import hmac as hmac_lib
+import secrets
 import uuid
 import json
 from dataclasses import dataclass, field
@@ -5,6 +8,21 @@ from typing import Dict, Optional
 from fastapi import WebSocket
 import redis.asyncio as aioredis
 import bcrypt
+
+
+def compute_hmac_key(password: str) -> str:
+    return hmac_lib.new(b"peerdesk-v1", password.encode(), hashlib.sha256).hexdigest()
+
+
+def generate_nonce() -> str:
+    return secrets.token_hex(16)
+
+
+def verify_challenge_response(nonce: str, response: str, stored_hmac_key: str) -> bool:
+    expected = hmac_lib.new(
+        stored_hmac_key.encode(), nonce.encode(), hashlib.sha256
+    ).hexdigest()
+    return hmac_lib.compare_digest(expected, response)
 
 
 @dataclass
@@ -27,9 +45,13 @@ async def register_agent(
     peer_id: str,
     password_hash: str,
     ws: WebSocket,
+    hmac_key: str = "",
 ) -> None:
     state.agent_connections[peer_id] = ws
-    await redis.hset(f"agent:{peer_id}", mapping={"password_hash": password_hash})
+    await redis.hset(f"agent:{peer_id}", mapping={
+        "password_hash": password_hash,
+        "hmac_key": hmac_key,
+    })
     await redis.expire(f"agent:{peer_id}", 3600)
 
 
@@ -50,6 +72,20 @@ async def unregister_agent(
         state.viewer_to_agent.pop(viewer_id, None)
         state.viewer_connections.pop(viewer_id, None)
     await redis.delete(f"agent:{peer_id}")
+
+
+async def handle_viewer_authenticated(
+    state: ConnectionState,
+    redis: aioredis.Redis,
+    peer_id: str,
+    viewer_ws: WebSocket,
+    remote_ip: str = "unknown",
+) -> str:
+    """Create viewer session and queue for agent approval. Returns viewer_session_id."""
+    viewer_id = str(uuid.uuid4())
+    # Don't register yet — wait for agent approval
+    await request_approval(state, peer_id, viewer_id, viewer_ws, remote_ip)
+    return viewer_id
 
 
 async def handle_join(
@@ -74,10 +110,7 @@ async def handle_join(
         await viewer_ws.send_text(json.dumps({"type": "error", "code": "unauthorized"}))
         return None
 
-    viewer_id = str(uuid.uuid4())
-    # Don't register yet — wait for agent approval
-    await request_approval(state, peer_id, viewer_id, viewer_ws, "unknown")
-    return viewer_id
+    return await handle_viewer_authenticated(state, redis, peer_id, viewer_ws)
 
 
 async def request_approval(
