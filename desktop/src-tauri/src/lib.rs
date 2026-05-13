@@ -6,20 +6,29 @@ use tauri::{
     Manager, State,
 };
 
+#[cfg(not(target_os = "android"))]
+use peerdesk_agent::{
+    config::{AccessMode, AppSettings, Config},
+    run_agent, AgentConfig,
+};
+
 #[derive(Default, Clone)]
 pub struct AgentState {
     pub running: bool,
     pub peer_id: String,
-    pub password: String,
 }
 
 type SharedAgentState = Arc<Mutex<AgentState>>;
+
+// ── get_agent_status ──────────────────────────────────────────────────────────
 
 #[derive(serde::Serialize, Clone)]
 pub struct AgentStatusResponse {
     running: bool,
     peer_id: String,
-    password: String,
+    approval_status: String,
+    server_url: Option<String>,
+    access_mode: String,
 }
 
 #[tauri::command]
@@ -27,17 +36,49 @@ async fn get_agent_status(
     state: State<'_, SharedAgentState>,
 ) -> Result<AgentStatusResponse, String> {
     let s = state.lock().await;
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let cfg = Config::load(&Config::config_path(false)).ok();
+        let settings = AppSettings::load(&AppSettings::settings_path(false)).unwrap_or_default();
+
+        let approval_status = if cfg.as_ref().and_then(|c| c.api_token.as_deref()).is_some() {
+            "approved".to_string()
+        } else {
+            "standalone".to_string()
+        };
+
+        let access_mode = match settings.access_mode {
+            AccessMode::Full => "full",
+            AccessMode::ViewOnly => "view_only",
+            AccessMode::NoIncoming => "no_incoming",
+        }
+        .to_string();
+
+        return Ok(AgentStatusResponse {
+            running: s.running,
+            peer_id: cfg.as_ref().map(|c| c.peer_id.clone()).unwrap_or_default(),
+            approval_status,
+            server_url: cfg.and_then(|c| c.server_url),
+            access_mode,
+        });
+    }
+
+    #[cfg(target_os = "android")]
     Ok(AgentStatusResponse {
         running: s.running,
         peer_id: s.peer_id.clone(),
-        password: s.password.clone(),
+        approval_status: "standalone".to_string(),
+        server_url: None,
+        access_mode: "full".to_string(),
     })
 }
+
+// ── start_agent ───────────────────────────────────────────────────────────────
 
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 async fn start_agent(
-    password: String,
     state: State<'_, SharedAgentState>,
 ) -> Result<AgentStatusResponse, String> {
     {
@@ -47,63 +88,191 @@ async fn start_agent(
         }
     }
 
-    // Read peer_id without running bcrypt — run_agent handles full config init.
-    let peer_id = {
-        let config_path = peerdesk_agent::Config::config_path(false);
-        peerdesk_agent::Config::load(&config_path)
-            .map(|c| c.peer_id)
-            .unwrap_or_default()
+    let settings = AppSettings::load(&AppSettings::settings_path(false)).unwrap_or_default();
+    let config_path = Config::config_path(false);
+
+    let cfg = {
+        use rand::distributions::Alphanumeric;
+        use rand::Rng;
+        let generated: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(12)
+            .map(char::from)
+            .collect();
+        Config::load_or_create(
+            &config_path,
+            &generated,
+            std::env::var("PEERDESK_SERVER").ok().as_deref(),
+            std::env::var("API_TOKEN").ok().filter(|t| !t.is_empty()).as_deref(),
+        )
+        .map_err(|e| e.to_string())?
     };
 
+    let peer_id = cfg.peer_id.clone();
+    let server_url = cfg.server_url.clone();
     {
         let mut s = state.lock().await;
         s.running = true;
         s.peer_id = peer_id.clone();
-        s.password = password.clone();
     }
 
-    let agent_cfg = peerdesk_agent::AgentConfig {
-        password,
-        server_url: std::env::var("PEERDESK_SERVER").ok(),
-        api_token: std::env::var("API_TOKEN").ok().filter(|t| !t.is_empty()),
+    let cast_only = settings.access_mode == AccessMode::ViewOnly;
+    let agent_cfg = AgentConfig {
+        password: String::new(),
+        server_url: cfg.server_url,
+        api_token: cfg.api_token,
         display_index: 0,
         portable: false,
+        cast_only,
     };
 
     let state_arc = Arc::clone(state.inner());
     tokio::spawn(async move {
-        if let Err(e) = peerdesk_agent::run_agent(agent_cfg).await {
-            tracing::error!("Agent stopped with error: {}", e);
+        if let Err(e) = run_agent(agent_cfg).await {
+            tracing::error!("Agent stopped: {}", e);
         }
         let mut s = state_arc.lock().await;
         s.running = false;
-        tracing::info!("Agent stopped");
     });
+
+    let access_mode = match settings.access_mode {
+        AccessMode::Full => "full",
+        AccessMode::ViewOnly => "view_only",
+        AccessMode::NoIncoming => "no_incoming",
+    }
+    .to_string();
 
     Ok(AgentStatusResponse {
         running: true,
         peer_id,
-        password: String::new(),
+        approval_status: "standalone".into(),
+        server_url,
+        access_mode,
     })
 }
 
 #[cfg(target_os = "android")]
 #[tauri::command]
 async fn start_agent(
-    _password: String,
     _state: State<'_, SharedAgentState>,
 ) -> Result<AgentStatusResponse, String> {
     Err("Host mode is not supported on Android (viewer only)".into())
 }
 
+// ── stop_agent ────────────────────────────────────────────────────────────────
+
 #[tauri::command]
 async fn stop_agent(state: State<'_, SharedAgentState>) -> Result<(), String> {
     let mut s = state.lock().await;
     s.running = false;
-    // The agent task will exit on next signaling disconnect
-    // A proper stop channel can be added later
     Ok(())
 }
+
+// ── get_settings ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_settings() -> Result<serde_json::Value, String> {
+    #[cfg(not(target_os = "android"))]
+    {
+        let s = AppSettings::load(&AppSettings::settings_path(false)).unwrap_or_default();
+        return serde_json::to_value(&s).map_err(|e| e.to_string());
+    }
+    #[cfg(target_os = "android")]
+    Ok(serde_json::json!({}))
+}
+
+// ── save_settings ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn save_settings(settings: serde_json::Value) -> Result<(), String> {
+    #[cfg(not(target_os = "android"))]
+    {
+        let s: AppSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
+        return s
+            .save(&AppSettings::settings_path(false))
+            .map_err(|e| e.to_string());
+    }
+    #[cfg(target_os = "android")]
+    {
+        let _ = settings;
+        Ok(())
+    }
+}
+
+// ── apply_config_link ─────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn apply_config_link(url: String) -> Result<(), String> {
+    #[cfg(not(target_os = "android"))]
+    {
+        let stripped = url
+            .strip_prefix("peerdesk://setup?")
+            .ok_or_else(|| "Invalid config link — must start with peerdesk://setup?".to_string())?;
+
+        let mut server: Option<String> = None;
+        let mut api_token: Option<String> = None;
+        let mut password: Option<String> = None;
+
+        for pair in stripped.split('&') {
+            if let Some((k, v)) = pair.split_once('=') {
+                let decoded = v
+                    .replace("%3A", ":")
+                    .replace("%2F", "/")
+                    .replace("%40", "@")
+                    .replace("%3D", "=");
+                match k {
+                    "server" => server = Some(decoded),
+                    "api_key" | "api_token" => api_token = Some(decoded),
+                    "password" => password = Some(decoded),
+                    _ => {}
+                }
+            }
+        }
+
+        let config_path = Config::config_path(false);
+        let pw = password.as_deref().unwrap_or("changeme");
+        Config::load_or_create(&config_path, pw, server.as_deref(), api_token.as_deref())
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    #[cfg(target_os = "android")]
+    {
+        let _ = url;
+        Ok(())
+    }
+}
+
+// ── reset_password ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn reset_password() -> Result<String, String> {
+    #[cfg(not(target_os = "android"))]
+    {
+        use rand::distributions::Alphanumeric;
+        use rand::Rng;
+        let new_pw: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(12)
+            .map(char::from)
+            .collect();
+        let config_path = Config::config_path(false);
+        let cfg = Config::load(&config_path).map_err(|e| e.to_string())?;
+        let hash = bcrypt::hash(&new_pw, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?;
+        Config {
+            peer_id: cfg.peer_id,
+            password_hash: hash,
+            server_url: cfg.server_url,
+            api_token: cfg.api_token,
+        }
+        .save(&config_path)
+        .map_err(|e| e.to_string())?;
+        return Ok(new_pw);
+    }
+    #[cfg(target_os = "android")]
+    Err("Not supported on Android".into())
+}
+
+// ── Tauri app ─────────────────────────────────────────────────────────────────
 
 pub fn run() {
     let shared_state: SharedAgentState = Arc::new(Mutex::new(AgentState::default()));
@@ -115,12 +284,16 @@ pub fn run() {
             get_agent_status,
             start_agent,
             stop_agent,
+            get_settings,
+            save_settings,
+            apply_config_link,
+            reset_password,
         ])
         .setup(|app| {
-            let show_item = MenuItem::with_id(app, "show", "Show PeerDesk", true, None::<&str>)?;
+            let show_item =
+                MenuItem::with_id(app, "show", "Show PeerDesk", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
-
             let _tray = TrayIconBuilder::new()
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -148,7 +321,6 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
-
             Ok(())
         })
         .run(tauri::generate_context!())
