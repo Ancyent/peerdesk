@@ -8,7 +8,12 @@ pub fn log_file_path() -> std::path::PathBuf {
     #[cfg(unix)]
     {
         let system_log = std::path::Path::new("/var/log/peerdesk-agent.log");
-        if system_log.parent().map(|p| p.exists()).unwrap_or(false) {
+        if std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(system_log)
+            .is_ok()
+        {
             return system_log.to_path_buf();
         }
     }
@@ -35,8 +40,13 @@ pub fn init_file() -> Result<WorkerGuard> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let dir = path.parent().unwrap();
-    let filename = path.file_name().unwrap().to_str().unwrap();
+    let dir = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("log path has no parent: {}", path.display()))?;
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| anyhow::anyhow!("log path has invalid filename: {}", path.display()))?;
 
     let file_appender = tracing_appender::rolling::never(dir, filename);
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);

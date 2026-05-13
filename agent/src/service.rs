@@ -7,8 +7,7 @@ pub const SERVICE_NAME: &str = "peerdesk-agent";
 /// Windows: registers via sc.exe and starts it (requires Administrator).
 #[allow(unreachable_code)]
 pub fn install_service() -> Result<()> {
-    let exe = std::env::current_exe()
-        .context("cannot determine current executable path")?;
+    let exe = std::env::current_exe().context("cannot determine current executable path")?;
     let exe_str = exe.to_string_lossy().to_string();
 
     #[cfg(target_os = "linux")]
@@ -73,8 +72,8 @@ fn install_systemd(exe_path: &str) -> Result<()> {
 
 #[cfg(target_os = "linux")]
 fn uninstall_systemd() -> Result<()> {
-    let _ = run_cmd("systemctl", &["stop", SERVICE_NAME]);
-    let _ = run_cmd("systemctl", &["disable", SERVICE_NAME]);
+    run_cmd("systemctl", &["stop", SERVICE_NAME]).ok();
+    run_cmd("systemctl", &["disable", SERVICE_NAME]).ok();
     let unit_path = format!("/etc/systemd/system/{}.service", SERVICE_NAME);
     if std::path::Path::new(&unit_path).exists() {
         std::fs::remove_file(&unit_path)
@@ -90,8 +89,19 @@ fn uninstall_systemd() -> Result<()> {
 #[cfg(target_os = "windows")]
 fn install_windows_service(exe_path: &str) -> Result<()> {
     let binpath = format!("\"{}\" --silent", exe_path);
-    run_cmd("sc", &["create", SERVICE_NAME, "binpath=", &binpath, "start=", "auto"])?;
-    run_cmd("sc", &["description", SERVICE_NAME, "PeerDesk Remote Access Agent"])?;
+    run_cmd(
+        "sc",
+        &[
+            "create",
+            SERVICE_NAME,
+            &format!("binpath={}", binpath),
+            "start=auto",
+        ],
+    )?;
+    run_cmd(
+        "sc",
+        &["description", SERVICE_NAME, "PeerDesk Remote Access Agent"],
+    )?;
     run_cmd("sc", &["start", SERVICE_NAME])?;
     println!("Service '{}' installed and started.", SERVICE_NAME);
     Ok(())
@@ -99,7 +109,7 @@ fn install_windows_service(exe_path: &str) -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn uninstall_windows_service() -> Result<()> {
-    let _ = run_cmd("sc", &["stop", SERVICE_NAME]);
+    run_cmd("sc", &["stop", SERVICE_NAME]).ok();
     run_cmd("sc", &["delete", SERVICE_NAME])?;
     println!("Service '{}' removed.", SERVICE_NAME);
     Ok(())
