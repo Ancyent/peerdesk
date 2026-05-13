@@ -46,6 +46,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     } else if (msg.type === 'agent_disconnected') {
       if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
       webrtc.disconnect();
+      onStateChange(session.id, 'error', 'Remote machine disconnected');
       onClose();
     }
   }, [webrtc, session.id, onStateChange, onClose]));
