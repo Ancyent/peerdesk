@@ -1,10 +1,10 @@
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, State,
 };
+use tokio::sync::Mutex;
 
 #[cfg(not(target_os = "android"))]
 use peerdesk_agent::{
@@ -55,13 +55,13 @@ async fn get_agent_status(
         }
         .to_string();
 
-        return Ok(AgentStatusResponse {
+        Ok(AgentStatusResponse {
             running: s.running,
             peer_id: cfg.as_ref().map(|c| c.peer_id.clone()).unwrap_or_default(),
             approval_status,
             server_url: cfg.and_then(|c| c.server_url),
             access_mode,
-        });
+        })
     }
 
     #[cfg(target_os = "android")]
@@ -78,9 +78,7 @@ async fn get_agent_status(
 
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
-async fn start_agent(
-    state: State<'_, SharedAgentState>,
-) -> Result<AgentStatusResponse, String> {
+async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusResponse, String> {
     {
         let s = state.lock().await;
         if s.running {
@@ -103,7 +101,10 @@ async fn start_agent(
             &config_path,
             &generated,
             std::env::var("PEERDESK_SERVER").ok().as_deref(),
-            std::env::var("API_TOKEN").ok().filter(|t| !t.is_empty()).as_deref(),
+            std::env::var("API_TOKEN")
+                .ok()
+                .filter(|t| !t.is_empty())
+                .as_deref(),
         )
         .map_err(|e| e.to_string())?
     };
@@ -116,6 +117,7 @@ async fn start_agent(
         s.peer_id = peer_id.clone();
     }
 
+    let had_token = cfg.api_token.is_some();
     let cast_only = settings.access_mode == AccessMode::ViewOnly;
     let agent_cfg = AgentConfig {
         password: String::new(),
@@ -145,7 +147,7 @@ async fn start_agent(
     Ok(AgentStatusResponse {
         running: true,
         peer_id,
-        approval_status: "standalone".into(),
+        approval_status: if had_token { "approved" } else { "standalone" }.to_string(),
         server_url,
         access_mode,
     })
@@ -153,9 +155,7 @@ async fn start_agent(
 
 #[cfg(target_os = "android")]
 #[tauri::command]
-async fn start_agent(
-    _state: State<'_, SharedAgentState>,
-) -> Result<AgentStatusResponse, String> {
+async fn start_agent(_state: State<'_, SharedAgentState>) -> Result<AgentStatusResponse, String> {
     Err("Host mode is not supported on Android (viewer only)".into())
 }
 
@@ -175,7 +175,7 @@ async fn get_settings() -> Result<serde_json::Value, String> {
     #[cfg(not(target_os = "android"))]
     {
         let s = AppSettings::load(&AppSettings::settings_path(false)).unwrap_or_default();
-        return serde_json::to_value(&s).map_err(|e| e.to_string());
+        serde_json::to_value(&s).map_err(|e| e.to_string())
     }
     #[cfg(target_os = "android")]
     Ok(serde_json::json!({}))
@@ -188,9 +188,8 @@ async fn save_settings(settings: serde_json::Value) -> Result<(), String> {
     #[cfg(not(target_os = "android"))]
     {
         let s: AppSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
-        return s
-            .save(&AppSettings::settings_path(false))
-            .map_err(|e| e.to_string());
+        s.save(&AppSettings::settings_path(false))
+            .map_err(|e| e.to_string())
     }
     #[cfg(target_os = "android")]
     {
@@ -233,7 +232,7 @@ async fn apply_config_link(url: String) -> Result<(), String> {
         let pw = password.as_deref().unwrap_or("changeme");
         Config::load_or_create(&config_path, pw, server.as_deref(), api_token.as_deref())
             .map_err(|e| e.to_string())?;
-        return Ok(());
+        Ok(())
     }
     #[cfg(target_os = "android")]
     {
@@ -266,7 +265,7 @@ async fn reset_password() -> Result<String, String> {
         }
         .save(&config_path)
         .map_err(|e| e.to_string())?;
-        return Ok(new_pw);
+        Ok(new_pw)
     }
     #[cfg(target_os = "android")]
     Err("Not supported on Android".into())
@@ -290,8 +289,7 @@ pub fn run() {
             reset_password,
         ])
         .setup(|app| {
-            let show_item =
-                MenuItem::with_id(app, "show", "Show PeerDesk", true, None::<&str>)?;
+            let show_item = MenuItem::with_id(app, "show", "Show PeerDesk", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
             let _tray = TrayIconBuilder::new()
