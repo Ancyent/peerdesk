@@ -18,7 +18,7 @@ interface Props {
 
 export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Props) {
   const [password, setPassword] = useState('');
-  const [viewState, setViewState] = useState<'connecting' | 'negotiating' | 'connected' | 'error'>('connecting');
+  const [viewState, setViewState] = useState<'connecting' | 'pending_approval' | 'negotiating' | 'connected' | 'error'>('connecting');
   const [errMsg, setErrMsg] = useState('');
   const [showFiles, setShowFiles] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -32,6 +32,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
 
   const { send } = useSignaling(signalingUrl, useCallback(async (msg: SignalingMessage) => {
     if (msg.type === 'joined') {
+      setViewState('negotiating');
       webrtc.startOffer();
     } else if (msg.type === 'answer') {
       await webrtc.handleAnswer(msg.sdp);
@@ -40,6 +41,12 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     } else if (msg.type === 'error') {
       if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
       const m = msg.code === 'unauthorized' ? 'Wrong password' : 'Machine not found';
+      setErrMsg(m);
+      setViewState('error');
+      onStateChange(session.id, 'error', m);
+    } else if (msg.type === 'denied') {
+      if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
+      const m = msg.reason || 'Connection denied by remote machine';
       setErrMsg(m);
       setViewState('error');
       onStateChange(session.id, 'error', m);
@@ -52,6 +59,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   }, [webrtc, session.id, onStateChange, onClose]));
 
   sendRef.current = send;
+
+  useEffect(() => () => { webrtc.disconnect(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!webrtc.stream || !videoRef.current) return;
@@ -75,8 +84,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   }, [viewState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleJoin = () => {
-    setViewState('negotiating');
-    onStateChange(session.id, 'negotiating');
+    setViewState('pending_approval');
+    onStateChange(session.id, 'negotiating'); // parent still sees 'negotiating'
     send({ type: 'join', peer_id: session.id, password });
   };
 
@@ -129,7 +138,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     );
   }
 
-  if (viewState === 'negotiating') {
+  if (viewState === 'pending_approval' || viewState === 'negotiating') {
     return (
       <div style={center}>
         <div style={{ textAlign: 'center' }}>
@@ -175,10 +184,16 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         style={{ flex: 1, width: '100%', objectFit: 'contain', display: 'block', cursor: 'crosshair' }}
         onMouseMove={e => {
           const rect = e.currentTarget.getBoundingClientRect();
-          webrtc.sendInput({ type: 'mouse_move', x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
+          const vw = videoRef.current?.videoWidth ?? rect.width;
+          const vh = videoRef.current?.videoHeight ?? rect.height;
+          webrtc.sendInput({
+            type: 'mouse_move',
+            x: Math.round((e.clientX - rect.left) / rect.width * vw),
+            y: Math.round((e.clientY - rect.top) / rect.height * vh),
+          });
         }}
-        onMouseDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_button', button: e.button, pressed: true }); }}
-        onMouseUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_button', button: e.button, pressed: false }); }}
+        onMouseDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_down', button: e.button }); }}
+        onMouseUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_up', button: e.button }); }}
         onContextMenu={e => e.preventDefault()}
       />
       {showFiles && <FileTransferModal ftChannel={webrtc.getFtChannel()} onClose={() => setShowFiles(false)} />}
