@@ -6,6 +6,7 @@ pub mod config;
 pub mod encode;
 pub mod file_transfer;
 pub mod input;
+pub mod logging;
 pub mod signaling;
 pub mod webrtc_peer;
 
@@ -28,12 +29,9 @@ pub struct AgentConfig {
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
-            password: std::env::var("PEERDESK_PASSWORD")
-                .unwrap_or_else(|_| "changeme".into()),
+            password: std::env::var("PEERDESK_PASSWORD").unwrap_or_else(|_| "changeme".into()),
             server_url: std::env::var("PEERDESK_SERVER").ok(),
-            api_token: std::env::var("API_TOKEN")
-                .ok()
-                .filter(|s| !s.is_empty()),
+            api_token: std::env::var("API_TOKEN").ok().filter(|s| !s.is_empty()),
             display_index: std::env::var("DISPLAY_INDEX")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -78,8 +76,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         tokio::sync::mpsc::channel::<signaling::SignalingMessage>(32);
 
     // Channel: main → signaling server (Answer, outbound ICE from webrtc)
-    let (to_sig_tx, to_sig_rx) =
-        tokio::sync::mpsc::channel::<signaling::SignalingMessage>(32);
+    let (to_sig_tx, to_sig_rx) = tokio::sync::mpsc::channel::<signaling::SignalingMessage>(32);
 
     // capture::run uses scrap::Capturer which is !Send, so run it on a
     // dedicated OS thread with its own single-threaded tokio runtime.
@@ -124,16 +121,17 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     // Spawn signaling client
     tokio::spawn(async move {
-        if let Err(e) =
-            signaling::run(&sig_url, &peer_id, &pw_hash, from_sig_tx, to_sig_rx).await
-        {
+        if let Err(e) = signaling::run(&sig_url, &peer_id, &pw_hash, from_sig_tx, to_sig_rx).await {
             tracing::error!("Signaling error: {}", e);
         }
     });
 
     // Forward outbound WebRTC messages (Answer + ICE) → signaling server
     // Use take() to extract without consuming `peer`, so it remains usable below.
-    let mut webrtc_out_rx = peer.from_signaling_rx.take().expect("from_signaling_rx must be Some");
+    let mut webrtc_out_rx = peer
+        .from_signaling_rx
+        .take()
+        .expect("from_signaling_rx must be Some");
     let to_sig_fwd = to_sig_tx.clone();
     tokio::spawn(async move {
         while let Some(msg) = webrtc_out_rx.recv().await {
@@ -146,8 +144,14 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // Main event loop: handle messages from signaling server
     loop {
         match from_sig_rx.recv().await {
-            Some(signaling::SignalingMessage::ViewerPending { viewer_id, remote_ip }) => {
-                info!("Viewer {} from {} requesting connection — auto-approving", viewer_id, remote_ip);
+            Some(signaling::SignalingMessage::ViewerPending {
+                viewer_id,
+                remote_ip,
+            }) => {
+                info!(
+                    "Viewer {} from {} requesting connection — auto-approving",
+                    viewer_id, remote_ip
+                );
                 // Auto-approve: send Approve back to signaling via to_sig_tx
                 let approve = signaling::SignalingMessage::Approve { viewer_id };
                 if let Err(e) = to_sig_tx.send(approve).await {
