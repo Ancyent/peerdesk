@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { Session } from '../types';
 
 interface Props {
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSettings }: Props) {
-  const tabStyle = (id: string): React.CSSProperties => ({
+  const tabStyle = (id: string): CSSProperties => ({
     background: 'none',
     border: 'none',
     borderBottom: activeTab === id ? '2px solid #26c6da' : '2px solid transparent',
@@ -34,13 +35,14 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
       {sessions.map(s => (
         <button key={s.id} style={tabStyle(s.id)} onClick={() => onTabSelect(s.id)}>
           {s.id}
-          <span
+          <button
+            type="button"
             onClick={e => { e.stopPropagation(); onTabClose(s.id); }}
-            style={{ opacity: 0.5, fontSize: 14, lineHeight: 1, cursor: 'pointer' }}
-            title="Close session"
+            style={{ background: 'none', border: 'none', opacity: 0.5, fontSize: 14, lineHeight: 1, cursor: 'pointer', padding: 0 }}
+            aria-label={`Close session ${s.id}`}
           >
             ×
-          </span>
+          </button>
         </button>
       ))}
 
