@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { HomeScreen } from './screens/HomeScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { StatusBar } from './components/StatusBar';
+import { TabBar } from './components/TabBar';
 import { useAgent } from './hooks/useAgent';
 import type { Session, SessionState } from './types';
 
@@ -56,23 +57,13 @@ export default function App() {
 
       <StatusBar approvalStatus={status.approval_status} serverUrl={status.server_url} />
 
-      {/* Tab bar — replaced by TabBar component in Task 2 */}
-      <div style={{ background: '#161b22', padding: '0 8px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #21262d', flexShrink: 0 }}>
-        {(['home', ...sessions.map(s => s.id)] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{ background: 'none', border: 'none', borderBottom: activeTab === tab ? '2px solid #26c6da' : '2px solid transparent', color: activeTab === tab ? '#26c6da' : '#8b949e', padding: '8px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            {tab === 'home' ? 'Home' : tab}
-            {tab !== 'home' && (
-              <span onClick={e => { e.stopPropagation(); handleCloseSession(tab); }} style={{ opacity: 0.5, fontSize: 14 }}>×</span>
-            )}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
-        <button onClick={() => setActiveTab('settings')} style={{ background: 'none', border: 'none', color: '#484f58', cursor: 'pointer', fontSize: 16, padding: '4px 8px' }}>⚙</button>
-      </div>
+      <TabBar
+        sessions={sessions}
+        activeTab={activeTab}
+        onTabSelect={setActiveTab}
+        onTabClose={handleCloseSession}
+        onSettings={() => setActiveTab('settings')}
+      />
 
       {/* Content area */}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
