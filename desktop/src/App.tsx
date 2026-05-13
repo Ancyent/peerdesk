@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { HomeScreen } from './screens/HomeScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { ViewerTab } from './screens/ViewerTab';
 import { StatusBar } from './components/StatusBar';
 import { TabBar } from './components/TabBar';
 import { useAgent } from './hooks/useAgent';
@@ -75,10 +76,12 @@ export default function App() {
         )}
         {sessions.map(session => (
           <div key={session.id} style={{ display: activeTab === session.id ? 'flex' : 'none', height: '100%', flexDirection: 'column' }}>
-            {/* ViewerTab wired in Task 7 */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117', color: '#484f58', fontSize: 12 }}>
-              Session {session.id} — loading viewer...
-            </div>
+            <ViewerTab
+              session={session}
+              signalingUrl={signalingUrl}
+              onStateChange={handleStateChange}
+              onClose={() => handleCloseSession(session.id)}
+            />
           </div>
         ))}
       </div>
