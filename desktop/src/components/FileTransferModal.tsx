@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 
 interface OutgoingFile {
@@ -6,14 +6,14 @@ interface OutgoingFile {
   name: string;
   size: number;
   sent: number;
-  status: 'sending' | 'done' | 'error';
+  status: 'pending' | 'sending' | 'done' | 'error';
+  errorNote?: string;
 }
 
 interface IncomingFile {
   id: string;
   name: string;
   size: number;
-  chunks: string[];
   received: number;
   status: 'receiving' | 'done';
   url?: string;
@@ -33,67 +33,72 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
   const [outgoing, setOutgoing] = useState<OutgoingFile[]>([]);
   const [incoming, setIncoming] = useState<IncomingFile[]>([]);
 
+  // Bug 3 fix: keep a ref so the unmount cleanup sees the latest incoming list
+  const incomingRef = useRef(incoming);
+  useEffect(() => { incomingRef.current = incoming; }, [incoming]);
+
+  // Revoke Blob URLs only on unmount, not on every incoming update
+  useEffect(() => {
+    return () => { incomingRef.current.forEach(f => { if (f.url) URL.revokeObjectURL(f.url); }); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!ftChannel) return;
     const handler = (e: MessageEvent) => {
+      // Binary messages are future-use (agent → viewer file send, not yet implemented)
+      if (e.data instanceof ArrayBuffer) return;
+
       try {
         const msg = JSON.parse(e.data as string);
-        if (msg.type === 'file_meta') {
-          setIncoming(prev => [...prev, { id: msg.id, name: msg.name, size: msg.size, chunks: [], received: 0, status: 'receiving' }]);
-        } else if (msg.type === 'file_chunk') {
-          setIncoming(prev => prev.map(f =>
-            f.id !== msg.id ? f :
-            { ...f, chunks: [...f.chunks, msg.data as string], received: f.received + Math.floor((msg.data as string).length * 3 / 4) }
-          ));
-        } else if (msg.type === 'file_end') {
-          setIncoming(prev => prev.map(f => {
-            if (f.id !== msg.id) return f;
-            const binary = atob(f.chunks.join(''));
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            const url = URL.createObjectURL(new Blob([bytes]));
-            return { ...f, status: 'done', url };
-          }));
+
+        // Agent responses to our outgoing transfers
+        if (msg.type === 'ft_accept') {
+          setOutgoing(prev => prev.map(f => f.id === msg.id ? { ...f, status: 'sending' } : f));
+        } else if (msg.type === 'ft_reject') {
+          setOutgoing(prev => prev.map(f => f.id === msg.id ? { ...f, status: 'error', errorNote: msg.reason as string } : f));
+        } else if (msg.type === 'ft_progress') {
+          setOutgoing(prev => prev.map(f => f.id === msg.id ? { ...f, sent: msg.received as number } : f));
+        } else if (msg.type === 'ft_done') {
+          setOutgoing(prev => prev.map(f => f.id === msg.id ? { ...f, status: 'done' } : f));
         }
+        // Incoming files from agent (future feature — placeholder)
       } catch { /* ignore malformed */ }
     };
     ftChannel.addEventListener('message', handler);
     return () => ftChannel.removeEventListener('message', handler);
   }, [ftChannel]);
 
-  useEffect(() => {
-    return () => {
-      incoming.forEach(f => { if (f.url) URL.revokeObjectURL(f.url); });
-    };
-  }, [incoming]);
-
+  // Bug 1 + Bug 2 fix: ft_offer message type + binary ArrayBuffer chunks
   const handlePickFile = (file: File) => {
     if (!ftChannel || ftChannel.readyState !== 'open') return;
     const id = genId();
     const CHUNK = 16 * 1024;
-    setOutgoing(prev => [...prev, { id, name: file.name, size: file.size, sent: 0, status: 'sending' }]);
-    ftChannel.send(JSON.stringify({ type: 'file_meta', id, name: file.name, size: file.size }));
+    setOutgoing(prev => [...prev, { id, name: file.name, size: file.size, sent: 0, status: 'pending' }]);
+    ftChannel.send(JSON.stringify({ type: 'ft_offer', id, name: file.name, size: file.size }));
 
-    const reader = new FileReader();
     let offset = 0;
+    const reader = new FileReader();
 
     const readNext = () => {
-      reader.readAsDataURL(file.slice(offset, offset + CHUNK));
+      reader.readAsArrayBuffer(file.slice(offset, offset + CHUNK));
     };
 
     reader.onload = () => {
-      const base64 = (reader.result as string).split(',')[1];
-      ftChannel.send(JSON.stringify({ type: 'file_chunk', id, data: base64 }));
-      offset += CHUNK;
+      if (!(reader.result instanceof ArrayBuffer)) return;
+      ftChannel.send(reader.result);
+      offset += reader.result.byteLength;
       setOutgoing(prev => prev.map(f => f.id === id ? { ...f, sent: Math.min(offset, file.size) } : f));
       if (offset < file.size) {
         readNext();
       } else {
-        ftChannel.send(JSON.stringify({ type: 'file_end', id }));
         setOutgoing(prev => prev.map(f => f.id === id ? { ...f, status: 'done' } : f));
       }
     };
-    reader.onerror = () => setOutgoing(prev => prev.map(f => f.id === id ? { ...f, status: 'error' } : f));
+
+    reader.onerror = () => {
+      setOutgoing(prev => prev.map(f => f.id === id ? { ...f, status: 'error' } : f));
+    };
+
     readNext();
   };
 
@@ -135,10 +140,13 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
                   <div style={{ fontSize: 11, color: '#c9d1d9', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{f.name}</span>
                     <span style={{ color: f.status === 'done' ? '#56d364' : f.status === 'error' ? '#f85149' : '#8b949e', flexShrink: 0 }}>
-                      {f.status === 'done' ? '✓ Done' : f.status === 'error' ? '✗ Error' : `${Math.round((f.sent / f.size) * 100)}%`}
+                      {f.status === 'done' ? '✓ Done'
+                        : f.status === 'error' ? `✗ ${f.errorNote ?? 'Error'}`
+                        : f.status === 'pending' ? 'Waiting…'
+                        : `${Math.round((f.sent / f.size) * 100)}%`}
                     </span>
                   </div>
-                  {f.status === 'sending' && (
+                  {(f.status === 'sending' || f.status === 'pending') && (
                     <div style={{ height: 3, background: '#21262d', borderRadius: 2 }}>
                       <div style={{ height: '100%', background: '#26c6da', borderRadius: 2, width: `${(f.sent / f.size) * 100}%`, transition: 'width 0.1s' }} />
                     </div>
