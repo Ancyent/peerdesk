@@ -61,6 +61,12 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
     return () => ftChannel.removeEventListener('message', handler);
   }, [ftChannel]);
 
+  useEffect(() => {
+    return () => {
+      incoming.forEach(f => { if (f.url) URL.revokeObjectURL(f.url); });
+    };
+  }, [incoming]);
+
   const handlePickFile = (file: File) => {
     if (!ftChannel || ftChannel.readyState !== 'open') return;
     const id = genId();
