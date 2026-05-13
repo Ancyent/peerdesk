@@ -66,6 +66,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     if (!webrtc.stream || !videoRef.current) return;
     videoRef.current.srcObject = webrtc.stream;
     videoRef.current.play().catch(() => {});
+    videoRef.current.focus();
     if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
     setViewState('connected');
     onStateChange(session.id, 'connected');
@@ -181,7 +182,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         ref={videoRef}
         autoPlay
         muted
-        style={{ flex: 1, width: '100%', objectFit: 'contain', display: 'block', cursor: 'crosshair' }}
+        tabIndex={0}
+        style={{ flex: 1, width: '100%', objectFit: 'contain', display: 'block', cursor: 'crosshair', outline: 'none' }}
         onMouseMove={e => {
           const rect = e.currentTarget.getBoundingClientRect();
           const vw = videoRef.current?.videoWidth ?? rect.width;
@@ -192,9 +194,12 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
             y: Math.round((e.clientY - rect.top) / rect.height * vh),
           });
         }}
-        onMouseDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_down', button: e.button }); }}
+        onMouseDown={e => { e.preventDefault(); e.currentTarget.focus(); webrtc.sendInput({ type: 'mouse_down', button: e.button }); }}
         onMouseUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_up', button: e.button }); }}
         onContextMenu={e => e.preventDefault()}
+        onKeyDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_down', key: e.key }); }}
+        onKeyUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key }); }}
+        onWheel={e => { e.preventDefault(); webrtc.sendInput({ type: 'scroll', delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); }}
       />
       {showFiles && <FileTransferModal ftChannel={webrtc.getFtChannel()} onClose={() => setShowFiles(false)} />}
     </div>
