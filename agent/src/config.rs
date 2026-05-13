@@ -167,7 +167,28 @@ fn default_codec()   -> String { "auto".into() }
 fn default_view()    -> String { "fit".into() }
 
 impl Default for AppSettings {
-    fn default() -> Self { serde_json::from_str("{}").unwrap() }
+    fn default() -> Self {
+        Self {
+            access_mode: AccessMode::Full,
+            show_approval_dialog: true,
+            auto_disconnect_minutes: None,
+            lock_screen_after_session: false,
+            allow_keyboard_mouse: true,
+            allow_clipboard: true,
+            allow_file_transfer: false,
+            allow_audio: false,
+            allow_terminal: false,
+            allow_remote_restart: false,
+            block_user_input: false,
+            image_quality: default_quality(),
+            codec: default_codec(),
+            view_mode: default_view(),
+            show_remote_cursor: false,
+            hardware_acceleration: true,
+            start_on_boot: false,
+            minimize_to_tray: true,
+        }
+    }
 }
 
 impl AppSettings {
