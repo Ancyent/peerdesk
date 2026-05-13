@@ -50,8 +50,26 @@ struct Cli {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    // Service management — no logging or config needed
+    // Service management
     if cli.install_service {
+        // Persist server/token to config before installing so the service picks them up on start
+        if cli.server.is_some() || cli.token.is_some() {
+            use rand::distributions::Alphanumeric;
+            use rand::Rng;
+            let generated_pw: String = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(12)
+                .map(char::from)
+                .collect();
+            let password = cli.password.as_deref().unwrap_or(&generated_pw);
+            let config_path = Config::config_path(cli.portable);
+            Config::load_or_create(
+                &config_path,
+                password,
+                cli.server.as_deref(),
+                cli.token.as_deref(),
+            )?;
+        }
         service::install_service()?;
         return Ok(());
     }
