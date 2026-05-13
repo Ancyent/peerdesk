@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
       - name: Install system deps
         run: |
           sudo apt-get update
@@ -37,6 +40,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
       - name: Build agent
         run: cargo build -p peerdesk-agent --release
       - name: Rename binary
@@ -55,6 +61,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
       - name: Build agent (x86_64)
         run: cargo build -p peerdesk-agent --release --target x86_64-apple-darwin
       - name: Build agent (arm64)
@@ -78,6 +87,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "desktop/src-tauri -> target"
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -110,6 +122,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "desktop/src-tauri -> target"
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -136,6 +151,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "desktop/src-tauri -> target"
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -158,6 +176,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "desktop/src-tauri -> target"
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
