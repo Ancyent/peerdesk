@@ -4,6 +4,7 @@ import { useAgent } from '../hooks/useAgent';
 import { useSettings } from '../hooks/useSettings';
 import { ModeDropdown } from '../components/ModeDropdown';
 import { RecentItem } from '../components/RecentItem';
+import { SecurityCodeBanner } from '../components/SecurityCodeBanner';
 
 interface Props {
   onConnect: (peerId: string) => void;
@@ -22,6 +23,7 @@ export function HomeScreen({ onConnect }: Props) {
   const { settings, updateSetting } = useSettings();
   const [connectId, setConnectId] = useState('');
   const [newPwd, setNewPwd] = useState<string | null>(null);
+  const [securityCode, setSecurityCode] = useState<string | null>(null);
 
   const handleResetPwd = async () => {
     try {
@@ -74,6 +76,10 @@ export function HomeScreen({ onConnect }: Props) {
                 </span>
               )}
             </div>
+
+            {securityCode && (
+              <SecurityCodeBanner code={securityCode} onDismiss={() => setSecurityCode(null)} />
+            )}
 
             <div style={{ fontSize: 10, color: '#484f58', marginBottom: 5 }}>Access mode</div>
             <ModeDropdown value={settings.access_mode} onChange={(m) => updateSetting('access_mode', m)} />

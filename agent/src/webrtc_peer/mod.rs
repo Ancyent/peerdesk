@@ -3,6 +3,7 @@ use crate::encode::H264Encoder;
 use crate::input::InputEvent;
 use crate::signaling::SignalingMessage;
 use anyhow::Result;
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use webrtc::{
@@ -10,8 +11,7 @@ use webrtc::{
     ice_transport::ice_server::RTCIceServer,
     media::Sample,
     peer_connection::{
-        configuration::RTCConfiguration,
-        sdp::session_description::RTCSessionDescription,
+        configuration::RTCConfiguration, sdp::session_description::RTCSessionDescription,
         RTCPeerConnection,
     },
     rtp_transceiver::rtp_codec::RTCRtpCodecCapability,
@@ -22,17 +22,15 @@ pub struct PeerConnection {
     pc: Arc<RTCPeerConnection>,
     pub to_signaling_tx: Sender<SignalingMessage>,
     pub from_signaling_rx: Option<Receiver<SignalingMessage>>,
-    pub clipboard_in_rx: Option<tokio::sync::mpsc::Receiver<String>>,  // from viewer → agent writes to clipboard
-    pub clipboard_out_tx: tokio::sync::mpsc::Sender<String>,           // from agent clipboard → viewer
+    pub clipboard_in_rx: Option<tokio::sync::mpsc::Receiver<String>>, // from viewer → agent writes to clipboard
+    pub clipboard_out_tx: tokio::sync::mpsc::Sender<String>, // from agent clipboard → viewer
     pub ft_in_tx: tokio::sync::mpsc::Sender<crate::file_transfer::FtMessage>,
     pub ft_control_rx: Option<tokio::sync::mpsc::Receiver<String>>,
+    pub security_code: Arc<std::sync::Mutex<Option<String>>>,
 }
 
 impl PeerConnection {
-    pub async fn new(
-        frame_rx: Receiver<FrameData>,
-        input_tx: Sender<InputEvent>,
-    ) -> Result<Self> {
+    pub async fn new(frame_rx: Receiver<FrameData>, input_tx: Sender<InputEvent>) -> Result<Self> {
         let mut media_engine = MediaEngine::default();
         media_engine.register_default_codecs()?;
 
@@ -65,18 +63,17 @@ impl PeerConnection {
             "peerdesk".to_owned(),
         ));
 
-        pc.add_track(
-            Arc::clone(&video_track)
-                as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>,
-        )
-        .await?;
+        pc.add_track(Arc::clone(&video_track)
+            as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>)
+            .await?;
 
         // Handle incoming data channels from viewer (input events, clipboard, file transfer)
         let input_tx_clone = input_tx.clone();
         let (clipboard_in_tx, clipboard_in_rx) = tokio::sync::mpsc::channel::<String>(16);
         let (clipboard_out_tx, clipboard_out_rx) = tokio::sync::mpsc::channel::<String>(16);
         let _ = clipboard_out_rx; // receiver wired in main.rs when needed
-        let (ft_in_tx, ft_in_rx) = tokio::sync::mpsc::channel::<crate::file_transfer::FtMessage>(32);
+        let (ft_in_tx, ft_in_rx) =
+            tokio::sync::mpsc::channel::<crate::file_transfer::FtMessage>(32);
         let (ft_control_tx, ft_control_rx) = tokio::sync::mpsc::channel::<String>(32);
         let clipboard_in_tx_clone = clipboard_in_tx.clone();
         let ft_in_tx_clone = ft_in_tx.clone();
@@ -117,9 +114,14 @@ impl PeerConnection {
                             let is_binary = !msg.is_string;
                             Box::pin(async move {
                                 if is_binary {
-                                    let _ = tx.send(crate::file_transfer::FtMessage::Chunk(data)).await;
+                                    let _ =
+                                        tx.send(crate::file_transfer::FtMessage::Chunk(data)).await;
                                 } else if let Ok(text) = std::str::from_utf8(&data) {
-                                    let _ = tx.send(crate::file_transfer::FtMessage::Control(text.to_string())).await;
+                                    let _ = tx
+                                        .send(crate::file_transfer::FtMessage::Control(
+                                            text.to_string(),
+                                        ))
+                                        .await;
                                 }
                             })
                         }));
@@ -156,22 +158,33 @@ impl PeerConnection {
         Ok(Self {
             pc,
             to_signaling_tx: to_sig_tx,
-            from_signaling_rx: Some(to_sig_rx),  // receiver for ICE+Answer outbound to signaling
+            from_signaling_rx: Some(to_sig_rx), // receiver for ICE+Answer outbound to signaling
             clipboard_in_rx: Some(clipboard_in_rx),
             clipboard_out_tx,
             ft_in_tx,
             ft_control_rx: Some(ft_control_rx),
+            security_code: Arc::new(std::sync::Mutex::new(None)),
         })
     }
 
     pub async fn handle_offer(&self, sdp: String) -> Result<()> {
-        let offer = RTCSessionDescription::offer(sdp)?;
+        let offer = RTCSessionDescription::offer(sdp.clone())?;
         self.pc.set_remote_description(offer).await?;
         let answer = self.pc.create_answer(None).await?;
         self.pc.set_local_description(answer.clone()).await?;
         self.to_signaling_tx
-            .send(SignalingMessage::Answer { sdp: answer.sdp })
+            .send(SignalingMessage::Answer { sdp: answer.sdp.clone() })
             .await?;
+        // Derive security code from DTLS fingerprints in SDP
+        let local_fp = extract_fingerprint(&answer.sdp).unwrap_or_default();
+        let remote_fp = extract_fingerprint(&sdp).unwrap_or_default();
+        if !local_fp.is_empty() && !remote_fp.is_empty() {
+            let code = derive_security_code(&local_fp, &remote_fp);
+            tracing::info!("Security code: {}", code);
+            if let Ok(mut guard) = self.security_code.lock() {
+                *guard = Some(code);
+            }
+        }
         Ok(())
     }
 
@@ -183,15 +196,29 @@ impl PeerConnection {
     }
 }
 
-async fn send_video_frames(
-    mut frame_rx: Receiver<FrameData>,
-    track: Arc<TrackLocalStaticSample>,
-) {
+pub fn derive_security_code(local_fp: &str, remote_fp: &str) -> String {
+    let mut fps = [local_fp, remote_fp];
+    fps.sort();
+    let combined = format!("{}|{}", fps[0], fps[1]);
+    let hash = Sha256::digest(combined.as_bytes());
+    let num = u32::from_be_bytes([hash[0], hash[1], hash[2], hash[3]]);
+    format!("{:06}", num % 1_000_000)
+}
+
+fn extract_fingerprint(sdp: &str) -> Option<String> {
+    sdp.lines()
+        .find(|l| l.starts_with("a=fingerprint:"))
+        .map(|l| l.trim_start_matches("a=fingerprint:").to_string())
+}
+
+async fn send_video_frames(mut frame_rx: Receiver<FrameData>, track: Arc<TrackLocalStaticSample>) {
     let mut encoder: Option<H264Encoder> = None;
     while let Some(frame) = frame_rx.recv().await {
         if encoder.is_none() {
             match H264Encoder::new(frame.width, frame.height, 30) {
-                Ok(enc) => { encoder = Some(enc); }
+                Ok(enc) => {
+                    encoder = Some(enc);
+                }
                 Err(e) => {
                     tracing::error!("H264Encoder init failed: {}", e);
                     continue;
@@ -227,5 +254,19 @@ mod tests {
             "PeerConnection creation failed: {:?}",
             result.err()
         );
+    }
+
+    #[test]
+    fn security_code_is_6_digits() {
+        let code = derive_security_code("sha-256 AA:BB:CC", "sha-256 DD:EE:FF");
+        assert_eq!(code.len(), 6);
+        assert!(code.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn security_code_is_symmetric() {
+        let code_ab = derive_security_code("fp_a", "fp_b");
+        let code_ba = derive_security_code("fp_b", "fp_a");
+        assert_eq!(code_ab, code_ba);
     }
 }

@@ -16,6 +16,7 @@ use peerdesk_agent::{
 pub struct AgentState {
     pub running: bool,
     pub peer_id: String,
+    pub security_code: Option<String>,
 }
 
 type SharedAgentState = Arc<Mutex<AgentState>>;
@@ -271,6 +272,16 @@ async fn reset_password() -> Result<String, String> {
     Err("Not supported on Android".into())
 }
 
+// ── get_security_code ─────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_security_code(
+    state: State<'_, SharedAgentState>,
+) -> Result<Option<String>, String> {
+    let guard = state.lock().await;
+    Ok(guard.security_code.clone())
+}
+
 // ── Tauri app ─────────────────────────────────────────────────────────────────
 
 pub fn run() {
@@ -287,6 +298,7 @@ pub fn run() {
             save_settings,
             apply_config_link,
             reset_password,
+            get_security_code,
         ])
         .setup(|app| {
             let show_item = MenuItem::with_id(app, "show", "Show PeerDesk", true, None::<&str>)?;
