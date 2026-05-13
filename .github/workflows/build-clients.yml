@@ -171,8 +171,8 @@ jobs:
           files: |
             agent-linux/peerdesk-agent-linux-x86_64
             agent-windows/peerdesk-agent-windows-x86_64.exe
-            viewer-linux/*.deb
-            viewer-linux/*.AppImage
-            viewer-windows/*.msi
-            viewer-windows/*.exe
+            viewer-linux/deb/*.deb
+            viewer-linux/appimage/*.AppImage
+            viewer-windows/msi/*.msi
+            viewer-windows/nsis/*.exe
             viewer-android/**/*.apk
