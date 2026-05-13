@@ -38,7 +38,6 @@ async fn get_agent_status(
 #[tauri::command]
 async fn start_agent(
     password: String,
-    signaling_url: String,
     state: State<'_, SharedAgentState>,
 ) -> Result<AgentStatusResponse, String> {
     {
@@ -48,8 +47,14 @@ async fn start_agent(
         }
     }
 
-    let cfg = peerdesk_agent::Config::load_or_create(&password)
-        .map_err(|e| e.to_string())?;
+    let config_path = peerdesk_agent::Config::config_path(false);
+    let cfg = peerdesk_agent::Config::load_or_create(
+        &config_path,
+        &password,
+        std::env::var("PEERDESK_SERVER").ok().as_deref(),
+        std::env::var("API_TOKEN").ok().filter(|t| !t.is_empty()).as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
 
     let peer_id = cfg.peer_id.clone();
 
@@ -62,10 +67,10 @@ async fn start_agent(
 
     let agent_cfg = peerdesk_agent::AgentConfig {
         password,
-        signaling_url,
-        api_url: std::env::var("API_URL").ok(),
+        server_url: std::env::var("PEERDESK_SERVER").ok(),
         api_token: std::env::var("API_TOKEN").ok().filter(|t| !t.is_empty()),
         display_index: 0,
+        portable: false,
     };
 
     let state_arc = Arc::clone(state.inner());
@@ -89,7 +94,6 @@ async fn start_agent(
 #[tauri::command]
 async fn start_agent(
     _password: String,
-    _signaling_url: String,
     _state: State<'_, SharedAgentState>,
 ) -> Result<AgentStatusResponse, String> {
     Err("Host mode is not supported on Android (viewer only)".into())

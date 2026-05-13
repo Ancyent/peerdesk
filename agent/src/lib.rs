@@ -17,10 +17,12 @@ pub use config::Config;
 #[derive(Debug, Clone)]
 pub struct AgentConfig {
     pub password: String,
-    pub signaling_url: String,
-    pub api_url: Option<String>,
+    /// Single server URL — signaling WS and API REST are derived from this.
+    pub server_url: Option<String>,
     pub api_token: Option<String>,
     pub display_index: usize,
+    /// Store config next to exe instead of user config dir.
+    pub portable: bool,
 }
 
 impl Default for AgentConfig {
@@ -28,9 +30,7 @@ impl Default for AgentConfig {
         Self {
             password: std::env::var("PEERDESK_PASSWORD")
                 .unwrap_or_else(|_| "changeme".into()),
-            signaling_url: std::env::var("SIGNALING_URL")
-                .unwrap_or_else(|_| "ws://localhost:8001/ws".into()),
-            api_url: std::env::var("API_URL").ok(),
+            server_url: std::env::var("PEERDESK_SERVER").ok(),
             api_token: std::env::var("API_TOKEN")
                 .ok()
                 .filter(|s| !s.is_empty()),
@@ -38,22 +38,32 @@ impl Default for AgentConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(0),
+            portable: false,
         }
     }
 }
 
 pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
-    let cfg = Config::load_or_create(&agent_cfg.password)?;
+    let config_path = Config::config_path(agent_cfg.portable);
+    let cfg = Config::load_or_create(
+        &config_path,
+        &agent_cfg.password,
+        agent_cfg.server_url.as_deref(),
+        agent_cfg.api_token.as_deref(),
+    )?;
     info!("PeerDesk agent — peer_id={}", cfg.peer_id);
 
-    // Optional: register with API server if API_TOKEN is set
-    if let (Some(api_url), Some(token)) = (&agent_cfg.api_url, &agent_cfg.api_token) {
-        match api_client::register_machine(api_url, token, &cfg.peer_id).await {
+    let signaling_url = cfg.signaling_url();
+    let api_url = cfg.api_url();
+    let effective_token = cfg.api_token.clone().or_else(|| agent_cfg.api_token.clone());
+
+    if let (Some(url), Some(token)) = (&api_url, &effective_token) {
+        match api_client::register_machine(url, token, &cfg.peer_id).await {
             Ok(m) => info!("Registered with API — machine_id={}", m.id),
             Err(e) => tracing::warn!("API registration failed (non-fatal): {}", e),
         }
     } else {
-        info!("API_TOKEN not set — running in standalone mode (no account required)");
+        info!("Running in standalone mode (no API token)");
     }
 
     info!("Password set. Waiting for connections...");
@@ -110,7 +120,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     let peer_id = cfg.peer_id.clone();
     let pw_hash = cfg.password_hash.clone();
-    let sig_url = cfg.signaling_url.clone();
+    let sig_url = signaling_url;
 
     // Spawn signaling client
     tokio::spawn(async move {

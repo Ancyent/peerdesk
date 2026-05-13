@@ -7,15 +7,38 @@ use std::path::{Path, PathBuf};
 pub struct Config {
     pub peer_id: String,
     pub password_hash: String,
-    pub signaling_url: String,
-}
-
-pub fn generate_peer_id() -> String {
-    let mut rng = rand::thread_rng();
-    (0..9).map(|_| rng.gen_range(0..10).to_string()).collect()
+    /// Base URL of the PeerDesk server, e.g. "https://api.example.com".
+    /// Signaling WebSocket and REST API URLs are derived from this.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_url: Option<String>,
+    /// Registration token for associating this machine with an account.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_token: Option<String>,
 }
 
 impl Config {
+    /// WebSocket URL for the signaling server, derived from server_url.
+    pub fn signaling_url(&self) -> String {
+        match &self.server_url {
+            Some(url) => {
+                let base = url.trim_end_matches('/');
+                let ws_base = base
+                    .replace("https://", "wss://")
+                    .replace("http://", "ws://");
+                format!("{}/ws", ws_base)
+            }
+            None => std::env::var("SIGNALING_URL")
+                .unwrap_or_else(|_| "ws://localhost:8001/ws".into()),
+        }
+    }
+
+    /// REST API base URL, derived from server_url.
+    pub fn api_url(&self) -> Option<String> {
+        self.server_url
+            .as_deref()
+            .map(|u| u.trim_end_matches('/').to_string())
+    }
+
     pub fn load(path: &Path) -> Result<Self> {
         let raw = std::fs::read_to_string(path)?;
         Ok(serde_json::from_str(&raw)?)
@@ -40,33 +63,65 @@ impl Config {
         Ok(())
     }
 
-    pub fn load_or_create(password: &str) -> Result<Self> {
-        let path = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("peerdesk")
-            .join("config.json");
+    /// Returns the config file path.
+    /// portable=true  → same directory as the executable (USB/portable mode).
+    /// portable=false → user config dir ($XDG_CONFIG_HOME/peerdesk/ on Linux,
+    ///                  %APPDATA%\peerdesk\ on Windows).
+    pub fn config_path(portable: bool) -> PathBuf {
+        if portable {
+            std::env::current_exe()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .parent()
+                .unwrap_or(Path::new("."))
+                .join("peerdesk.json")
+        } else {
+            dirs::config_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join("peerdesk")
+                .join("config.json")
+        }
+    }
 
-        match Self::load(&path) {
-            Ok(cfg) => return Ok(cfg),
+    /// Load existing config or create a new one.
+    /// `server_url` and `api_token` override saved values when provided.
+    pub fn load_or_create(
+        path: &Path,
+        password: &str,
+        server_url: Option<&str>,
+        api_token: Option<&str>,
+    ) -> Result<Self> {
+        let mut cfg = match Self::load(path) {
+            Ok(existing) => existing,
             Err(ref e) => {
                 let is_not_found = e.downcast_ref::<std::io::Error>()
                     .map_or(false, |io| io.kind() == std::io::ErrorKind::NotFound);
                 if !is_not_found {
                     return Err(anyhow::anyhow!("{}", e));
                 }
-                // File not found — fall through to create
+                Config {
+                    peer_id: generate_peer_id(),
+                    password_hash: bcrypt::hash(password, bcrypt::DEFAULT_COST)?,
+                    server_url: None,
+                    api_token: None,
+                }
             }
-        }
-        let hash = bcrypt::hash(password, bcrypt::DEFAULT_COST)?;
-        let cfg = Config {
-            peer_id: generate_peer_id(),
-            password_hash: hash,
-            signaling_url: std::env::var("SIGNALING_URL")
-                .unwrap_or_else(|_| "ws://localhost:8001/ws".into()),
         };
-        cfg.save(&path)?;
+
+        if let Some(url) = server_url {
+            cfg.server_url = Some(url.to_string());
+        }
+        if let Some(tok) = api_token {
+            cfg.api_token = Some(tok.to_string());
+        }
+
+        cfg.save(path)?;
         Ok(cfg)
     }
+}
+
+pub fn generate_peer_id() -> String {
+    let mut rng = rand::thread_rng();
+    (0..9).map(|_| rng.gen_range(0..10).to_string()).collect()
 }
 
 #[cfg(test)]
@@ -87,10 +142,57 @@ mod tests {
         let cfg = Config {
             peer_id: "123456789".into(),
             password_hash: "$2b$12$abc".into(),
-            signaling_url: "ws://localhost:8001/ws".into(),
+            server_url: Some("https://api.example.com".into()),
+            api_token: Some("tok123".into()),
         };
         cfg.save(&path).unwrap();
         let loaded = Config::load(&path).unwrap();
         assert_eq!(loaded.peer_id, "123456789");
+        assert_eq!(loaded.server_url.as_deref(), Some("https://api.example.com"));
+        assert_eq!(loaded.api_token.as_deref(), Some("tok123"));
+    }
+
+    #[test]
+    fn signaling_url_derives_from_https() {
+        let cfg = Config {
+            peer_id: "x".into(),
+            password_hash: "x".into(),
+            server_url: Some("https://api.example.com".into()),
+            api_token: None,
+        };
+        assert_eq!(cfg.signaling_url(), "wss://api.example.com/ws");
+    }
+
+    #[test]
+    fn signaling_url_derives_from_http() {
+        let cfg = Config {
+            peer_id: "x".into(),
+            password_hash: "x".into(),
+            server_url: Some("http://localhost:8001".into()),
+            api_token: None,
+        };
+        assert_eq!(cfg.signaling_url(), "ws://localhost:8001/ws");
+    }
+
+    #[test]
+    fn signaling_url_fallback_when_no_server() {
+        let cfg = Config {
+            peer_id: "x".into(),
+            password_hash: "x".into(),
+            server_url: None,
+            api_token: None,
+        };
+        assert_eq!(cfg.signaling_url(), "ws://localhost:8001/ws");
+    }
+
+    #[test]
+    fn api_url_strips_trailing_slash() {
+        let cfg = Config {
+            peer_id: "x".into(),
+            password_hash: "x".into(),
+            server_url: Some("https://api.example.com/".into()),
+            api_token: None,
+        };
+        assert_eq!(cfg.api_url(), Some("https://api.example.com".to_string()));
     }
 }
