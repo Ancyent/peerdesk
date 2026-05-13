@@ -1,5 +1,5 @@
 interface StatusBarProps {
-  approvalStatus: string;
+  approvalStatus: 'pending' | 'approved' | 'denied' | 'standalone';
   serverUrl: string | null;
 }
 
