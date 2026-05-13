@@ -48,6 +48,18 @@ export interface MachineOut {
   id: string; peer_id: string; name: string; os: string | null;
   is_online: boolean; last_seen_at: string | null; created_at: string;
   company_id: string | null; location_id: string | null; group_id: string | null;
+  approval_status: string;   // "pending" | "approved" | "denied"
+  api_key_id: string | null;
+}
+
+export interface ApiKeyOut {
+  id: string;
+  key: string;
+  name: string;
+  auto_approve: boolean;
+  is_active: boolean;
+  created_at: string;
+  last_used_at: string | null;
 }
 
 export interface CompanyOut {
@@ -105,6 +117,20 @@ export const api = {
         headers: authHeaders(token),
         body: JSON.stringify({ peer_id, name, os }),
       }),
+    approve: (token: string, machineId: string) =>
+      request<MachineOut>(`/machines/${machineId}/approve`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      }),
+    deny: (token: string, machineId: string) =>
+      request<MachineOut>(`/machines/${machineId}/deny`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      }),
+    listByStatus: (token: string, status: string) =>
+      request<MachineOut[]>(`/machines?status=${encodeURIComponent(status)}`, {
+        headers: authHeaders(token),
+      }),
   },
   branding: {
     get: () => request<BrandingConfig>('/branding'),
@@ -113,6 +139,21 @@ export const api = {
         method: 'POST',
         headers: authHeaders(token),
         body: JSON.stringify(data),
+      }),
+  },
+  apiKeys: {
+    list: (token: string) =>
+      request<ApiKeyOut[]>('/api-keys', { headers: authHeaders(token) }),
+    create: (token: string, name: string, autoApprove = false) =>
+      request<ApiKeyOut>('/api-keys', {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ name, auto_approve: autoApprove }),
+      }),
+    revoke: (token: string, id: string) =>
+      request<void>(`/api-keys/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
       }),
   },
   companies: {
