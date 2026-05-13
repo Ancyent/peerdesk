@@ -92,5 +92,14 @@ export function useWebRTC(
 
   const getFtChannel = useCallback(() => ftChRef.current, []);
 
-  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, disconnect, getFtChannel };
+  const setMaxBitrate = useCallback(async (kbps: number | null) => {
+    const sender = pcRef.current?.getSenders().find(s => s.track?.kind === 'video');
+    if (!sender) return;
+    const params = sender.getParameters();
+    if (!params.encodings?.length) params.encodings = [{}];
+    params.encodings[0].maxBitrate = kbps !== null ? kbps * 1000 : undefined;
+    await sender.setParameters(params);
+  }, []);
+
+  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, disconnect, getFtChannel, setMaxBitrate };
 }
