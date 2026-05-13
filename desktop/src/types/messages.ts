@@ -12,4 +12,7 @@ export type SignalingMessage =
   | { type: 'approved' }
   | { type: 'denied'; reason: string }
   | { type: 'switch_display'; index: number }
-  | { type: 'display_list'; displays: Array<{ index: number; width: number; height: number; is_primary: boolean }> };
+  | { type: 'display_list'; displays: Array<{ index: number; width: number; height: number; is_primary: boolean }> }
+  | { type: 'request_challenge'; peer_id: string }
+  | { type: 'challenge'; nonce: string }
+  | { type: 'auth_response'; peer_id: string; response: string };

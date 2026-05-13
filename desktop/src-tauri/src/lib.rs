@@ -263,6 +263,7 @@ async fn reset_password() -> Result<String, String> {
             password_hash: hash,
             server_url: cfg.server_url,
             api_key: cfg.api_key,
+            hmac_key: Some(peerdesk_agent::config::derive_hmac_key(&new_pw)),
         }
         .save(&config_path)
         .map_err(|e| e.to_string())?;

@@ -9,6 +9,30 @@ import type { SignalingMessage } from '../types/messages';
 
 const fmt = (id: string) => id.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
 
+async function computeHmacKey(password: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode('peerdesk-v1'),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(password));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function computeResponse(nonce: string, hmacKey: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(hmacKey),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(nonce));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 interface Props {
   session: Session;
   signalingUrl: string;
@@ -34,6 +58,17 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     if (msg.type === 'joined') {
       setViewState('negotiating');
       webrtc.startOffer();
+    } else if (msg.type === 'challenge') {
+      const nonce = msg.nonce;
+      computeHmacKey(password).then(hmacKey =>
+        computeResponse(nonce, hmacKey).then(response => {
+          sendRef.current?.({ type: 'auth_response', peer_id: session.id, response });
+        })
+      ).catch(() => {
+        setErrMsg('Crypto error');
+        setViewState('error');
+        onStateChange(session.id, 'error', 'Crypto error');
+      });
     } else if (msg.type === 'answer') {
       await webrtc.handleAnswer(msg.sdp);
     } else if (msg.type === 'ice_candidate') {
@@ -56,7 +91,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
       onStateChange(session.id, 'error', 'Remote machine disconnected');
       onClose();
     }
-  }, [webrtc, session.id, onStateChange, onClose]));
+  }, [webrtc, session.id, onStateChange, onClose, password]));
 
   sendRef.current = send;
 
@@ -86,8 +121,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
 
   const handleJoin = () => {
     setViewState('pending_approval');
-    onStateChange(session.id, 'negotiating'); // parent still sees 'negotiating'
-    send({ type: 'join', peer_id: session.id, password });
+    onStateChange(session.id, 'negotiating');
+    send({ type: 'request_challenge', peer_id: session.id });
   };
 
   const handleDisconnect = () => {

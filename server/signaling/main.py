@@ -166,3 +166,4 @@ async def websocket_endpoint(ws: WebSocket):
             if agent_pid:
                 state.agent_to_viewer.pop(agent_pid, None)
             state.viewer_connections.pop(viewer_id, None)
+            state.viewer_pending.pop(viewer_id, None)
