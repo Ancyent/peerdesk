@@ -8,6 +8,7 @@ import { AgentInstallPage } from './pages/AgentInstallPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { BrandingPage } from './pages/BrandingPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ApiKeysPage } from './pages/ApiKeysPage';
 import { AppShell, type AppPage } from './components/AppShell';
 import { OrgTree, type OrgNode } from './components/OrgTree';
 import { ConnectForm } from './components/ConnectForm';
@@ -122,6 +123,7 @@ export default function App() {
       {page === 'machines'      && <MachinesPage onConnect={handleDashboardConnect} />}
       {page === 'organization'  && <OrganizationPage onConnect={handleDashboardConnect} orgNode={orgNode} />}
       {page === 'agent-install' && <AgentInstallPage />}
+      {page === 'api-keys'      && <ApiKeysPage />}
       {page === 'downloads'     && <DownloadsPage />}
       {page === 'branding'      && <BrandingPage onBack={() => setPage('machines')} />}
       {page === 'settings'      && <SettingsPage />}
