@@ -23,6 +23,7 @@ echo "[1/2] Linux x86_64..."
 cargo build -p peerdesk-agent --release
 cp target/release/peerdesk-agent "${OUT}/peerdesk-agent-linux-x86_64"
 echo "      ✓ ${OUT}/peerdesk-agent-linux-x86_64 ($(du -sh "${OUT}/peerdesk-agent-linux-x86_64" | cut -f1))"
+echo "      Peer ID: $(./${OUT}/peerdesk-agent-linux-x86_64 --get-id)"
 
 # ── Android aarch64 (opțional, necesită NDK) ──────────────────────────────────
 echo ""

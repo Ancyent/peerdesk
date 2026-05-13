@@ -457,3 +457,46 @@ Planned:
 ## License
 
 MIT
+
+---
+
+## Agent Deployment
+
+### Quick install — Linux (as root)
+```bash
+curl -sSL https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.sh \
+  | sudo bash -s -- --server=https://your-server.com --token=YOUR_TOKEN
+```
+
+### Quick install — Windows (as Administrator)
+```powershell
+irm https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.ps1 | iex
+# Or with parameters:
+.\install.ps1 -Server "https://your-server.com" -Token "YOUR_TOKEN"
+```
+
+### Manual / portable
+```bash
+# Get peer ID (creates config on first run):
+./peerdesk-agent --server=https://your-server.com --token=YOUR_TOKEN --get-id
+
+# Install as service (Linux):
+sudo ./peerdesk-agent --install-service --server=https://your-server.com --token=YOUR_TOKEN
+
+# Portable mode (config stored next to binary):
+./peerdesk-agent --portable --server=https://your-server.com
+```
+
+### CLI reference
+
+| Flag | Description |
+|---|---|
+| `--server=URL` | Base URL of PeerDesk server |
+| `--token=TOKEN` | Registration token from dashboard |
+| `--password=PW` | Override connection password |
+| `--silent` | Log to file, no stdout (used by service) |
+| `--portable` | Store config next to binary |
+| `--get-id` | Print peer ID and exit |
+| `--reset-password` | Generate new password, print, exit |
+| `--install-service` | Install as systemd/Windows service |
+| `--uninstall-service` | Remove service |
