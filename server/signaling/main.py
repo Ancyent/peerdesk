@@ -101,10 +101,11 @@ async def websocket_endpoint(ws: WebSocket):
                     viewer_id = await handle_join(
                         state, redis_client, data["peer_id"], data["password"], ws
                     )
+                    viewer_ip = ws.client.host if ws.client else "unknown"
                     if viewer_id:
-                        audit_log("connection_attempt", data["peer_id"], str(ws.client), "approved")
+                        audit_log("connection_attempt", data["peer_id"], viewer_ip, "approved")
                     else:
-                        audit_log("connection_attempt", data.get("peer_id", ""), str(ws.client), "auth_failed")
+                        audit_log("connection_attempt", data.get("peer_id", ""), viewer_ip, "auth_failed")
 
                 elif msg_type in ("offer", "answer", "ice_candidate"):
                     await forward_to_peer(state, peer_id, viewer_id, data)
