@@ -15,9 +15,10 @@ pub struct H264Encoder {
 impl H264Encoder {
     pub fn new(width: u32, height: u32, fps: u32) -> Result<Self> {
         anyhow::ensure!(
-            width % 2 == 0 && height % 2 == 0,
+            width.is_multiple_of(2) && height.is_multiple_of(2),
             "H.264 requires even dimensions, got {}x{}",
-            width, height
+            width,
+            height
         );
         let api = OpenH264API::from_source();
         let config = EncoderConfig::new()
@@ -26,7 +27,12 @@ impl H264Encoder {
             .enable_skip_frame(true)
             .debug(false);
         let encoder = Encoder::with_api_config(api, config)?;
-        Ok(Self { encoder, width, height, frame_count: 0 })
+        Ok(Self {
+            encoder,
+            width,
+            height,
+            frame_count: 0,
+        })
     }
 
     pub fn encode_bgra(&mut self, bgra: &[u8]) -> Result<Vec<u8>> {
@@ -41,7 +47,7 @@ impl H264Encoder {
             expected
         );
         // Force IDR keyframe every 60 frames so browsers can start decoding quickly
-        if self.frame_count % 60 == 0 {
+        if self.frame_count.is_multiple_of(60) {
             self.encoder.force_intra_frame();
         }
         self.frame_count += 1;

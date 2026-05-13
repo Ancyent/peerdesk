@@ -9,8 +9,12 @@ pub struct ClipboardMessage {
 /// Runs clipboard sync:
 /// - Polls local clipboard every 500ms for changes → sends via `out_tx`
 /// - Receives text via `in_rx` → writes to local clipboard
+///
 /// Runs clipboard I/O on a dedicated OS thread (arboard is blocking/!Send).
-pub async fn run(out_tx: Sender<ClipboardMessage>, mut in_rx: Receiver<ClipboardMessage>) -> Result<()> {
+pub async fn run(
+    out_tx: Sender<ClipboardMessage>,
+    mut in_rx: Receiver<ClipboardMessage>,
+) -> Result<()> {
     let (poll_tx, mut poll_rx) = tokio::sync::mpsc::channel::<String>(8);
     let (write_tx, write_rx) = std::sync::mpsc::sync_channel::<String>(8);
 
@@ -66,7 +70,9 @@ mod tests {
 
     #[test]
     fn clipboard_message_holds_text() {
-        let msg = ClipboardMessage { text: "hello clipboard".into() };
+        let msg = ClipboardMessage {
+            text: "hello clipboard".into(),
+        };
         assert_eq!(msg.text, "hello clipboard");
     }
 }
