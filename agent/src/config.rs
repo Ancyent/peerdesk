@@ -141,30 +141,56 @@ pub enum AccessMode {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppSettings {
-    #[serde(default)]                     pub access_mode: AccessMode,
-    #[serde(default = "default_true")]    pub show_approval_dialog: bool,
-    #[serde(default)]                     pub auto_disconnect_minutes: Option<u32>,
-    #[serde(default)]                     pub lock_screen_after_session: bool,
-    #[serde(default = "default_true")]    pub allow_keyboard_mouse: bool,
-    #[serde(default = "default_true")]    pub allow_clipboard: bool,
-    #[serde(default)]                     pub allow_file_transfer: bool,
-    #[serde(default)]                     pub allow_audio: bool,
-    #[serde(default)]                     pub allow_terminal: bool,
-    #[serde(default)]                     pub allow_remote_restart: bool,
-    #[serde(default)]                     pub block_user_input: bool,
-    #[serde(default = "default_quality")] pub image_quality: String,
-    #[serde(default = "default_codec")]   pub codec: String,
-    #[serde(default = "default_view")]    pub view_mode: String,
-    #[serde(default)]                     pub show_remote_cursor: bool,
-    #[serde(default = "default_true")]    pub hardware_acceleration: bool,
-    #[serde(default)]                     pub start_on_boot: bool,
-    #[serde(default = "default_true")]    pub minimize_to_tray: bool,
+    #[serde(default)]
+    pub access_mode: AccessMode,
+    #[serde(default = "default_true")]
+    pub show_approval_dialog: bool,
+    #[serde(default)]
+    pub auto_disconnect_minutes: Option<u32>,
+    #[serde(default)]
+    pub lock_screen_after_session: bool,
+    #[serde(default = "default_true")]
+    pub allow_keyboard_mouse: bool,
+    #[serde(default = "default_true")]
+    pub allow_clipboard: bool,
+    #[serde(default)]
+    pub allow_file_transfer: bool,
+    #[serde(default)]
+    pub allow_audio: bool,
+    #[serde(default)]
+    pub allow_terminal: bool,
+    #[serde(default)]
+    pub allow_remote_restart: bool,
+    #[serde(default)]
+    pub block_user_input: bool,
+    #[serde(default = "default_quality")]
+    pub image_quality: String,
+    #[serde(default = "default_codec")]
+    pub codec: String,
+    #[serde(default = "default_view")]
+    pub view_mode: String,
+    #[serde(default)]
+    pub show_remote_cursor: bool,
+    #[serde(default = "default_true")]
+    pub hardware_acceleration: bool,
+    #[serde(default)]
+    pub start_on_boot: bool,
+    #[serde(default = "default_true")]
+    pub minimize_to_tray: bool,
 }
 
-fn default_true()    -> bool   { true }
-fn default_quality() -> String { "balanced".into() }
-fn default_codec()   -> String { "auto".into() }
-fn default_view()    -> String { "fit".into() }
+fn default_true() -> bool {
+    true
+}
+fn default_quality() -> String {
+    "balanced".into()
+}
+fn default_codec() -> String {
+    "auto".into()
+}
+fn default_view() -> String {
+    "fit".into()
+}
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -198,7 +224,9 @@ impl AppSettings {
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
-        if let Some(p) = path.parent() { std::fs::create_dir_all(p)?; }
+        if let Some(p) = path.parent() {
+            std::fs::create_dir_all(p)?;
+        }
         std::fs::write(path, serde_json::to_string_pretty(self)?)?;
         Ok(())
     }
@@ -302,7 +330,10 @@ mod tests {
     fn app_settings_roundtrips_to_file() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("peerdesk-settings.json");
-        let s = AppSettings { allow_file_transfer: true, ..AppSettings::default() };
+        let s = AppSettings {
+            allow_file_transfer: true,
+            ..AppSettings::default()
+        };
         s.save(&path).unwrap();
         let loaded = AppSettings::load(&path).unwrap();
         assert!(loaded.allow_file_transfer);
@@ -310,7 +341,10 @@ mod tests {
 
     #[test]
     fn access_mode_serializes_as_snake_case() {
-        let s = AppSettings { access_mode: AccessMode::ViewOnly, ..AppSettings::default() };
+        let s = AppSettings {
+            access_mode: AccessMode::ViewOnly,
+            ..AppSettings::default()
+        };
         let json = serde_json::to_string(&s).unwrap();
         assert!(json.contains("view_only"));
     }
