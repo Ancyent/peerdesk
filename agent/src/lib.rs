@@ -185,9 +185,12 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 viewer_id,
                 remote_ip,
             }) => {
-                info!(
-                    "Viewer {} from {} requesting connection — auto-approving",
-                    viewer_id, remote_ip
+                tracing::info!(
+                    event = "viewer_connection_request",
+                    viewer_id = %viewer_id,
+                    remote_ip = %remote_ip,
+                    action = "auto_approve",
+                    "Incoming connection request"
                 );
                 // Auto-approve: send Approve back to signaling via to_sig_tx
                 let approve = signaling::SignalingMessage::Approve { viewer_id };

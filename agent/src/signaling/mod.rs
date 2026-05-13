@@ -7,19 +7,47 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SignalingMessage {
-    Register { peer_id: String, password_hash: String },
-    Registered { peer_id: String },
-    ViewerJoined { viewer_id: String },
-    ViewerPending { viewer_id: String, remote_ip: String },
-    Approve { viewer_id: String },
-    Deny { viewer_id: String },
-    Denied { reason: String },
-    Offer { sdp: String },
-    Answer { sdp: String },
-    IceCandidate { candidate: serde_json::Value },
-    Error { code: String },
-    SwitchDisplay { index: usize },
-    DisplayList { displays: Vec<crate::capture::DisplayInfo> },
+    Register {
+        peer_id: String,
+        password_hash: String,
+    },
+    Registered {
+        peer_id: String,
+    },
+    ViewerJoined {
+        viewer_id: String,
+    },
+    ViewerPending {
+        viewer_id: String,
+        remote_ip: String,
+    },
+    Approve {
+        viewer_id: String,
+    },
+    Deny {
+        viewer_id: String,
+    },
+    Denied {
+        reason: String,
+    },
+    Offer {
+        sdp: String,
+    },
+    Answer {
+        sdp: String,
+    },
+    IceCandidate {
+        candidate: serde_json::Value,
+    },
+    Error {
+        code: String,
+    },
+    SwitchDisplay {
+        index: usize,
+    },
+    DisplayList {
+        displays: Vec<crate::capture::DisplayInfo>,
+    },
 }
 
 pub async fn run(
@@ -29,6 +57,15 @@ pub async fn run(
     to_webrtc: Sender<SignalingMessage>,
     mut from_webrtc: Receiver<SignalingMessage>,
 ) -> Result<()> {
+    if signaling_url.starts_with("ws://")
+        && !signaling_url.contains("localhost")
+        && !signaling_url.contains("127.0.0.1")
+    {
+        tracing::warn!(
+            "⚠ Connecting to signaling server over unencrypted ws:// — \
+             use wss:// in production. Passwords and metadata are visible to network observers."
+        );
+    }
     let (ws_stream, _) = connect_async(signaling_url).await?;
     let (mut write, mut read) = ws_stream.split();
 
@@ -36,7 +73,9 @@ pub async fn run(
         peer_id: peer_id.to_string(),
         password_hash: password_hash.to_string(),
     };
-    write.send(Message::Text(serde_json::to_string(&register)?)).await?;
+    write
+        .send(Message::Text(serde_json::to_string(&register)?))
+        .await?;
     tracing::info!("Registered with signaling server, peer_id={}", peer_id);
 
     loop {
@@ -109,7 +148,9 @@ mod tests {
 
     #[test]
     fn serializes_approve_message() {
-        let msg = SignalingMessage::Approve { viewer_id: "abc".into() };
+        let msg = SignalingMessage::Approve {
+            viewer_id: "abc".into(),
+        };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("\"type\":\"approve\""));
     }
@@ -118,7 +159,12 @@ mod tests {
     fn serializes_display_list_message() {
         use crate::capture::DisplayInfo;
         let msg = SignalingMessage::DisplayList {
-            displays: vec![DisplayInfo { index: 0, width: 1920, height: 1080, is_primary: true }],
+            displays: vec![DisplayInfo {
+                index: 0,
+                width: 1920,
+                height: 1080,
+                is_primary: true,
+            }],
         };
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("\"type\":\"display_list\""));

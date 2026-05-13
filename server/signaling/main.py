@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import time
@@ -16,6 +17,17 @@ from session import (
     register_agent,
     unregister_agent,
 )
+
+def audit_log(event: str, peer_id: str, viewer_ip: str, outcome: str, **extra):
+    print(json.dumps({
+        "event": event,
+        "peer_id": peer_id,
+        "viewer_ip": viewer_ip,
+        "outcome": outcome,
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        **extra,
+    }), flush=True)
+
 
 # Per-IP rate limiter: track WebSocket connection timestamps
 _connection_attempts: dict[str, list[float]] = defaultdict(list)
@@ -89,6 +101,10 @@ async def websocket_endpoint(ws: WebSocket):
                     viewer_id = await handle_join(
                         state, redis_client, data["peer_id"], data["password"], ws
                     )
+                    if viewer_id:
+                        audit_log("connection_attempt", data["peer_id"], str(ws.client), "approved")
+                    else:
+                        audit_log("connection_attempt", data.get("peer_id", ""), str(ws.client), "auth_failed")
 
                 elif msg_type in ("offer", "answer", "ice_candidate"):
                     await forward_to_peer(state, peer_id, viewer_id, data)
