@@ -68,7 +68,11 @@ pub async fn run(tx: Sender<FrameData>, display_index: usize) -> Result<()> {
     loop {
         match capturer.frame() {
             Ok(frame) => {
-                let fd = FrameData { width: w, height: h, data: frame.to_vec() };
+                let fd = FrameData {
+                    width: w,
+                    height: h,
+                    data: frame.to_vec(),
+                };
                 // try_send drops the frame if encoder is busy — prevents latency buildup
                 match tx.try_send(fd) {
                     Ok(_) => {}

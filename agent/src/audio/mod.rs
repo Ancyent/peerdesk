@@ -25,7 +25,10 @@ pub async fn run(tx: Sender<AudioFrame>) -> Result<()> {
     let config = match device.default_input_config() {
         Ok(c) => c,
         Err(e) => {
-            tracing::warn!("No audio config available: {} — audio streaming disabled", e);
+            tracing::warn!(
+                "No audio config available: {} — audio streaming disabled",
+                e
+            );
             return Ok(());
         }
     };

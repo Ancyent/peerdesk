@@ -11,8 +11,8 @@ pub enum FtMessage {
 }
 
 pub async fn run(mut rx: Receiver<FtMessage>, control_tx: Sender<String>) -> Result<()> {
-    let transfer_dir = dirs::download_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp/peerdesk-transfers"));
+    let transfer_dir =
+        dirs::download_dir().unwrap_or_else(|| PathBuf::from("/tmp/peerdesk-transfers"));
     std::fs::create_dir_all(&transfer_dir)?;
 
     // (id, name, expected_size, accumulated_bytes)
@@ -35,12 +35,16 @@ pub async fn run(mut rx: Receiver<FtMessage>, control_tx: Sender<String>) -> Res
                             } else {
                                 let cap = (size as usize).min(16 * 1024 * 1024);
                                 active = Some((id.clone(), name, size, Vec::with_capacity(cap)));
-                                let _ = control_tx.send(
-                                    serde_json::json!({"type":"ft_accept","id":id}).to_string()
-                                ).await;
+                                let _ = control_tx
+                                    .send(
+                                        serde_json::json!({"type":"ft_accept","id":id}).to_string(),
+                                    )
+                                    .await;
                             }
                         }
-                        "ft_cancel" => { active = None; }
+                        "ft_cancel" => {
+                            active = None;
+                        }
                         _ => {}
                     }
                 }
@@ -62,11 +66,15 @@ pub async fn run(mut rx: Receiver<FtMessage>, control_tx: Sender<String>) -> Res
                         if let Err(e) = tokio::fs::write(&path, buf).await {
                             tracing::error!("Failed to write file {:?}: {}", path, e);
                         } else {
-                            tracing::info!("File transfer complete: {:?} ({} bytes)", path, received);
+                            tracing::info!(
+                                "File transfer complete: {:?} ({} bytes)",
+                                path,
+                                received
+                            );
                         }
-                        let _ = control_tx.send(
-                            serde_json::json!({"type":"ft_done","id":id}).to_string()
-                        ).await;
+                        let _ = control_tx
+                            .send(serde_json::json!({"type":"ft_done","id":id}).to_string())
+                            .await;
                         active = None;
                     }
                 }
@@ -82,8 +90,7 @@ mod tests {
 
     #[test]
     fn transfer_dir_is_valid_path() {
-        let dir = dirs::download_dir()
-            .unwrap_or_else(|| PathBuf::from("/tmp/peerdesk-transfers"));
+        let dir = dirs::download_dir().unwrap_or_else(|| PathBuf::from("/tmp/peerdesk-transfers"));
         assert!(!dir.as_os_str().is_empty());
     }
 }
