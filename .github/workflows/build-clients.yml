@@ -144,8 +144,9 @@ jobs:
           fi
       - name: Build APK
         env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/26.1.10909125
-        run: cd desktop && cargo tauri android build --apk
+        run: cd desktop && cargo tauri android build --debug --apk
       - name: Collect artifacts
         run: |
           mkdir -p dist
