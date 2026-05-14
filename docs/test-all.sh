@@ -162,7 +162,7 @@ ACCESS_TOKEN=""
 if $PROD_MODE; then
   skip "Testele API sar în --prod mode"
 else
-  TEST_EMAIL="test-$(date +%s)@peerdesk.test"
+  TEST_EMAIL="test-$(date +%s)@peerdesk-test.com"
   TEST_PASS="TestPass123!"
 
   REGISTER_RESP=$(curl -s --max-time 10 -X POST "$API_URL/auth/register" \
@@ -216,7 +216,7 @@ if [[ -z "$ACCESS_TOKEN" ]]; then
   skip "Testele machines sar — nu am token valid"
 else
   AUTH_H="Authorization: Bearer $ACCESS_TOKEN"
-  TEST_PEER_ID="tp-$(date +%s)"
+  TEST_PEER_ID="$(shuf -i 100000000-999999999 -n 1 2>/dev/null || echo "$(date +%s)" | grep -oP '\d{9}$')"
 
   MACHINE_RESP=$(curl -s --max-time 10 -X POST "$API_URL/machines" \
     -H "Content-Type: application/json" -H "$AUTH_H" \
@@ -247,7 +247,7 @@ else
     [[ "$APP" == "200" || "$APP" == "204" ]] && pass "POST /machines/approve → $APP" || fail "POST /machines/approve → $APP"
 
     DENY_RESP=$(curl -s -X POST "$API_URL/machines" -H "Content-Type: application/json" -H "$AUTH_H" \
-      -d "{\"peer_id\":\"deny-$(date +%s)\",\"name\":\"Deny Test\"}")
+      -d "{\"peer_id\":\"$(shuf -i 100000000-999999999 -n 1 2>/dev/null || echo 300000003)\",\"name\":\"Deny Test\"}")
     DENY_ID=$(json_get "$DENY_RESP" "id")
     if [[ -n "$DENY_ID" && "$DENY_ID" != "null" ]]; then
       DENY_C=$(http_code -X POST "$API_URL/machines/$DENY_ID/deny" -H "$AUTH_H")
@@ -331,13 +331,14 @@ else
     || fail "POST /tokens → format invalid ($TOK_RESP)"
 
   if [[ -n "$TOK_VAL" && "$TOK_VAL" != "null" ]]; then
+    REDEEM_PID="$(shuf -i 100000000-999999999 -n 1 2>/dev/null || echo "$(date +%N)" | grep -oP '^\d{9}')"
     REDEEM=$(json_get "$(curl -s -X POST "$API_URL/tokens/redeem" \
       -H "Content-Type: application/json" \
-      -d "{\"token\":\"$TOK_VAL\",\"peer_id\":\"rp-$(date +%s)\",\"name\":\"Redeemed PC\"}")" "peer_id")
+      -d "{\"token\":\"$TOK_VAL\",\"peer_id\":\"$REDEEM_PID\",\"name\":\"Redeemed PC\"}")" "peer_id")
     [[ -n "$REDEEM" ]] && pass "POST /tokens/redeem → mașinărie înregistrată" || fail "POST /tokens/redeem → eșuat"
 
     REDEEM2=$(http_code -X POST "$API_URL/tokens/redeem" -H "Content-Type: application/json" \
-      -d "{\"token\":\"$TOK_VAL\",\"peer_id\":\"rp2-$(date +%s)\",\"name\":\"Dup\"}")
+      -d "{\"token\":\"$TOK_VAL\",\"peer_id\":\"$(shuf -i 100000000-999999999 -n 1 2>/dev/null || echo 200000002)\",\"name\":\"Dup\"}")
     [[ "$REDEEM2" == "400" ]] && pass "Redeem a doua oară → 400 (token deja folosit)" || fail "Redeem a doua oară → $REDEEM2"
   fi
 
