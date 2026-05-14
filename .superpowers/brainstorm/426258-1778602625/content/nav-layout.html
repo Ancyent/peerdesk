@@ -1,0 +1,147 @@
+<h2>Cum ar trebui să arate navigația dashboard-ului?</h2>
+<p class="subtitle">Alege structura generală — o vom rafina împreună</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="sidebar" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:16px;border-radius:6px;font-family:monospace;font-size:12px">
+      <div style="display:flex;height:220px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+        <div style="width:180px;background:#1e293b;color:#cbd5e1;padding:16px;flex-shrink:0">
+          <div style="color:#fff;font-weight:600;font-size:13px;margin-bottom:20px">⬛ PeerDesk</div>
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Organizare</div>
+          <div style="padding:6px 8px;border-radius:4px;color:#e2e8f0;font-size:12px;margin-bottom:2px">🏢 Companii</div>
+          <div style="padding:6px 8px;border-radius:4px;color:#e2e8f0;font-size:12px;margin-bottom:2px">📍 Locații</div>
+          <div style="padding:6px 8px;border-radius:4px;color:#e2e8f0;font-size:12px;margin-bottom:2px">📁 Grupuri</div>
+          <div style="padding:6px 8px;border-radius:4px;background:#334155;color:#fff;font-size:12px;margin-bottom:2px">🖥 Mașini</div>
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px">Admin</div>
+          <div style="padding:6px 8px;color:#e2e8f0;font-size:12px;margin-bottom:2px">⬇️ Agent / Download</div>
+          <div style="padding:6px 8px;color:#e2e8f0;font-size:12px;margin-bottom:2px">⚙️ Setări</div>
+          <div style="padding:6px 8px;color:#e2e8f0;font-size:12px">🎨 Branding</div>
+        </div>
+        <div style="flex:1;background:#f8fafc;padding:16px">
+          <div style="font-weight:600;font-size:13px;color:#1e293b;margin-bottom:12px">Mașini</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:12px;font-weight:500">PC-Birou-01</div>
+                <div style="font-size:10px;color:#94a3b8">HQ › IT · Windows</div>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span>
+                <button style="padding:3px 10px;font-size:10px;background:#3b82f6;color:#fff;border:none;border-radius:4px">Connect</button>
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:12px;font-weight:500">Laptop-Dev-Ana</div>
+                <div style="font-size:10px;color:#94a3b8">HQ › Dev · macOS</div>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="width:7px;height:7px;border-radius:50%;background:#9ca3af;display:inline-block"></span>
+                <button style="padding:3px 10px;font-size:10px;background:#f3f4f6;color:#9ca3af;border:none;border-radius:4px">Connect</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Sidebar permanent</h3>
+      <p>Navigație laterală fixă, toate secțiunile vizibile. Clasic pentru dashboard-uri de admin. Navigare rapidă.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="topnav" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:16px;border-radius:6px">
+      <div style="height:220px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+        <div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 16px;display:flex;align-items:center;gap:16px">
+          <span style="font-weight:700;font-size:13px">PeerDesk</span>
+          <div style="display:flex;gap:2px">
+            <span style="padding:5px 10px;font-size:11px;border-radius:4px;background:#eff6ff;color:#3b82f6;font-weight:500">Mașini</span>
+            <span style="padding:5px 10px;font-size:11px;border-radius:4px;color:#64748b">Organizare</span>
+            <span style="padding:5px 10px;font-size:11px;border-radius:4px;color:#64748b">Agent</span>
+            <span style="padding:5px 10px;font-size:11px;border-radius:4px;color:#64748b">Setări</span>
+          </div>
+          <div style="margin-left:auto">
+            <span style="width:26px;height:26px;border-radius:50%;background:#3b82f6;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px">A</span>
+          </div>
+        </div>
+        <div style="padding:14px;background:#f8fafc">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:11px;color:#64748b">
+            <span style="color:#3b82f6">Firma ABC</span> › <span style="color:#3b82f6">HQ</span> › <span style="color:#1e293b;font-weight:500">IT</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px">
+              <div style="font-size:11px;font-weight:500;margin-bottom:4px">PC-Birou-01</div>
+              <div style="font-size:10px;color:#94a3b8;margin-bottom:6px">Windows</div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:9px;color:#16a34a">● Online</span>
+                <button style="padding:2px 8px;font-size:9px;background:#3b82f6;color:#fff;border:none;border-radius:3px">Connect</button>
+              </div>
+            </div>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px">
+              <div style="font-size:11px;font-weight:500;margin-bottom:4px">Laptop-Dev-Ana</div>
+              <div style="font-size:10px;color:#94a3b8;margin-bottom:6px">macOS</div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:9px;color:#9ca3af">● Offline</span>
+                <button style="padding:2px 8px;font-size:9px;background:#f3f4f6;color:#9ca3af;border:none;border-radius:3px">Connect</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Top nav + breadcrumb</h3>
+      <p>Navigație sus, ierarhia Company→Location→Group ca breadcrumb/filtru. Mai mult spațiu vertical pentru conținut.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:16px;border-radius:6px">
+      <div style="display:flex;height:220px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+        <div style="width:48px;background:#1e293b;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:12px;flex-shrink:0">
+          <div style="color:#fff;font-size:14px">⬛</div>
+          <div style="color:#94a3b8;font-size:14px">🖥</div>
+          <div style="color:#60a5fa;font-size:14px">🏢</div>
+          <div style="color:#94a3b8;font-size:14px">⬇️</div>
+          <div style="color:#94a3b8;font-size:14px;margin-top:auto">⚙️</div>
+        </div>
+        <div style="width:150px;background:#f1f5f9;border-right:1px solid #e2e8f0;padding:10px;flex-shrink:0;overflow:hidden">
+          <div style="font-size:10px;font-weight:600;color:#1e293b;margin-bottom:8px">Organizare</div>
+          <div style="font-size:10px;color:#475569;margin-bottom:4px">▼ 🏢 Firma ABC</div>
+          <div style="font-size:10px;color:#475569;margin-bottom:3px;padding-left:12px">▼ 📍 HQ</div>
+          <div style="font-size:10px;padding:2px 6px;background:#dbeafe;color:#1d4ed8;border-radius:3px;margin-bottom:2px;margin-left:22px">📁 IT</div>
+          <div style="font-size:10px;padding:2px 6px;color:#64748b;margin-left:22px;border-radius:3px">📁 Dev</div>
+          <div style="font-size:10px;color:#475569;margin-left:12px;margin-top:3px">▶ 📍 Depozit</div>
+        </div>
+        <div style="flex:1;background:#fff;padding:10px;overflow:hidden">
+          <div style="font-size:10px;font-weight:600;color:#1e293b;margin-bottom:8px">IT — 3 mașini</div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:7px;display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:10px;font-weight:500">PC-Birou-01</div>
+              <div style="display:flex;gap:3px;align-items:center">
+                <span style="width:5px;height:5px;border-radius:50%;background:#22c55e;display:inline-block"></span>
+                <button style="padding:2px 6px;font-size:9px;background:#3b82f6;color:#fff;border:none;border-radius:3px">▶</button>
+              </div>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:7px;display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:10px;font-weight:500">Server-Backup</div>
+              <div style="display:flex;gap:3px;align-items:center">
+                <span style="width:5px;height:5px;border-radius:50%;background:#22c55e;display:inline-block"></span>
+                <button style="padding:2px 6px;font-size:9px;background:#3b82f6;color:#fff;border:none;border-radius:3px">▶</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Icon bar + arbore ierarhic</h3>
+      <p>Icon bar îngust + panou cu arbore Company→Location→Group expandabil. Stil VS Code / Linear. Cel mai compact, ideal pentru multe mașini.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">Click pe variantă pentru a o selecta, sau spune-mi în terminal ce preferi.</p>

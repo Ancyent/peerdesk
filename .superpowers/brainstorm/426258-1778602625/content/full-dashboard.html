@@ -1,0 +1,142 @@
+<h2>Dashboard complet — overview final</h2>
+<p class="subtitle">Toate secțiunile integrate. Confirmă că e ce ai în minte înainte de spec.</p>
+
+<div class="mockup">
+  <div class="mockup-header">PeerDesk Dashboard — layout complet (navigație C selectată)</div>
+  <div class="mockup-body" style="padding:0">
+    <div style="display:flex;height:500px;font-family:system-ui,sans-serif;font-size:12px">
+
+      <!-- Icon bar -->
+      <div style="width:52px;background:#0f172a;display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:4px;flex-shrink:0">
+        <div style="color:#fff;font-size:18px;margin-bottom:12px">🖥</div>
+        <div style="width:36px;border-radius:6px;padding:7px 0;text-align:center;font-size:16px;color:#94a3b8" title="Mașini">💻</div>
+        <div style="width:36px;border-radius:6px;padding:7px 0;text-align:center;font-size:16px;background:#1e3a5f;color:#60a5fa" title="Organizare (activ)">🏢</div>
+        <div style="width:36px;border-radius:6px;padding:7px 0;text-align:center;font-size:16px;color:#94a3b8" title="Instalare Agent">⬇️</div>
+        <div style="width:36px;border-radius:6px;padding:7px 0;text-align:center;font-size:16px;color:#94a3b8" title="Download Clients">📦</div>
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:4px;align-items:center">
+          <div style="width:36px;border-radius:6px;padding:7px 0;text-align:center;font-size:16px;color:#94a3b8" title="Branding">🎨</div>
+          <div style="width:36px;border-radius:6px;padding:7px 0;text-align:center;font-size:16px;color:#94a3b8" title="Setări">⚙️</div>
+          <div style="width:28px;height:28px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;margin-top:6px;cursor:pointer">A</div>
+        </div>
+      </div>
+
+      <!-- Tree panel -->
+      <div style="width:200px;background:#f8fafc;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;flex-shrink:0">
+        <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:11px;font-weight:600;color:#0f172a">Organizare</div>
+          <span style="color:#3b82f6;font-size:16px;cursor:pointer;line-height:1">+</span>
+        </div>
+        <div style="padding:8px;flex:1;overflow:auto">
+          <div style="display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:4px;cursor:pointer;color:#334155">
+              <span style="font-size:9px;color:#94a3b8;width:10px">▼</span><span>🏢</span>
+              <span style="font-size:11px;font-weight:500">Firma ABC</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:4px;cursor:pointer;color:#475569;padding-left:18px">
+              <span style="font-size:9px;color:#94a3b8;width:10px">▼</span><span>📍</span>
+              <span style="font-size:11px">HQ București</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;background:#dbeafe;color:#1d4ed8;padding-left:30px">
+              <span style="font-size:9px;width:10px">▶</span><span>📁</span>
+              <span style="font-size:11px;font-weight:500">IT</span>
+              <span style="margin-left:auto;background:#bfdbfe;border-radius:10px;padding:1px 5px;font-size:9px">5</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:4px;cursor:pointer;color:#64748b;padding-left:30px">
+              <span style="font-size:9px;width:10px">▶</span><span>📁</span>
+              <span style="font-size:11px">Dev</span>
+              <span style="margin-left:auto;background:#f1f5f9;border-radius:10px;padding:1px 5px;font-size:9px">3</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:4px;cursor:pointer;color:#64748b;padding-left:18px">
+              <span style="font-size:9px;color:#94a3b8;width:10px">▶</span><span>📍</span>
+              <span style="font-size:11px">Depozit Ploiești</span>
+            </div>
+            <div style="height:1px;background:#e2e8f0;margin:6px 0"></div>
+            <div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:4px;cursor:pointer;color:#334155">
+              <span style="font-size:9px;color:#94a3b8;width:10px">▶</span><span>🏢</span>
+              <span style="font-size:11px;font-weight:500">Client XYZ</span>
+            </div>
+          </div>
+        </div>
+        <div style="padding:8px;border-top:1px solid #e2e8f0">
+          <button style="width:100%;padding:5px;font-size:10px;background:#fff;border:1px dashed #cbd5e1;border-radius:4px;color:#64748b;cursor:pointer">+ Adaugă companie</button>
+        </div>
+      </div>
+
+      <!-- Main area -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;background:#fff">
+        <div style="padding:10px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#64748b">Firma ABC › HQ › <strong style="color:#0f172a">IT</strong></span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <input style="padding:4px 10px;font-size:11px;border:1px solid #e2e8f0;border-radius:4px;width:130px" placeholder="🔍 Caută..." />
+            <button style="padding:4px 12px;font-size:11px;background:#3b82f6;color:#fff;border:none;border-radius:4px;font-weight:500">+ Adaugă</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:0;border-bottom:1px solid #e2e8f0">
+          <div style="flex:1;padding:8px 14px;border-right:1px solid #e2e8f0"><div style="font-size:9px;color:#64748b">TOTAL</div><div style="font-size:16px;font-weight:700;color:#0f172a">5</div></div>
+          <div style="flex:1;padding:8px 14px;border-right:1px solid #e2e8f0"><div style="font-size:9px;color:#64748b">ONLINE</div><div style="font-size:16px;font-weight:700;color:#16a34a">3</div></div>
+          <div style="flex:1;padding:8px 14px"><div style="font-size:9px;color:#64748b">OFFLINE</div><div style="font-size:16px;font-weight:700;color:#9ca3af">2</div></div>
+        </div>
+        <div style="flex:1;overflow:auto;padding:10px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;align-items:center;padding:9px 12px;border:1px solid #e2e8f0;border-radius:6px">
+              <div style="width:7px;height:7px;border-radius:50%;background:#22c55e;margin-right:10px;flex-shrink:0"></div>
+              <div style="flex:1"><div style="font-weight:600;font-size:11px">PC-Birou-01</div><div style="font-size:10px;color:#94a3b8">Windows 11 · 847392810</div></div>
+              <button style="padding:3px 10px;font-size:10px;background:#3b82f6;color:#fff;border:none;border-radius:4px">Connect</button>
+              <button style="padding:3px 7px;font-size:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;color:#64748b;margin-left:4px">···</button>
+            </div>
+            <div style="display:flex;align-items:center;padding:9px 12px;border:1px solid #e2e8f0;border-radius:6px">
+              <div style="width:7px;height:7px;border-radius:50%;background:#22c55e;margin-right:10px;flex-shrink:0"></div>
+              <div style="flex:1"><div style="font-weight:600;font-size:11px">Server-NAS</div><div style="font-size:10px;color:#94a3b8">Ubuntu 24.04 · 293847561</div></div>
+              <button style="padding:3px 10px;font-size:10px;background:#3b82f6;color:#fff;border:none;border-radius:4px">Connect</button>
+              <button style="padding:3px 7px;font-size:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;color:#64748b;margin-left:4px">···</button>
+            </div>
+            <div style="display:flex;align-items:center;padding:9px 12px;border:1px solid #e2e8f0;border-radius:6px;opacity:0.6">
+              <div style="width:7px;height:7px;border-radius:50%;background:#d1d5db;margin-right:10px;flex-shrink:0"></div>
+              <div style="flex:1"><div style="font-weight:600;font-size:11px;color:#6b7280">Laptop-Contabilitate</div><div style="font-size:10px;color:#94a3b8">offline 2h</div></div>
+              <button style="padding:3px 10px;font-size:10px;background:#f3f4f6;color:#d1d5db;border:none;border-radius:4px" disabled>Connect</button>
+              <button style="padding:3px 7px;font-size:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;color:#64748b;margin-left:4px">···</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:20px">
+  <h3>Toate secțiunile planificate</h3>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px">
+    <div style="border:1px solid #e2e8f0;border-radius:7px;padding:12px;background:#fff">
+      <div style="font-size:18px;margin-bottom:5px">💻</div>
+      <div style="font-size:11px;font-weight:600;margin-bottom:3px">Mașini</div>
+      <div style="font-size:10px;color:#64748b">Listă flat, toate mașinile, filtrare rapidă</div>
+    </div>
+    <div style="border:2px solid #3b82f6;border-radius:7px;padding:12px;background:#eff6ff">
+      <div style="font-size:18px;margin-bottom:5px">🏢</div>
+      <div style="font-size:11px;font-weight:600;margin-bottom:3px">Organizare</div>
+      <div style="font-size:10px;color:#1d4ed8">Company→Location→Group→Machine, CRUD complet</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:7px;padding:12px;background:#fff">
+      <div style="font-size:18px;margin-bottom:5px">⬇️</div>
+      <div style="font-size:11px;font-weight:600;margin-bottom:3px">Instalare Agent</div>
+      <div style="font-size:10px;color:#64748b">Token one-time + one-liner per platformă (Linux/Win/macOS)</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:7px;padding:12px;background:#fff">
+      <div style="font-size:18px;margin-bottom:5px">📦</div>
+      <div style="font-size:11px;font-weight:600;margin-bottom:3px">Download Clients</div>
+      <div style="font-size:10px;color:#64748b">Viewer desktop + agent binar, toate platformele</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:7px;padding:12px;background:#fff">
+      <div style="font-size:18px;margin-bottom:5px">🎨</div>
+      <div style="font-size:11px;font-weight:600;margin-bottom:3px">Branding</div>
+      <div style="font-size:10px;color:#64748b">Existent, mutat în sidebar icon</div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:7px;padding:12px;background:#fff">
+      <div style="font-size:18px;margin-bottom:5px">⚙️</div>
+      <div style="font-size:11px;font-weight:600;margin-bottom:3px">Setări</div>
+      <div style="font-size:10px;color:#64748b">Profil, parolă, 2FA, API tokens</div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Arată bine? Sau vrei să modifici ceva înainte să scriu spec-ul detaliat?</p>

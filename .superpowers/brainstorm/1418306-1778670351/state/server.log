@@ -1,0 +1,7 @@
+{"type":"server-started","port":56765,"host":"0.0.0.0","url_host":"localhost","url":"http://localhost:56765","screen_dir":"/root/peerdesk/.superpowers/brainstorm/1418306-1778670351/content","state_dir":"/root/peerdesk/.superpowers/brainstorm/1418306-1778670351/state"}
+{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/1418306-1778670351/content/home-layout.html"}
+{"source":"user-event","type":"click","text":"● Connected to api.example.com\n        \n          \n            THIS DEVICE\n            123 078 154\n            Password\n            •••••••• 👁 📋\n            \n              ● Approved\n            \n            Mode: Full Access ▾\n          \n          \n            CONNECT TO REMOTE\n            Enter peer ID or address...\n            Connect\n            RECENT\n            \n              Desktop\n              Server\n            \n          \n        \n      \n    \n    \n      A — Dual Panel (RustDesk-style)\n      Stânga: datele tale. Dreapta: conectare la altul. Simplu, direct, familiar utilizatorilor RustDesk.","choice":"a","id":null,"timestamp":1778670506068}
+{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/1418306-1778670351/content/accent-color.html"}
+{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/1418306-1778670351/content/settings-layout.html"}
+{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/1418306-1778670351/content/full-mockup.html"}
+{"type":"server-stopped","reason":"idle timeout"}
