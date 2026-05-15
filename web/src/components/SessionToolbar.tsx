@@ -21,8 +21,10 @@ function latencyColor(ms: number | null): string {
 
 export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, onDisconnect, onCtrlAltDel, onToggleViewOnly, onFileTransfer }: Props) {
   const btn = (active?: boolean, danger?: boolean): React.CSSProperties => ({
-    padding: '4px 10px', border: 'none', borderRadius: 6,
-    background: active ? 'rgba(0,200,150,0.2)' : 'rgba(255,255,255,0.06)',
+    padding: '5px 11px',
+    border: `1px solid ${active ? 'rgba(0,200,150,0.4)' : danger ? 'rgba(248,113,113,0.3)' : 'rgba(0,200,150,0.15)'}`,
+    borderRadius: 7,
+    background: active ? 'rgba(0,200,150,0.15)' : danger ? 'rgba(248,113,113,0.1)' : 'rgba(0,200,150,0.06)',
     color: danger ? 'var(--red)' : active ? 'var(--accent)' : 'var(--text-2)',
     fontSize: 11, fontWeight: active ? 600 : 400, cursor: 'pointer',
     display: 'flex', alignItems: 'center', gap: 5,
@@ -47,31 +49,47 @@ export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, o
     });
   };
 
-  const sep = <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />;
+  const sep = <div style={{ width: 1, height: 18, background: 'rgba(0,200,150,0.2)', margin: '0 6px' }} />;
 
   return (
-    <div style={{ height: 36, background: 'rgba(17,24,36,0.93)', backdropFilter: 'blur(8px)', borderBottom: '1px solid var(--border-dim)', display: 'flex', alignItems: 'center', gap: 4, padding: '0 12px', flexShrink: 0 }}>
-      {/* Latency/FPS badge */}
-      <div style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-dim)', borderRadius: 6, padding: '2px 8px', color: latencyColor(latencyMs), display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{
+      height: 42,
+      background: 'rgba(10,15,24,0.98)',
+      backdropFilter: 'blur(12px)',
+      borderBottom: '1px solid rgba(0,200,150,0.25)',
+      display: 'flex', alignItems: 'center', gap: 4,
+      padding: '0 14px', flexShrink: 0,
+      boxShadow: '0 2px 16px rgba(0,0,0,0.5)',
+    }}>
+      <div style={{
+        fontSize: 11, fontFamily: 'monospace', fontWeight: 700,
+        background: 'rgba(0,200,150,0.12)',
+        border: '1px solid rgba(0,200,150,0.3)',
+        borderRadius: 7, padding: '3px 10px',
+        color: latencyColor(latencyMs),
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}>
         {latencyMs !== null ? `${latencyMs}ms` : '—'}
-        <span style={{ color: 'var(--text-3)' }}>·</span>
+        <span style={{ color: 'rgba(0,200,150,0.3)' }}>·</span>
         <span style={{ color: 'var(--text-2)' }}>{fps !== null ? `${fps}fps` : '—'}</span>
       </div>
       {sep}
       <button style={btn()} onClick={handleScreenshot}>📸 Screenshot</button>
       <button style={btn()} onClick={onCtrlAltDel}>⌨ Ctrl+Alt+Del</button>
-      <button style={btn(isViewOnly)} onClick={onToggleViewOnly}>👁 {isViewOnly ? 'View-Only ON' : 'View-Only'}</button>
+      <button style={btn(isViewOnly)} onClick={onToggleViewOnly}>
+        👁 {isViewOnly ? 'View-Only ON' : 'View-Only'}
+      </button>
       <button style={btn()} onClick={onFileTransfer}>📁 Fișiere</button>
       <div style={{ flex: 1 }} />
-      <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'monospace' }}>
+      <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'monospace', marginRight: 8 }}>
         {peerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1·$2·$3')}
       </div>
       {sep}
       <button
         style={btn(false, true)}
         onClick={onDisconnect}
-        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--red-bg)'}
-        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.2)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(248,113,113,0.5)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.1)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(248,113,113,0.3)'; }}
       >✕ Deconectează</button>
     </div>
   );

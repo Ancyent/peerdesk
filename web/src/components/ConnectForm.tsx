@@ -1,4 +1,3 @@
-// web/src/components/ConnectForm.tsx
 import { useState } from 'react';
 import { useBrandingContext } from '../branding/BrandingContext';
 
@@ -13,54 +12,97 @@ export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
   const [password, setPassword] = useState('');
   const { brand_name, logo_data_url } = useBrandingContext();
 
+  const inp: React.CSSProperties = {
+    padding: '10px 14px', fontSize: 15,
+    borderRadius: 8, border: '1px solid var(--border-dim)',
+    background: 'var(--bg-hover)', color: 'var(--text-1)',
+    width: '100%', boxSizing: 'border-box' as const,
+    outline: 'none', transition: 'border-color 0.2s',
+  };
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', height: '100vh', gap: 16, fontFamily: 'sans-serif'
+      justifyContent: 'center', height: '100vh',
+      background: 'var(--bg-base)', fontFamily: 'system-ui, sans-serif',
     }}>
-      {logo_data_url
-        ? <img src={logo_data_url} alt={brand_name} style={{ height: 48, objectFit: 'contain', maxWidth: 200 }} />
-        : <h1 style={{ margin: 0 }}>{brand_name}</h1>
-      }
-      <p style={{ color: '#666', margin: 0 }}>Enter the remote machine ID</p>
-      {error && <p style={{ color: 'red', margin: 0 }}>{error}</p>}
-      <form
-        onSubmit={(e) => { e.preventDefault(); onConnect(peerId, password); }}
-        style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 280 }}
-      >
-        <input
-          type="text"
-          placeholder="9-digit ID"
-          value={peerId}
-          onChange={(e) => setPeerId(e.target.value.replace(/\D/g, '').slice(0, 9))}
-          style={{
-            padding: '10px 12px', fontSize: 18, letterSpacing: 4,
-            borderRadius: 6, border: '1px solid #ccc', textAlign: 'center'
-          }}
-          maxLength={9}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: '10px 12px', fontSize: 16, borderRadius: 6, border: '1px solid #ccc' }}
-          required
-        />
-        <button
-          type="submit"
-          disabled={peerId.length !== 9}
-          style={{
-            padding: 10, fontSize: 16, borderRadius: 6,
-            background: 'var(--accent)', color: '#fff', border: 'none',
-            cursor: peerId.length === 9 ? 'pointer' : 'not-allowed',
-            opacity: peerId.length === 9 ? 1 : 0.6
-          }}
-        >
-          Connect
-        </button>
-      </form>
+      <div style={{
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-dim)',
+        borderRadius: 16, padding: '36px 32px',
+        width: 340, boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+      }}>
+        {/* Logo / Brand */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          {logo_data_url
+            ? <img src={logo_data_url} alt={brand_name} style={{ height: 40, objectFit: 'contain', maxWidth: 160 }} />
+            : <div style={{
+                fontSize: 22, fontWeight: 700,
+                background: 'linear-gradient(90deg, #67e8c8, #7dd3fc)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+              }}>{brand_name || 'PeerDesk'}</div>
+          }
+          <p style={{ color: 'var(--text-3)', margin: '8px 0 0', fontSize: 13 }}>
+            Conectează-te la o mașinărie remotă
+          </p>
+        </div>
+
+        {error && (
+          <div style={{
+            marginBottom: 16, padding: '10px 14px',
+            background: 'var(--red-bg)', border: '1px solid rgba(248,113,113,0.3)',
+            borderRadius: 8, color: 'var(--red)', fontSize: 13,
+          }}>{error}</div>
+        )}
+
+        <form onSubmit={e => { e.preventDefault(); onConnect(peerId, password); }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
+              Peer ID
+            </label>
+            <input
+              type="text"
+              placeholder="000 000 000"
+              value={peerId}
+              onChange={e => setPeerId(e.target.value.replace(/\D/g, '').slice(0, 9))}
+              style={{ ...inp, fontSize: 20, letterSpacing: 6, textAlign: 'center', fontFamily: 'monospace' }}
+              maxLength={9}
+              required
+              autoFocus
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
+              Parolă
+            </label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              style={inp}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={peerId.length !== 9}
+            style={{
+              padding: '11px', fontSize: 14, borderRadius: 9, border: 'none',
+              background: peerId.length === 9
+                ? 'linear-gradient(135deg, var(--accent), var(--accent-2))'
+                : 'var(--bg-hover)',
+              color: peerId.length === 9 ? '#111' : 'var(--text-3)',
+              fontWeight: 700, cursor: peerId.length === 9 ? 'pointer' : 'not-allowed',
+              boxShadow: peerId.length === 9 ? '0 2px 12px rgba(0,200,150,0.4)' : 'none',
+              transition: 'all 0.2s',
+            }}
+          >
+            {peerId.length === 9 ? '⚡ Conectează' : 'Introdu ID-ul'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
