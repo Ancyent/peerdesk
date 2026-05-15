@@ -29,12 +29,12 @@ export function OrganizationPage({ onConnect, orgNode }: Props) {
     .sort((a, b) => Number(b.is_online) - Number(a.is_online));
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 900 }}>
-      <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
+    <div style={{ padding: '20px 24px', maxWidth: 900, background: 'var(--bg-base)', minHeight: '100%' }}>
+      <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>
         {orgNode.type === 'all' ? 'Toate mașinile' : `Mașini (${filtered.length})`}
       </h2>
       {filtered.length === 0 ? (
-        <div style={{ padding: 32, border: '1px dashed #e2e8f0', borderRadius: 8, textAlign: 'center', color: '#9ca3af' }}>
+        <div style={{ padding: 32, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)' }}>
           Nicio mașinărie în această secțiune.
         </div>
       ) : (

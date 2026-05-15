@@ -61,17 +61,17 @@ export function AgentInstallPage() {
   const fmt = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 
   return (
-    <div style={{ padding: '24px', maxWidth: 640 }}>
-      <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: '#0f172a' }}>Instalare Agent</h2>
-      <p style={{ margin: '0 0 24px', fontSize: 13, color: '#64748b' }}>
+    <div style={{ padding: '24px', maxWidth: 640, background: 'var(--bg-base)', minHeight: '100%' }}>
+      <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>Instalare Agent</h2>
+      <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--text-2)' }}>
         Generează un token de înregistrare și rulează comanda pe mașina pe care vrei să o controlezi.
       </p>
 
       {!token ? (
-        <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 20 }}>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: '#374151' }}>Plasare (opțional)</label>
+        <div style={{ border: '1px solid var(--border-dim)', borderRadius: 10, padding: 20, background: 'var(--bg-surface)' }}>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-2)' }}>Plasare (opțional)</label>
           <select value={placementCompany} onChange={e => setPlacementCompany(e.target.value)}
-            style={{ width: '100%', padding: '8px 12px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 16 }}>
+            style={{ width: '100%', padding: '8px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, marginBottom: 16, background: 'var(--bg-surface)', color: 'var(--text-1)' }}>
             <option value="">Fără organizare</option>
             {companies.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
           </select>
@@ -82,9 +82,9 @@ export function AgentInstallPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ border: '1px solid #bbf7d0', borderRadius: 10, padding: 20, background: '#f0fdf4', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'monospace', fontSize: 28, fontWeight: 700, letterSpacing: 4, color: '#15803d', marginBottom: 6 }}>{token.token}</div>
-            <div style={{ fontSize: 12, color: '#16a34a' }}>
+          <div style={{ border: '1px solid var(--green-glow)', borderRadius: 10, padding: 20, background: 'var(--green-bg)', textAlign: 'center' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 28, fontWeight: 700, letterSpacing: 4, color: 'var(--green)', marginBottom: 6 }}>{token.token}</div>
+            <div style={{ fontSize: 12, color: 'var(--green)' }}>
               {secondsLeft > 0 ? `Expiră în ${fmt(secondsLeft)}` : 'EXPIRAT'} · folosit o singură dată
             </div>
           </div>
@@ -94,23 +94,23 @@ export function AgentInstallPage() {
               {(['linux', 'windows', 'macos'] as Platform[]).map(p => (
                 <button key={p} onClick={() => setPlatform(p)} style={{
                   padding: '5px 14px', fontSize: 12, borderRadius: 5, cursor: 'pointer',
-                  background: platform === p ? '#0f172a' : '#f1f5f9',
-                  color: platform === p ? '#fff' : '#64748b',
-                  border: platform === p ? 'none' : '1px solid #e2e8f0',
+                  background: platform === p ? 'var(--bg-base)' : 'var(--bg-hover)',
+                  color: platform === p ? '#fff' : 'var(--text-2)',
+                  border: platform === p ? 'none' : '1px solid var(--border-dim)',
                 }}>
                   {p === 'linux' ? 'Linux' : p === 'windows' ? 'Windows' : 'macOS'}
                 </button>
               ))}
             </div>
-            <div style={{ background: '#0f172a', borderRadius: 8, padding: '12px 14px', fontFamily: 'monospace', fontSize: 11, color: '#e2e8f0', lineHeight: 1.6, wordBreak: 'break-all' }}>
+            <div style={{ background: 'var(--bg-base)', borderRadius: 8, padding: '12px 14px', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-1)', lineHeight: 1.6, wordBreak: 'break-all', border: '1px solid var(--border-dim)' }}>
               {commands[platform]}
             </div>
-            <button onClick={copyCmd} style={{ marginTop: 8, padding: '6px 16px', fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 5, background: '#fff', cursor: 'pointer', color: copied ? '#16a34a' : '#475569' }}>
+            <button onClick={copyCmd} style={{ marginTop: 8, padding: '6px 16px', fontSize: 12, border: '1px solid var(--border-dim)', borderRadius: 5, background: 'var(--bg-hover)', cursor: 'pointer', color: copied ? 'var(--green)' : 'var(--text-2)' }}>
               {copied ? '✓ Copiat' : '📋 Copiază comanda'}
             </button>
           </div>
 
-          <button onClick={() => setToken(null)} style={{ padding: 8, fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#64748b' }}>
+          <button onClick={() => setToken(null)} style={{ padding: 8, fontSize: 12, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-hover)', cursor: 'pointer', color: 'var(--text-2)' }}>
             Generează alt token
           </button>
         </div>

@@ -30,26 +30,26 @@ export function RegisterPage({ onGoLogin }: Props) {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', gap:16, fontFamily:'sans-serif' }}>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:16, fontFamily:'sans-serif', background:'var(--bg-base)' }}>
       {logo_data_url
         ? <img src={logo_data_url} alt={brand_name} style={{ height: 48, objectFit: 'contain', maxWidth: 200 }} />
-        : <h1 style={{ margin:0 }}>{brand_name}</h1>
+        : <h1 style={{ margin:0, color:'var(--text-1)' }}>{brand_name}</h1>
       }
-      <p style={{ color:'#666', margin:0 }}>Create your account</p>
-      {error && <p style={{ color:'red', margin:0, fontSize:14 }}>{error}</p>}
-      <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12, width:300 }}>
+      <p style={{ color:'var(--text-2)', margin:0 }}>Create your account</p>
+      {error && <p style={{ color:'var(--red)', margin:0, fontSize:14 }}>{error}</p>}
+      <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12, width:300, background:'var(--bg-surface)', padding:24, borderRadius:10, border:'1px solid var(--border-dim)' }}>
         <input type="text" placeholder="Full name" value={name} onChange={e => setName(e.target.value)}
-          style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid #ccc' }} required />
+          style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid var(--border-dim)', background:'var(--bg-surface)', color:'var(--text-1)' }} required />
         <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
-          style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid #ccc' }} required />
+          style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid var(--border-dim)', background:'var(--bg-surface)', color:'var(--text-1)' }} required />
         <input type="password" placeholder="Password (min 8 chars)" value={password} onChange={e => setPassword(e.target.value)}
-          style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid #ccc' }} minLength={8} required />
+          style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid var(--border-dim)', background:'var(--bg-surface)', color:'var(--text-1)' }} minLength={8} required />
         <button type="submit" disabled={loading}
           style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? 'Creating account…' : 'Create Account'}
         </button>
       </form>
-      <p style={{ color:'#666', fontSize:14, margin:0 }}>
+      <p style={{ color:'var(--text-2)', fontSize:14, margin:0 }}>
         Already have an account?{' '}
         <button onClick={onGoLogin} style={{ background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontSize:14, padding:0 }}>
           Sign in

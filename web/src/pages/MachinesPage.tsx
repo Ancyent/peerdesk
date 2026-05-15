@@ -48,38 +48,38 @@ export function MachinesPage({ onConnect }: Props) {
     .sort((a, b) => Number(b.is_online) - Number(a.is_online));
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 900 }}>
+    <div style={{ padding: '20px 24px', maxWidth: 900, background: 'var(--bg-base)', minHeight: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0f172a' }}>Mașini</h2>
-        <span style={{ fontSize: 12, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: 10 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>Mașini</h2>
+        <span style={{ fontSize: 12, color: 'var(--green)', background: 'var(--green-bg)', border: '1px solid var(--green-glow)', padding: '2px 8px', borderRadius: 10 }}>
           {machines.filter(m => m.is_online).length} online
         </span>
         {pending.length > 0 && (
-          <span style={{ fontSize: 12, color: '#d97706', background: '#fef3c7', padding: '2px 8px', borderRadius: 10, cursor: 'pointer' }} onClick={() => setTab('pending')}>
+          <span style={{ fontSize: 12, color: 'var(--yellow)', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', padding: '2px 8px', borderRadius: 10, cursor: 'pointer' }} onClick={() => setTab('pending')}>
             {pending.length} pending approval
           </span>
         )}
         <div style={{ marginLeft: 'auto' }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Caută..." style={{ padding: '6px 12px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 6, width: 200 }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Caută..." style={{ padding: '6px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, width: 200, background: 'var(--bg-surface)', color: 'var(--text-1)' }} />
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--border-dim)' }}>
         {(['active', 'pending'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '8px 16px', fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? '#2563eb' : '#64748b', background: 'none', border: 'none', borderBottom: tab === t ? '2px solid #2563eb' : '2px solid transparent', cursor: 'pointer' }}>
+          <button key={t} onClick={() => setTab(t)} style={{ padding: '8px 16px', fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? 'var(--accent-2)' : 'var(--text-2)', background: 'none', border: 'none', borderBottom: tab === t ? '2px solid var(--accent-2)' : '2px solid transparent', cursor: 'pointer' }}>
             {t === 'active' ? 'Active' : `Pending${pending.length > 0 ? ` (${pending.length})` : ''}`}
           </button>
         ))}
       </div>
 
-      {loading && <p style={{ color: '#9ca3af' }}>Se încarcă...</p>}
+      {loading && <p style={{ color: 'var(--text-3)' }}>Se încarcă...</p>}
 
       {/* Active tab */}
       {!loading && tab === 'active' && (
         <>
           {filtered.length === 0 && (
-            <div style={{ padding: 32, border: '1px dashed #e2e8f0', borderRadius: 8, textAlign: 'center', color: '#9ca3af' }}>
+            <div style={{ padding: 32, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)' }}>
               {search ? 'Nicio mașinărie găsită.' : 'Nicio mașinărie înregistrată. Folosește secțiunea Instalare Agent.'}
             </div>
           )}
@@ -93,16 +93,16 @@ export function MachinesPage({ onConnect }: Props) {
       {!loading && tab === 'pending' && (
         <>
           {pending.length === 0 && (
-            <div style={{ padding: 32, border: '1px dashed #e2e8f0', borderRadius: 8, textAlign: 'center', color: '#9ca3af' }}>
+            <div style={{ padding: 32, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)' }}>
               No machines pending approval.
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {pending.map(m => (
-              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8 }}>
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 8 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{m.name}</div>
-                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{m.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
                     ID: {m.peer_id} · {m.os ?? 'Unknown OS'} · {new Date(m.created_at).toLocaleDateString()}
                   </div>
                 </div>
