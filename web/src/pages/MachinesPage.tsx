@@ -106,10 +106,10 @@ export function MachinesPage({ onConnect }: Props) {
                     ID: {m.peer_id} · {m.os ?? 'Unknown OS'} · {new Date(m.created_at).toLocaleDateString()}
                   </div>
                 </div>
-                <button onClick={() => handleApprove(m.id)} style={{ padding: '6px 14px', fontSize: 13, fontWeight: 600, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                <button onClick={() => handleApprove(m.id)} style={{ padding: '6px 14px', fontSize: 13, fontWeight: 600, background: 'var(--green)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                   Approve
                 </button>
-                <button onClick={() => handleDeny(m.id)} style={{ padding: '6px 14px', fontSize: 13, fontWeight: 600, background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                <button onClick={() => handleDeny(m.id)} style={{ padding: '6px 14px', fontSize: 13, fontWeight: 600, background: 'var(--red)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                   Deny
                 </button>
               </div>
