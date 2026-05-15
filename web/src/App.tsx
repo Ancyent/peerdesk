@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from './auth/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -13,6 +13,8 @@ import { AppShell, type AppPage } from './components/AppShell';
 import { OrgTree, type OrgNode } from './components/OrgTree';
 import { ConnectForm } from './components/ConnectForm';
 import { Viewer } from './components/Viewer';
+import { SessionToolbar } from './components/SessionToolbar';
+import type { ViewerHandle } from './components/Viewer';
 import { FileTransferBar } from './components/FileTransferBar';
 import { DisplaySelector } from './components/DisplaySelector';
 import { useSignaling } from './hooks/useSignaling';
@@ -35,6 +37,10 @@ export default function App() {
   const [orgNode, setOrgNode] = useState<OrgNode>({ type: 'all' });
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
   const clipboardReceiveRef = useRef<((text: string) => void) | null>(null);
+  const viewerRef = useRef<ViewerHandle>(null);
+  const [isViewOnly, setIsViewOnly] = useState(false);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [fps, setFps] = useState<number | null>(null);
 
   const SIGNALING_URL = getConfig().signalingUrl;
 
@@ -54,6 +60,16 @@ export default function App() {
     if (!ch) return;
     ch.onmessage = (e: MessageEvent) => handleFtMessage(e.data as string | ArrayBuffer);
   }, [webrtc.stream, handleFtMessage, webrtc]);
+
+  useEffect(() => {
+    if (viewerState !== 'connected') return;
+    let frames = 0;
+    let rafId: number;
+    const tick = () => { frames++; rafId = requestAnimationFrame(tick); };
+    rafId = requestAnimationFrame(tick);
+    const id = setInterval(() => { setFps(frames); frames = 0; }, 1000);
+    return () => { cancelAnimationFrame(rafId); clearInterval(id); };
+  }, [viewerState]);
 
   const { send } = useSignaling(SIGNALING_URL, async (msg) => {
     if (msg.type === 'joined')             { webrtc.startOffer(); }
@@ -93,17 +109,33 @@ export default function App() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#6b7280' }}>Connecting to {connectPeerId}…</div>
     );
     if (viewerState === 'connected') return (
-      <div style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative' }}>
-        <Viewer stream={webrtc.stream}
-          onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
-          onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
-          onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
-          onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
-          onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
-          onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
+      <div style={{ width: '100vw', height: '100vh', background: '#000', display: 'flex', flexDirection: 'column' }}>
+        <SessionToolbar
+          peerId={connectPeerId}
+          latencyMs={latencyMs}
+          fps={fps}
+          isViewOnly={isViewOnly}
+          videoRef={{ current: viewerRef.current?.videoElement ?? null } as React.RefObject<HTMLVideoElement | null>}
+          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); setPage('machines'); setIsViewOnly(false); }}
+          onCtrlAltDel={() => webrtc.sendInput({ type: 'key_down', key: 'Control' })}
+          onToggleViewOnly={() => setIsViewOnly(v => !v)}
+          onFileTransfer={() => {}}
         />
-        <DisplaySelector displays={displays} current={currentDisplay} onChange={handleDisplaySwitch} />
-        <FileTransferBar transfer={transfer} onSendFile={sendFile} />
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <Viewer
+            ref={viewerRef}
+            stream={webrtc.stream}
+            isViewOnly={isViewOnly}
+            onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
+            onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
+            onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
+            onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
+            onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
+            onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
+          />
+          <DisplaySelector displays={displays} current={currentDisplay} onChange={handleDisplaySwitch} />
+          <FileTransferBar transfer={transfer} onSendFile={sendFile} />
+        </div>
       </div>
     );
   }
