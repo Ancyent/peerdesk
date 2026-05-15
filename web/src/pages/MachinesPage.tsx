@@ -60,7 +60,7 @@ export function MachinesPage({ onConnect }: Props) {
           </span>
         )}
         <div style={{ marginLeft: 'auto' }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Caută..." style={{ padding: '6px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, width: 200, background: 'var(--bg-surface)', color: 'var(--text-1)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Caută..." style={{ padding: '6px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, width: 200, background: 'var(--bg-surface)', color: 'var(--text-1)', outline: 'none' }} />
         </div>
       </div>
 

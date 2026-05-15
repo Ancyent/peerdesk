@@ -47,3 +47,19 @@ html, body, #root {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Dark scrollbar global */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #253045 transparent;
+}
+*::-webkit-scrollbar { width: 5px; height: 5px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #253045; border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background: #2e3d55; }
+
+/* Focus ring consistent */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

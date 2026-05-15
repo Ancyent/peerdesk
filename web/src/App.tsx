@@ -39,7 +39,7 @@ export default function App() {
   const clipboardReceiveRef = useRef<((text: string) => void) | null>(null);
   const viewerRef = useRef<ViewerHandle>(null);
   const [isViewOnly, setIsViewOnly] = useState(false);
-  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [latencyMs] = useState<number | null>(null);
   const [fps, setFps] = useState<number | null>(null);
 
   const SIGNALING_URL = getConfig().signalingUrl;
@@ -106,7 +106,26 @@ export default function App() {
 
   if (page === 'viewer') {
     if (viewerState === 'connecting') return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#6b7280' }}>Connecting to {connectPeerId}…</div>
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: 'var(--bg-base)', gap: 20,
+        fontFamily: 'system-ui, sans-serif',
+      }}>
+        <div style={{
+          width: 44, height: 44,
+          border: '2px solid rgba(0,200,150,0.15)',
+          borderTopColor: 'var(--accent)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ color: 'var(--text-2)', fontSize: 14 }}>Conectare în curs...</div>
+          <div style={{ color: 'var(--text-3)', fontSize: 12, fontFamily: 'monospace', marginTop: 6 }}>
+            {connectPeerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1 · $2 · $3')}
+          </div>
+        </div>
+      </div>
     );
     if (viewerState === 'connected') return (
       <div style={{ width: '100vw', height: '100vh', background: '#000', display: 'flex', flexDirection: 'column' }}>
