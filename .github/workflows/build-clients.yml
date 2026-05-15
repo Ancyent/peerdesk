@@ -153,7 +153,7 @@ jobs:
         env:
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
         run: |
-          echo "$ANDROID_KEYSTORE_B64" | base64 -d > /tmp/release.jks
+          echo "$ANDROID_KEYSTORE_B64" | tr -d ' \n\r' | base64 -d > /tmp/release.jks
           cat >> desktop/src-tauri/gen/android/app/build.gradle.kts << 'GRADLE_EOF'
 
           android {
