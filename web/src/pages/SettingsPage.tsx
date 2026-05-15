@@ -3,6 +3,22 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError } from '../api/client';
 
+// Defined at module level — NOT inside SettingsPage — to avoid focus loss on re-render
+const inp: CSSProperties = {
+  padding: '8px 12px', fontSize: 13, border: '1px solid var(--border-dim)',
+  borderRadius: 6, width: '100%', boxSizing: 'border-box',
+  background: 'var(--bg-hover)', color: 'var(--text-1)',
+};
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div style={{ border: '1px solid var(--border-dim)', borderRadius: 10, padding: 20, marginBottom: 16, background: 'var(--bg-surface)' }}>
+      <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{title}</h3>
+      {children}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { user, accessToken } = useAuth();
   const [name, setName] = useState(user?.name ?? '');
@@ -35,15 +51,6 @@ export function SettingsPage() {
       setTimeout(() => setPwMsg(''), 2500);
     } catch (e) { setPwErr(e instanceof ApiError ? e.message : 'Eroare'); }
   };
-
-  const inp: CSSProperties = { padding: '8px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, width: '100%', boxSizing: 'border-box', background: 'var(--bg-hover)', color: 'var(--text-1)' };
-
-  const Section = ({ title, children }: { title: string; children: ReactNode }) => (
-    <div style={{ border: '1px solid var(--border-dim)', borderRadius: 10, padding: 20, marginBottom: 16, background: 'var(--bg-surface)' }}>
-      <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{title}</h3>
-      {children}
-    </div>
-  );
 
   return (
     <div style={{ padding: '24px', maxWidth: 500, background: 'var(--bg-base)', minHeight: '100%' }}>

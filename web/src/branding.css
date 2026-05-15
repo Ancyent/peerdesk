@@ -1,4 +1,12 @@
 /* PeerDesk — design tokens + global keyframes */
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  background: #182030;
+  min-height: 100vh;
+}
+
 :root {
   --bg-base:    #182030;
   --bg-surface: #1f2a3c;
