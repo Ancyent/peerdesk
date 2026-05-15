@@ -1,5 +1,41 @@
-/* Default CSS custom properties for PeerDesk theming */
+/* PeerDesk — design tokens + global keyframes */
 :root {
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
+  --bg-base:    #182030;
+  --bg-surface: #1f2a3c;
+  --bg-sidebar: #111824;
+  --bg-hover:   #253045;
+  --bg-active:  #223050;
+
+  --border:     rgba(0, 200, 150, 0.20);
+  --border-dim: rgba(0, 200, 150, 0.09);
+
+  --text-1: #ffffff;
+  --text-2: #90a8c0;
+  --text-3: #506070;
+
+  --accent:       #00c896;
+  --accent-2:     #00a8ff;
+  --accent-hover: #00daa8;
+
+  --green:      #00e5a0;
+  --green-bg:   rgba(0, 229, 160, 0.10);
+  --green-glow: rgba(0, 229, 160, 0.25);
+  --red:        #f87171;
+  --red-bg:     rgba(248, 113, 113, 0.10);
+  --yellow:     #fbbf24;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.85); }
+}
+
+@keyframes scan-line {
+  0%   { top: 0; }
+  100% { top: 110px; }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
