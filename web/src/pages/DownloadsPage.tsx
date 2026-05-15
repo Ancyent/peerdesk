@@ -1,22 +1,24 @@
 import { getConfig } from '../config';
 
-// suffix: filename in GitHub releases | null: not yet available
+const LATEST = 'v0.3.9';
+
 const CLIENTS: { title: string; icon: string; desc: string; platforms: { label: string; suffix: string | null }[] }[] = [
   { title: 'Agent (mașina controlată)', icon: '🖥', desc: 'Rulează pe mașina la care vrei acces remote.',
     platforms: [
-      { label: 'Linux x86_64',   suffix: 'peerdesk-agent-linux-x86_64' },
-      { label: 'Linux .deb',     suffix: null },
-      { label: 'Windows .exe',   suffix: null },
-      { label: 'macOS .dmg',     suffix: null },
+      { label: 'Linux x86_64',    suffix: `peerdesk-agent-linux-x86_64-${LATEST}` },
+      { label: 'Windows .exe',    suffix: `peerdesk-agent-windows-x86_64-${LATEST}.exe` },
+      { label: 'macOS .dmg',      suffix: null },
     ]},
   { title: 'Viewer Desktop (Tauri)', icon: '👁', desc: 'Aplicație nativă pentru control remote.',
     platforms: [
-      { label: 'Linux',   suffix: null },
-      { label: 'Windows', suffix: null },
-      { label: 'macOS',   suffix: null },
+      { label: 'Linux .deb',      suffix: `peerdesk-viewer-linux-${LATEST}-amd64.deb` },
+      { label: 'Linux .AppImage', suffix: `peerdesk-viewer-linux-${LATEST}.AppImage` },
+      { label: 'Windows .msi',    suffix: `peerdesk-viewer-windows-${LATEST}-x64.msi` },
+      { label: 'Windows .exe',    suffix: `peerdesk-viewer-windows-${LATEST}-x64-setup.exe` },
+      { label: 'macOS',           suffix: null },
     ]},
   { title: 'Android', icon: '📱', desc: 'Viewer pe telefon sau tabletă.',
-    platforms: [{ label: 'Android .apk', suffix: null }]},
+    platforms: [{ label: 'Android .apk', suffix: `peerdesk-android-${LATEST}.apk` }]},
 ];
 
 export function DownloadsPage() {

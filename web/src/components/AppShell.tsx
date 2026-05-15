@@ -74,23 +74,24 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif', background: 'var(--bg-base)' }}>
-      {/* Sidebar */}
-      <div style={{
-        width: collapsed ? 64 : 220, flexShrink: 0,
-        background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border-dim)',
-        display: 'flex', flexDirection: 'column',
-        position: 'relative', overflow: 'hidden',
-        transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)',
-        boxShadow: '4px 0 24px rgba(0,0,0,0.2)',
-      }}>
+      {/* Sidebar wrapper — overflow:visible so toggle isn't clipped */}
+      <div style={{ width: collapsed ? 64 : 220, flexShrink: 0, position: 'relative', transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)' }}>
+        {/* Toggle button outside overflow:hidden */}
         <button onClick={() => setCollapsed(c => !c)} style={{
-          position: 'absolute', top: 20, right: -13, zIndex: 20,
+          position: 'absolute', top: 19, right: -13, zIndex: 30,
           width: 26, height: 26, borderRadius: '50%',
           background: 'var(--bg-surface)', border: '1px solid var(--border)',
           color: 'var(--accent)', fontSize: 9, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'all 0.2s',
         }}>{collapsed ? '▶' : '◀'}</button>
+        {/* Inner sidebar with overflow:hidden to clip labels */}
+        <div style={{
+          width: '100%', height: '100%',
+          background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border-dim)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          boxShadow: '4px 0 24px rgba(0,0,0,0.2)',
+        }}>
 
         {/* Logo */}
         <div style={{ padding: '18px 16px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border-dim)', minHeight: 64 }}>
@@ -160,7 +161,8 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
             )}
           </div>
         </div>
-      </div>
+        </div>{/* end inner sidebar */}
+      </div>{/* end sidebar wrapper */}
 
       {/* Context panel */}
       {contextPanel && (
