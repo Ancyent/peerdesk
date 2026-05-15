@@ -287,6 +287,7 @@ async fn get_security_code(
 
 // ── Tauri app ─────────────────────────────────────────────────────────────────
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let shared_state: SharedAgentState = Arc::new(Mutex::new(AgentState::default()));
 
