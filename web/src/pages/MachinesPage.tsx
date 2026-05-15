@@ -83,7 +83,7 @@ export function MachinesPage({ onConnect }: Props) {
               {search ? 'Nicio mașinărie găsită.' : 'Nicio mașinărie înregistrată. Folosește secțiunea Instalare Agent.'}
             </div>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(265px, 1fr))', gap: 14 }}>
             {filtered.map(m => <MachineCard key={m.id} machine={m} onConnect={onConnect} />)}
           </div>
         </>
