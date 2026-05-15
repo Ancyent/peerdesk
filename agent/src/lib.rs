@@ -113,12 +113,13 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // capture::run uses scrap::Capturer which is !Send, so run it on a
     // dedicated OS thread with its own single-threaded tokio runtime.
     let capture_display_index = agent_cfg.display_index;
+    let (display_switch_tx, display_switch_rx) = tokio::sync::mpsc::channel::<usize>(4);
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("capture runtime");
-        if let Err(e) = rt.block_on(capture::run(frame_tx, capture_display_index)) {
+        if let Err(e) = rt.block_on(capture::run(frame_tx, capture_display_index, display_switch_rx)) {
             tracing::error!("Capture error: {}", e);
         }
     });
@@ -220,9 +221,8 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 tracing::warn!("Signaling error from server: {}", code);
             }
             Some(signaling::SignalingMessage::SwitchDisplay { index }) => {
-                info!("Viewer requested display switch to index {}", index);
-                // TODO: restart capture thread with new display_index
-                // For now, log and acknowledge
+                info!("Switching to display {}", index);
+                let _ = display_switch_tx.send(index).await;
             }
             Some(_) => {} // Registered, Answer, etc. — ignore in main loop
             None => {

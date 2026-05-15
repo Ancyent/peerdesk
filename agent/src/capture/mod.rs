@@ -53,42 +53,56 @@ pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
     }
 }
 
-pub async fn run(tx: Sender<FrameData>, display_index: usize) -> Result<()> {
-    let display = {
-        let mut all = scrap::Display::all()?;
-        if display_index < all.len() {
-            all.remove(display_index)
-        } else {
-            scrap::Display::primary()?
-        }
-    };
-    let (w, h) = (display.width() as u32, display.height() as u32);
-    let mut capturer = Capturer::new(display)?;
+pub async fn run(
+    tx: Sender<FrameData>,
+    initial_display_index: usize,
+    mut switch_rx: tokio::sync::mpsc::Receiver<usize>,
+) -> Result<()> {
+    let mut display_index = initial_display_index;
 
     loop {
-        match capturer.frame() {
-            Ok(frame) => {
-                let fd = FrameData {
-                    width: w,
-                    height: h,
-                    data: frame.to_vec(),
-                };
-                // try_send drops the frame if encoder is busy — prevents latency buildup
-                match tx.try_send(fd) {
-                    Ok(_) => {}
-                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                        // encoder backpressure — skip frame to stay live
-                    }
-                    Err(_) => break,
+        let display = {
+            let mut all = scrap::Display::all()?;
+            if display_index < all.len() {
+                all.remove(display_index)
+            } else {
+                scrap::Display::primary()?
+            }
+        };
+        let (w, h) = (display.width() as u32, display.height() as u32);
+        let mut capturer = Capturer::new(display)?;
+
+        'capture: loop {
+            match switch_rx.try_recv() {
+                Ok(new_index) => {
+                    tracing::info!("Switching capture to display {}", new_index);
+                    display_index = new_index;
+                    break 'capture;
                 }
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return Ok(()),
             }
-            Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                tokio::time::sleep(Duration::from_millis(16)).await;
+
+            match capturer.frame() {
+                Ok(frame) => {
+                    let fd = FrameData {
+                        width: w,
+                        height: h,
+                        data: frame.to_vec(),
+                    };
+                    match tx.try_send(fd) {
+                        Ok(_) => {}
+                        Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {}
+                        Err(_) => return Ok(()),
+                    }
+                }
+                Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                    tokio::time::sleep(Duration::from_millis(16)).await;
+                }
+                Err(e) => return Err(e.into()),
             }
-            Err(e) => return Err(e.into()),
         }
     }
-    Ok(())
 }
 
 #[cfg(test)]
