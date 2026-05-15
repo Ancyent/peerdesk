@@ -7,3 +7,5 @@ dist/
 .venv/
 *.env.local
 builds/
+peerdesk-release.jks
+android-secrets.env
