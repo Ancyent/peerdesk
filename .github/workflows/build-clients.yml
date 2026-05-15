@@ -147,22 +147,45 @@ jobs:
         run: cargo install tauri-cli --version "^2" --locked
       - name: Build frontend
         run: cd desktop && npm ci && npm run build
-      - name: Init Android (if needed)
+      - name: Init Android
+        run: cd desktop && cargo tauri android init
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE }}
         run: |
-          if [[ ! -d "desktop/src-tauri/gen/android" ]]; then
-            cd desktop && cargo tauri android init
-          fi
-      - name: Build APK
+          echo "$ANDROID_KEYSTORE_B64" | base64 -d > /tmp/release.jks
+          cat >> desktop/src-tauri/gen/android/app/build.gradle.kts << 'GRADLE_EOF'
+
+          android {
+              signingConfigs {
+                  create("release") {
+                      storeFile = file("/tmp/release.jks")
+                      storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")!!
+                      keyAlias = System.getenv("ANDROID_KEY_ALIAS")!!
+                      keyPassword = System.getenv("ANDROID_KEY_PASSWORD")!!
+                  }
+              }
+              buildTypes {
+                  getByName("release") {
+                      signingConfig = signingConfigs.getByName("release")
+                  }
+              }
+          }
+          GRADLE_EOF
+      - name: Build APK (signed release)
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/26.1.10909125
-        run: cd desktop && cargo tauri android build --debug --apk
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: cd desktop && cargo tauri android build --apk
       - name: Collect artifacts
         run: |
           VERSION="${{ github.ref_name }}"
           mkdir -p dist
-          find desktop/src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | while read f; do
-            cp "$f" "dist/peerdesk-android-${VERSION}-debug.apk"
+          find desktop/src-tauri/gen/android/app/build/outputs/apk/release -name '*.apk' | while read f; do
+            cp "$f" "dist/peerdesk-android-${VERSION}.apk"
           done
       - uses: actions/upload-artifact@v4
         with:
