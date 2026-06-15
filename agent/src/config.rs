@@ -45,11 +45,23 @@ pub struct Config {
 }
 
 impl Config {
+    /// Canonical server root: trailing slash and a trailing "/api" removed,
+    /// so the user may enter either "https://host" or "https://host/api".
+    fn server_base(&self) -> Option<String> {
+        self.server_url.as_deref().map(|u| {
+            let b = u.trim_end_matches('/');
+            b.strip_suffix("/api")
+                .unwrap_or(b)
+                .trim_end_matches('/')
+                .to_string()
+        })
+    }
+
     /// WebSocket URL for the signaling server, derived from server_url.
+    /// The bundled deployment fronts signaling at `<server>/ws` (nginx).
     pub fn signaling_url(&self) -> String {
-        match &self.server_url {
-            Some(url) => {
-                let base = url.trim_end_matches('/');
+        match self.server_base() {
+            Some(base) => {
                 let ws_base = base
                     .replace("https://", "wss://")
                     .replace("http://", "ws://");
@@ -61,11 +73,11 @@ impl Config {
         }
     }
 
-    /// REST API base URL, derived from server_url.
+    /// REST API base URL. The bundled deployment fronts the API at `<server>/api`
+    /// (the same nginx that serves `/ws`), so derive `<server>/api`. Without the
+    /// prefix the agent's POST /machines/register hits the web SPA and 405s.
     pub fn api_url(&self) -> Option<String> {
-        self.server_url
-            .as_deref()
-            .map(|u| u.trim_end_matches('/').to_string())
+        self.server_base().map(|base| format!("{}/api", base))
     }
 
     pub fn load(path: &Path) -> Result<Self> {
@@ -344,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn api_url_strips_trailing_slash() {
+    fn api_url_appends_api_prefix() {
         let cfg = Config {
             peer_id: "x".into(),
             password_hash: "x".into(),
@@ -352,7 +364,23 @@ mod tests {
             api_key: None,
             hmac_key: None,
         };
-        assert_eq!(cfg.api_url(), Some("https://api.example.com".to_string()));
+        // nginx fronts the REST API under /api (same host that serves /ws)
+        assert_eq!(cfg.api_url(), Some("https://api.example.com/api".to_string()));
+        assert_eq!(cfg.signaling_url(), "wss://api.example.com/ws");
+    }
+
+    #[test]
+    fn urls_normalize_when_server_already_has_api_suffix() {
+        let cfg = Config {
+            peer_id: "x".into(),
+            password_hash: "x".into(),
+            server_url: Some("https://host.example.com/api".into()),
+            api_key: None,
+            hmac_key: None,
+        };
+        // entering ".../api" must not double the prefix or break signaling
+        assert_eq!(cfg.api_url(), Some("https://host.example.com/api".to_string()));
+        assert_eq!(cfg.signaling_url(), "wss://host.example.com/ws");
     }
 
     #[test]
