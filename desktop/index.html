@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PeerDesk</title>
+    <style>
+      /* Critical reset — applied before the bundle so there is no white border
+         or flash around the frameless window at first paint. */
+      html, body, #root { margin: 0; padding: 0; height: 100%; background: #0d1117; }
+      body { overflow: hidden; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
