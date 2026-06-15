@@ -2,6 +2,18 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.4] — 2026-06-15
+
+### Fixed
+- **Agent:** a registered machine now actually shows **online**. `send_heartbeat`
+  was never called, so the machine stayed `is_online=false` (shown offline even
+  after approval); the agent now sends a heartbeat immediately and every 30s.
+- **Agent:** Windows machines are named from `COMPUTERNAME` instead of `Unknown`.
+- **Desktop:** removed the **white border** around the window — it was the
+  browser default `body` margin; added a global + inline critical CSS reset
+  (`margin:0`, dark background, `html/body/#root` at `height:100%`) and themed
+  dark scrollbars, which also removes the stray scrollbar.
+
 ## [0.4.3] — 2026-06-15
 
 ### Fixed
