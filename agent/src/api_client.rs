@@ -97,8 +97,12 @@ pub async fn send_heartbeat(api_url: &str, peer_id: &str, online: bool) -> Resul
 
 fn get_hostname() -> String {
     std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME")) // Windows
         .or_else(|_| std::fs::read_to_string("/etc/hostname").map(|s| s.trim().to_string()))
-        .unwrap_or_else(|_| "Unknown".to_string())
+        .map(|s| s.trim().to_string())
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Unknown".to_string())
 }
 
 #[cfg(test)]

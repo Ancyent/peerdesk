@@ -96,6 +96,21 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         info!("Running in standalone mode (no API key)");
     }
 
+    // Heartbeat: keep this machine marked online in the dashboard while the
+    // agent runs. Without this the machine registers but stays is_online=false
+    // (shown offline even after approval). Sends immediately, then every 30s.
+    if let (Some(url), Some(_)) = (api_url.clone(), effective_key.clone()) {
+        let hb_peer = cfg.peer_id.clone();
+        tokio::spawn(async move {
+            loop {
+                if let Err(e) = api_client::send_heartbeat(&url, &hb_peer, true).await {
+                    tracing::debug!("heartbeat error: {}", e);
+                }
+                tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+            }
+        });
+    }
+
     info!("Waiting for connections...");
 
     let (frame_tx, frame_rx) = tokio::sync::mpsc::channel(2);
