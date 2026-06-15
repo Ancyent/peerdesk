@@ -1,12 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAgent } from '../hooks/useAgent';
 
 export function NetworkSettings() {
   const { status } = useAgent();
-  const [serverUrl, setServerUrl] = useState(status.server_url ?? '');
+  const [serverUrl, setServerUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const syncedRef = useRef(false);
+
+  // Sync server URL once, after the first async status poll returns
+  useEffect(() => {
+    if (!syncedRef.current && status.server_url !== null) {
+      syncedRef.current = true;
+      setServerUrl(status.server_url ?? '');
+    }
+  }, [status.server_url]);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
 
   const showMsg = (text: string, ok: boolean) => {
@@ -55,8 +64,13 @@ export function NetworkSettings() {
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 10, color: '#484f58', marginBottom: 5 }}>API KEY</div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <input type={showKey ? 'text' : 'password'} value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="pd_••••••••••••••••"
-              style={{ flex: 1, background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#c9d1d9' }} />
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder={status.approval_status !== 'standalone' && !apiKey ? '••• key saved — enter new key to replace' : 'pd_••••••••••••••••'}
+              style={{ flex: 1, background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#c9d1d9' }}
+            />
             <button onClick={() => setShowKey(v => !v)} style={{ background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '0 12px', cursor: 'pointer', color: '#8b949e', fontSize: 11 }}>{showKey ? 'Hide' : 'Show'}</button>
           </div>
         </div>
