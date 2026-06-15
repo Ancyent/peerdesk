@@ -4,6 +4,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { ViewerTab } from './screens/ViewerTab';
 import { StatusBar } from './components/StatusBar';
 import { TabBar } from './components/TabBar';
+import { TitleBar } from './components/TitleBar';
 import { AppProvider, useAgentContext } from './context/AppContext';
 import type { Session, SessionState } from './types';
 
@@ -45,6 +46,8 @@ function AppInner() {
 
   return (
     <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#0d1117', height: '100vh', display: 'flex', flexDirection: 'column', color: '#e6edf3' }}>
+      <TitleBar />
+
       <StatusBar approvalStatus={status.approval_status} serverUrl={status.server_url} />
 
       <TabBar

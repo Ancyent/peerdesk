@@ -50,10 +50,22 @@ export function HomeScreen({ onConnect }: Props) {
             </div>
 
             <div style={{ fontSize: 10, color: '#484f58', marginBottom: 5 }}>Password</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
               <div style={{ fontSize: 16, color: '#c9d1d9', letterSpacing: 3, flex: 1 }}>••••••••</div>
-              <button onClick={() => navigator.clipboard.writeText(status.peer_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5, fontSize: 13 }} title="Copy ID">📋</button>
-              <button onClick={handleResetPwd} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5, fontSize: 13 }} title="Reset password">🔄</button>
+              <button
+                onClick={() => navigator.clipboard.writeText(status.peer_id)}
+                title="Copy ID"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'rgba(38,198,218,0.10)', border: '1px solid rgba(38,198,218,0.30)', borderRadius: 6, color: '#26c6da', cursor: 'pointer' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              </button>
+              <button
+                onClick={handleResetPwd}
+                title="Reset password"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'rgba(38,198,218,0.10)', border: '1px solid rgba(38,198,218,0.30)', borderRadius: 6, color: '#26c6da', cursor: 'pointer' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
+              </button>
             </div>
 
             {newPwd && (
