@@ -45,17 +45,6 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#0d1117', height: '100vh', display: 'flex', flexDirection: 'column', color: '#e6edf3' }}>
-      {/* Title bar */}
-      <div style={{ background: '#161b22', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 7, borderBottom: '1px solid #21262d', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['#ff5f56', '#febc2e', '#27c93f'] as const).map((c, i) => (
-            <div key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: c }} />
-          ))}
-        </div>
-        <div style={{ flex: 1, textAlign: 'center', fontSize: 12, color: '#8b949e', fontWeight: 500 }}>PeerDesk</div>
-        <div style={{ width: 16 }} />
-      </div>
-
       <StatusBar approvalStatus={status.approval_status} serverUrl={status.server_url} />
 
       <TabBar
