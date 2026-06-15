@@ -2,6 +2,23 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.2] — 2026-06-15
+
+Comprehensive bug-fix pass across all components (agent, servers, web, desktop).
+
+### Security
+- **Agent:** fixed path traversal in file transfer — a viewer-supplied filename could escape the download directory and write arbitrary files; names are now reduced to a basename and validated against the download dir
+- **API:** fixed 2FA bypass — the login `temp_token` was a fully valid access token; replaced with a dedicated short-lived `pending_2fa` token rejected by protected endpoints
+- **Signaling:** fixed `peer_id` hijack — a registration could overwrite a live agent's entry; re-registration now requires a matching HMAC key
+- **API:** `set_placement` validates company/location/group ownership; registration-token redemption uses `SELECT ... FOR UPDATE` to prevent double-redemption
+- **Agent:** an HTTP 409 approval re-check failure now defaults to `pending` (not `approved`)
+
+### Fixed
+- **Agent:** H.264 encoder resets on resolution change so video survives a display switch; `start_agent` no longer overwrites the saved HMAC key with an empty password; `stop_agent` actually aborts the running task; removed a silently-failing audio thread
+- **Signaling:** rate limiter now accepts the socket before closing it (the limit was a no-op); a viewer disconnecting during approval can no longer crash the agent's connection; the real viewer IP is passed to the approval notification
+- **Web:** Ctrl+Alt+Del sends the full key sequence; file-transfer bar opens on demand instead of covering the remote video and the toolbar button works; OrgTree honors the dark theme; ConnectForm syncs when switching machines; branding logo removal no longer renders a broken image
+- **Desktop:** removed hardcoded fake "Recent" machines (now a real localStorage list); shared agent/settings state via context (fixes stale settings and redundant polling); `denied` approval status is shown distinctly in red; deleted dead code; real app version; settings polish
+
 ## [0.1.2] — 2026-05-12
 
 Native desktop clients for Linux, Windows, macOS, and Android.
