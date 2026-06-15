@@ -148,8 +148,10 @@ impl Config {
         if let Some(tok) = api_key {
             cfg.api_key = Some(tok.to_string());
         }
-        // Populate hmac_key if missing (upgrade path for existing configs)
-        if cfg.hmac_key.is_none() {
+        // Populate hmac_key if missing (upgrade path for existing configs).
+        // Skip when password is empty (e.g. the Tauri desktop passes ""), so we
+        // never overwrite an existing key with one derived from "".
+        if cfg.hmac_key.is_none() && !password.is_empty() {
             cfg.hmac_key = Some(derive_hmac_key(password));
         }
 

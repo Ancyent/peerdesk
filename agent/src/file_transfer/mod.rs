@@ -62,15 +62,27 @@ pub async fn run(mut rx: Receiver<FtMessage>, control_tx: Sender<String>) -> Res
                     }
 
                     if received >= size {
-                        let path = transfer_dir.join(name);
-                        if let Err(e) = tokio::fs::write(&path, buf).await {
-                            tracing::error!("Failed to write file {:?}: {}", path, e);
-                        } else {
-                            tracing::info!(
-                                "File transfer complete: {:?} ({} bytes)",
-                                path,
-                                received
-                            );
+                        // Sanitize the viewer-supplied name: strip to a bare
+                        // basename and reject anything that escapes transfer_dir.
+                        let safe_name = std::path::Path::new(name.as_str())
+                            .file_name()
+                            .map(std::path::PathBuf::from);
+                        let path = safe_name.map(|n| transfer_dir.join(n));
+                        match path {
+                            Some(path) if path.starts_with(&transfer_dir) => {
+                                if let Err(e) = tokio::fs::write(&path, buf).await {
+                                    tracing::error!("Failed to write file {:?}: {}", path, e);
+                                } else {
+                                    tracing::info!(
+                                        "File transfer complete: {:?} ({} bytes)",
+                                        path,
+                                        received
+                                    );
+                                }
+                            }
+                            _ => {
+                                tracing::warn!("Rejected unsafe transfer filename: {:?}", name);
+                            }
                         }
                         let _ = control_tx
                             .send(serde_json::json!({"type":"ft_done","id":id}).to_string())

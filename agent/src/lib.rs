@@ -140,18 +140,10 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         });
     }
 
-    // Audio streaming (non-fatal if no device)
-    // cpal::Stream is !Send, so run on a dedicated OS thread with its own runtime.
-    let (audio_tx, _audio_rx) = tokio::sync::mpsc::channel::<audio::AudioFrame>(8);
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("audio runtime");
-        if let Err(e) = rt.block_on(audio::run(audio_tx)) {
-            tracing::warn!("Audio capture ended: {}", e);
-        }
-    });
+    // Audio capture is not yet wired into the WebRTC pipeline. Previously an
+    // audio thread was spawned with a receiver that was dropped immediately,
+    // so every blocking_send failed silently. Don't spawn the broken path
+    // until audio has a real consumer.
 
     let peer_id = cfg.peer_id.clone();
     let pw_hash = cfg.password_hash.clone();

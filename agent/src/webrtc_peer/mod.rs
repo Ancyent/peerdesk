@@ -213,11 +213,19 @@ fn extract_fingerprint(sdp: &str) -> Option<String> {
 
 async fn send_video_frames(mut frame_rx: Receiver<FrameData>, track: Arc<TrackLocalStaticSample>) {
     let mut encoder: Option<H264Encoder> = None;
+    let mut enc_dims: (u32, u32) = (0, 0);
     while let Some(frame) = frame_rx.recv().await {
+        // Reset the encoder if the frame dimensions changed (e.g. after a
+        // display/resolution switch); otherwise encode_bgra fails forever on a
+        // dimension mismatch and video silently dies.
+        if enc_dims != (frame.width, frame.height) {
+            encoder = None;
+        }
         if encoder.is_none() {
             match H264Encoder::new(frame.width, frame.height, 30) {
                 Ok(enc) => {
                     encoder = Some(enc);
+                    enc_dims = (frame.width, frame.height);
                 }
                 Err(e) => {
                     tracing::error!("H264Encoder init failed: {}", e);
@@ -226,15 +234,22 @@ async fn send_video_frames(mut frame_rx: Receiver<FrameData>, track: Arc<TrackLo
             }
         }
         let enc = encoder.as_mut().unwrap();
-        if let Ok(h264) = enc.encode_bgra(&frame.data) {
-            if !h264.is_empty() {
-                let _ = track
-                    .write_sample(&Sample {
-                        data: h264.into(),
-                        duration: std::time::Duration::from_millis(33),
-                        ..Default::default()
-                    })
-                    .await;
+        match enc.encode_bgra(&frame.data) {
+            Ok(h264) => {
+                if !h264.is_empty() {
+                    let _ = track
+                        .write_sample(&Sample {
+                            data: h264.into(),
+                            duration: std::time::Duration::from_millis(33),
+                            ..Default::default()
+                        })
+                        .await;
+                }
+            }
+            Err(e) => {
+                // Drop the encoder so it re-inits on the next frame.
+                tracing::warn!("encode_bgra failed, resetting encoder: {}", e);
+                encoder = None;
             }
         }
     }

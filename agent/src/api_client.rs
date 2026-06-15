@@ -43,8 +43,13 @@ pub async fn register_machine(api_url: &str, api_key: &str, peer_id: &str) -> Re
 
     if res.status().as_u16() == 409 {
         tracing::info!("peer_id={} already registered, checking current status", peer_id);
+        // If the re-check fails, default to "pending" (conservative) so a
+        // denied machine can never bypass denial via a transient error.
         let status = check_approval_status(api_url, api_key, peer_id).await
-            .unwrap_or_else(|_| "approved".to_string());
+            .unwrap_or_else(|e| {
+                tracing::warn!("Approval re-check failed, treating as pending: {}", e);
+                "pending".to_string()
+            });
         return Ok(MachineOut {
             id: String::new(),
             peer_id: peer_id.to_string(),

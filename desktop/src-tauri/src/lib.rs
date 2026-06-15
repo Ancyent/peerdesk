@@ -14,11 +14,13 @@ use peerdesk_agent::{
     run_agent, AgentConfig,
 };
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct AgentState {
     pub running: bool,
     pub peer_id: String,
     pub security_code: Option<String>,
+    /// Handle to abort the spawned run_agent task on stop.
+    pub task: Option<tokio::task::AbortHandle>,
 }
 
 type SharedAgentState = Arc<Mutex<AgentState>>;
@@ -132,13 +134,18 @@ async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusRe
     };
 
     let state_arc = Arc::clone(state.inner());
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         if let Err(e) = run_agent(agent_cfg).await {
             tracing::error!("Agent stopped: {}", e);
         }
         let mut s = state_arc.lock().await;
         s.running = false;
+        s.task = None;
     });
+    {
+        let mut s = state.lock().await;
+        s.task = Some(handle.abort_handle());
+    }
 
     let access_mode = match settings.access_mode {
         AccessMode::Full => "full",
@@ -167,6 +174,9 @@ async fn start_agent(_state: State<'_, SharedAgentState>) -> Result<AgentStatusR
 #[tauri::command]
 async fn stop_agent(state: State<'_, SharedAgentState>) -> Result<(), String> {
     let mut s = state.lock().await;
+    if let Some(handle) = s.task.take() {
+        handle.abort();
+    }
     s.running = false;
     Ok(())
 }
