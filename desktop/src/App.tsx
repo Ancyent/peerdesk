@@ -45,7 +45,7 @@ function AppInner() {
   }, []);
 
   return (
-    <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#0d1117', height: '100vh', display: 'flex', flexDirection: 'column', color: '#e6edf3' }}>
+    <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#0d1117', height: '100%', display: 'flex', flexDirection: 'column', color: '#e6edf3', overflow: 'hidden' }}>
       <TitleBar />
 
       <StatusBar approvalStatus={status.approval_status} serverUrl={status.server_url} />

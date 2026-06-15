@@ -1,0 +1,38 @@
+/* PeerDesk desktop — global reset + theme.
+   Without this the browser default body margin shows as white edges and the
+   100% app overflows the viewport, producing a stray scrollbar. */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0d1117;
+}
+
+body {
+  overflow: hidden; /* the app manages its own scroll regions */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #e6edf3;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dark, slim scrollbars for the inner scroll areas (panels, settings, etc.) */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #283040;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #38465c;
+}
