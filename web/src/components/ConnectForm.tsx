@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useBrandingContext } from '../branding/BrandingContext';
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
 export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
   const [peerId, setPeerId] = useState(initialPeerId ?? '');
   const [password, setPassword] = useState('');
+
+  useEffect(() => { setPeerId(initialPeerId ?? ''); }, [initialPeerId]);
   const { brand_name, logo_data_url } = useBrandingContext();
 
   const inp: React.CSSProperties = {
@@ -93,7 +95,7 @@ export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
               background: peerId.length === 9
                 ? 'linear-gradient(135deg, var(--accent), var(--accent-2))'
                 : 'var(--bg-hover)',
-              color: peerId.length === 9 ? '#111' : 'var(--text-3)',
+              color: peerId.length === 9 ? 'var(--text-1)' : 'var(--text-3)',
               fontWeight: 700, cursor: peerId.length === 9 ? 'pointer' : 'not-allowed',
               boxShadow: peerId.length === 9 ? '0 2px 12px rgba(0,200,150,0.4)' : 'none',
               transition: 'all 0.2s',

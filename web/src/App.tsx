@@ -39,6 +39,7 @@ export default function App() {
   const clipboardReceiveRef = useRef<((text: string) => void) | null>(null);
   const viewerRef = useRef<ViewerHandle>(null);
   const [isViewOnly, setIsViewOnly] = useState(false);
+  const [showFileTransfer, setShowFileTransfer] = useState(false);
   const [latencyMs] = useState<number | null>(null);
   const [fps, setFps] = useState<number | null>(null);
 
@@ -135,10 +136,17 @@ export default function App() {
           fps={fps}
           isViewOnly={isViewOnly}
           videoRef={{ current: viewerRef.current?.videoElement ?? null } as React.RefObject<HTMLVideoElement | null>}
-          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); setPage('machines'); setIsViewOnly(false); }}
-          onCtrlAltDel={() => webrtc.sendInput({ type: 'key_down', key: 'Control' })}
+          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); setPage('machines'); setIsViewOnly(false); setShowFileTransfer(false); }}
+          onCtrlAltDel={() => {
+            webrtc.sendInput({ type: 'key_down', key: 'Control' });
+            webrtc.sendInput({ type: 'key_down', key: 'Alt' });
+            webrtc.sendInput({ type: 'key_down', key: 'Delete' });
+            webrtc.sendInput({ type: 'key_up', key: 'Delete' });
+            webrtc.sendInput({ type: 'key_up', key: 'Alt' });
+            webrtc.sendInput({ type: 'key_up', key: 'Control' });
+          }}
           onToggleViewOnly={() => setIsViewOnly(v => !v)}
-          onFileTransfer={() => {}}
+          onFileTransfer={() => setShowFileTransfer(v => !v)}
         />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <Viewer
@@ -153,8 +161,24 @@ export default function App() {
             onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
           />
           <DisplaySelector displays={displays} current={currentDisplay} onChange={handleDisplaySwitch} />
-          <FileTransferBar transfer={transfer} onSendFile={sendFile} />
+          {(showFileTransfer || transfer) && (
+            <FileTransferBar transfer={transfer} onSendFile={sendFile} />
+          )}
         </div>
+      </div>
+    );
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: 'var(--bg-base)', gap: 16,
+        fontFamily: 'system-ui, sans-serif',
+      }}>
+        <div style={{ color: 'var(--text-2)', fontSize: 14 }}>{errMsg || 'Sesiunea s-a încheiat'}</div>
+        <button onClick={() => { setViewerState('idle'); setPage('connect'); }}
+          style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--border-dim)',
+            background: 'var(--bg-hover)', color: 'var(--text-1)', cursor: 'pointer', fontSize: 13 }}>
+          Înapoi
+        </button>
       </div>
     );
   }

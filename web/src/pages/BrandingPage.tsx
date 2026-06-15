@@ -49,7 +49,7 @@ export function BrandingPage({ onBack }: Props) {
       const updated = await api.branding.update(accessToken, {
         brand_name: brandName,
         accent_color: accentColor,
-        logo_data_url: logoDataUrl ?? '',
+        logo_data_url: logoDataUrl,
       });
       applyBranding(updated);
       setSaved(true);
@@ -63,7 +63,7 @@ export function BrandingPage({ onBack }: Props) {
 
   const handleReset = async () => {
     if (!accessToken) return;
-    const defaults = { brand_name: 'PeerDesk', accent_color: '#2563eb', logo_data_url: '' };
+    const defaults = { brand_name: 'PeerDesk', accent_color: '#2563eb', logo_data_url: null };
     await api.branding.update(accessToken, defaults).catch(() => {});
     setBrandName('PeerDesk');
     setAccentColor('#2563eb');
@@ -171,7 +171,7 @@ export function BrandingPage({ onBack }: Props) {
               <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)' }}>{brandName || 'PeerDesk'}</span>
             )}
             <button style={{
-              padding: '10px 24px', background: accentColor, color: '#fff',
+              padding: '10px 24px', background: accentColor, color: 'var(--text-1)',
               border: 'none', borderRadius: 6, fontSize: 15, cursor: 'default', fontWeight: 500,
             }}>
               Connect

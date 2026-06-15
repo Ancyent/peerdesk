@@ -61,7 +61,7 @@ export function MachineCard({ machine: m, onConnect, onDelete }: Props) {
           {m.os ?? 'Linux'}{!online && m.last_seen_at ? ` · offline ${formatLastSeen(m.last_seen_at)}` : online ? ' · ultima activitate: acum' : ''}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button disabled={!online} onClick={() => online && onConnect(m.peer_id)} style={{ flex: 1, padding: '8px 0', background: online ? 'linear-gradient(135deg, var(--accent), var(--accent-2))' : 'var(--bg-hover)', border: 'none', borderRadius: 8, color: online ? '#111' : 'var(--text-3)', fontSize: 12, fontWeight: 700, cursor: online ? 'pointer' : 'default', boxShadow: online ? '0 2px 12px rgba(0,200,150,0.38)' : 'none', transition: 'all 0.2s' }}>
+          <button disabled={!online} onClick={() => online && onConnect(m.peer_id)} style={{ flex: 1, padding: '8px 0', background: online ? 'linear-gradient(135deg, var(--accent), var(--accent-2))' : 'var(--bg-hover)', border: 'none', borderRadius: 8, color: online ? 'var(--text-1)' : 'var(--text-3)', fontSize: 12, fontWeight: 700, cursor: online ? 'pointer' : 'default', boxShadow: online ? '0 2px 12px rgba(0,200,150,0.38)' : 'none', transition: 'all 0.2s' }}>
             {online ? '⚡ Conectează' : 'Offline'}
           </button>
           {onDelete && (

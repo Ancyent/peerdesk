@@ -58,13 +58,22 @@ export function useFileTransfer(ftChannel: RTCDataChannel | null) {
     const buffer = await file.arrayBuffer();
     let offset = 0;
     while (offset < buffer.byteLength) {
+      if (ftChannel.readyState !== 'open') {
+        setTransfer(s => s ? { ...s, status: 'error' } : null);
+        return;
+      }
       if (ftChannel.bufferedAmount > 1024 * 1024) {
         // Back-pressure: wait for buffer to drain
         await new Promise(r => setTimeout(r, 50));
         continue;
       }
       const chunk = buffer.slice(offset, offset + CHUNK_SIZE);
-      ftChannel.send(chunk);
+      try {
+        ftChannel.send(chunk);
+      } catch {
+        setTransfer(s => s ? { ...s, status: 'error' } : null);
+        return;
+      }
       offset += chunk.byteLength;
       setTransfer(s => s ? { ...s, sent: offset } : null);
       await new Promise(r => setTimeout(r, 0));

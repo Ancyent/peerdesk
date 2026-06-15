@@ -20,12 +20,20 @@ export function useSignaling(
         console.warn('Ignoring malformed signaling message');
       }
     };
+    ws.onerror = () => {
+      console.warn('Signaling WebSocket error');
+    };
+    ws.onclose = (e) => {
+      if (!e.wasClean) console.warn('Signaling WebSocket closed unexpectedly', e.code);
+    };
     return () => ws.close();
   }, [url]);
 
   const send = useCallback((msg: SignalingMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msg));
+    } else {
+      console.warn('Signaling send dropped: WebSocket not open', msg.type);
     }
   }, []);
 

@@ -59,20 +59,20 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
   const ns = (node: OrgNode): CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 5,
     cursor: 'pointer', fontSize: 12, userSelect: 'none',
-    background: isSelected(node) ? '#dbeafe' : 'transparent',
-    color: isSelected(node) ? '#1d4ed8' : '#475569',
+    background: isSelected(node) ? 'var(--bg-active)' : 'transparent',
+    color: isSelected(node) ? 'var(--accent)' : 'var(--text-2)',
     fontWeight: isSelected(node) ? 500 : 400,
   });
 
   const badge = (id: string) => machineCounts[id]
-    ? <span style={{ marginLeft: 'auto', background: '#f1f5f9', borderRadius: 10, padding: '1px 5px', fontSize: 10 }}>{machineCounts[id]}</span>
+    ? <span style={{ marginLeft: 'auto', background: 'var(--bg-hover)', borderRadius: 10, padding: '1px 5px', fontSize: 10 }}>{machineCounts[id]}</span>
     : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>Organizare</span>
-        <button onClick={() => setAdding(true)} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>+</button>
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-dim)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>Organizare</span>
+        <button onClick={() => setAdding(true)} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>+</button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
         <div style={{ ...ns({ type: 'all' }), marginBottom: 4 }} onClick={() => onSelect({ type: 'all' })}>
@@ -82,7 +82,7 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
           <div key={co.id}>
             <div style={{ ...ns({ type: 'company', id: co.id }) }}
               onClick={() => { onSelect({ type: 'company', id: co.id }); toggle(co.id, 'company'); }}>
-              <span style={{ fontSize: 9, width: 10, color: '#94a3b8' }}>{expanded.has(co.id) ? '▼' : '▶'}</span>
+              <span style={{ fontSize: 9, width: 10, color: 'var(--text-3)' }}>{expanded.has(co.id) ? '▼' : '▶'}</span>
               <span>🏢</span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</span>
               {badge(co.id)}
@@ -91,7 +91,7 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
               <div key={loc.id}>
                 <div style={{ ...ns({ type: 'location', id: loc.id }), paddingLeft: 20 }}
                   onClick={() => { onSelect({ type: 'location', id: loc.id }); toggle(loc.id, 'location'); }}>
-                  <span style={{ fontSize: 9, width: 10, color: '#94a3b8' }}>{expanded.has(loc.id) ? '▼' : '▶'}</span>
+                  <span style={{ fontSize: 9, width: 10, color: 'var(--text-3)' }}>{expanded.has(loc.id) ? '▼' : '▶'}</span>
                   <span>📍</span>
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loc.name}</span>
                   {badge(loc.id)}
@@ -113,8 +113,8 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
             <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') addCompany(); if (e.key === 'Escape') { setAdding(false); setNewName(''); } }}
               placeholder="Nume companie"
-              style={{ flex: 1, padding: '4px 8px', fontSize: 11, border: '1px solid #e2e8f0', borderRadius: 4 }} />
-            <button onClick={addCompany} style={{ padding: '4px 8px', fontSize: 11, background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>✓</button>
+              style={{ flex: 1, padding: '4px 8px', fontSize: 11, border: '1px solid var(--border-dim)', borderRadius: 4, background: 'var(--bg-hover)', color: 'var(--text-1)' }} />
+            <button onClick={addCompany} style={{ padding: '4px 8px', fontSize: 11, background: 'var(--accent)', color: 'var(--text-1)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>✓</button>
           </div>
         )}
       </div>
