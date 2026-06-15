@@ -1,11 +1,12 @@
 interface RecentItemProps {
-  name: string;
+  name?: string;
   peerId: string;
-  online: boolean;
+  online?: boolean;
   onConnect: (peerId: string) => void;
 }
 
-export function RecentItem({ name, peerId, online, onConnect }: RecentItemProps) {
+export function RecentItem({ name, peerId, online = false, onConnect }: RecentItemProps) {
+  const label = name ?? peerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
   return (
     <div
       onClick={() => onConnect(peerId)}
@@ -31,7 +32,7 @@ export function RecentItem({ name, peerId, online, onConnect }: RecentItemProps)
           background: online ? '#56d364' : '#484f58',
         }}
       />
-      <div style={{ flex: 1, fontSize: 11, color: '#c9d1d9' }}>{name}</div>
+      <div style={{ flex: 1, fontSize: 11, color: '#c9d1d9' }}>{label}</div>
       <div style={{ fontSize: 10, color: '#484f58', fontFamily: 'monospace' }}>
         {peerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}
       </div>

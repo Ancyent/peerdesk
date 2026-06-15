@@ -5,21 +5,32 @@ interface StatusBarProps {
 
 export function StatusBar({ approvalStatus, serverUrl }: StatusBarProps) {
   const isPending = approvalStatus === 'pending';
-  const text = isPending
-    ? '⏳ Pending admin approval — check your dashboard'
-    : serverUrl
-      ? `Connected to ${serverUrl.replace(/^https?:\/\//, '')}`
-      : 'Running in standalone mode';
+  const isDenied = approvalStatus === 'denied';
+
+  const text = isDenied
+    ? '⛔ Access denied — your device was rejected by the admin'
+    : isPending
+      ? '⏳ Pending admin approval — check your dashboard'
+      : serverUrl
+        ? `Connected to ${serverUrl.replace(/^https?:\/\//, '')}`
+        : 'Running in standalone mode';
+
+  const background = isDenied
+    ? '#5c1010'
+    : isPending
+      ? '#7c3a00'
+      : 'linear-gradient(90deg, #005f63, #00838f)';
+
+  const color = isDenied ? '#fca5a5' : isPending ? '#fed7aa' : '#b2ebf2';
+  const dot = isDenied ? '#f85149' : isPending ? '#fb923c' : '#26c6da';
 
   return (
     <div
       style={{
-        background: isPending
-          ? '#7c3a00'
-          : 'linear-gradient(90deg, #005f63, #00838f)',
+        background,
         padding: '4px 16px',
         fontSize: 10,
-        color: isPending ? '#fed7aa' : '#b2ebf2',
+        color,
         display: 'flex',
         alignItems: 'center',
         gap: 8,
@@ -29,10 +40,10 @@ export function StatusBar({ approvalStatus, serverUrl }: StatusBarProps) {
         style={{
           width: 6,
           height: 6,
-          background: isPending ? '#fb923c' : '#26c6da',
+          background: dot,
           borderRadius: '50%',
           flexShrink: 0,
-          animation: !isPending ? 'pulsedot 2s infinite' : undefined,
+          animation: !isPending && !isDenied ? 'pulsedot 2s infinite' : undefined,
         }}
       />
       {text}

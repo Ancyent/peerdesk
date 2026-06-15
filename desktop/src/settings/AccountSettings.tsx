@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useAgent } from '../hooks/useAgent';
+import { getVersion } from '@tauri-apps/api/app';
+import { useAgentContext } from '../context/AppContext';
 
 export function AccountSettings() {
-  const { status } = useAgent();
+  const { status } = useAgentContext();
   const [newPwd, setNewPwd] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion(null));
+  }, []);
 
   const handleReset = async () => {
     try {
@@ -41,7 +47,7 @@ export function AccountSettings() {
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
         <div style={{ fontSize: 12, color: '#8b949e' }}>Agent version</div>
-        <div style={{ fontSize: 12, color: '#c9d1d9' }}>v0.2.0</div>
+        <div style={{ fontSize: 12, color: '#c9d1d9' }}>{version ? `v${version}` : '—'}</div>
       </div>
 
       <div style={{ marginTop: 20 }}>

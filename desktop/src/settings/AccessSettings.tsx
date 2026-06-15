@@ -66,9 +66,17 @@ export function AccessSettings({ settings, updateSetting }: Props) {
 
       <div>
         <SectionTitle>Unattended Access</SectionTitle>
-        <div style={{ fontSize: 10, color: '#484f58', marginBottom: 6 }}>PERMANENT PASSWORD</div>
-        <input type="password" placeholder="Set a permanent password for unattended access..." style={{ width: '100%', background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#c9d1d9', boxSizing: 'border-box' }} />
-        <div style={{ fontSize: 10, color: '#484f58', marginTop: 4 }}>Leave empty to disable unattended access</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <div style={{ fontSize: 10, color: '#484f58' }}>PERMANENT PASSWORD</div>
+          <span style={{ fontSize: 9, fontWeight: 600, color: '#8b949e', background: '#21262d', border: '1px solid #30363d', borderRadius: 10, padding: '1px 7px' }}>Coming soon</span>
+        </div>
+        <input
+          type="password"
+          disabled
+          placeholder="Set a permanent password for unattended access..."
+          style={{ width: '100%', background: '#1a1f25', border: '1px solid #30363d', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#484f58', boxSizing: 'border-box', cursor: 'not-allowed' }}
+        />
+        <div style={{ fontSize: 10, color: '#484f58', marginTop: 4 }}>Unattended access is not available yet.</div>
       </div>
     </div>
   );

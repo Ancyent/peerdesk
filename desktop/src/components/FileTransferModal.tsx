@@ -37,6 +37,9 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
   const incomingRef = useRef(incoming);
   useEffect(() => { incomingRef.current = incoming; }, [incoming]);
 
+  // Pending outgoing transfers awaiting an ft_accept before chunks are sent.
+  const pendingSends = useRef<Map<string, { start: () => void; abort: () => void }>>(new Map());
+
   // Revoke Blob URLs only on unmount, not on every incoming update
   useEffect(() => {
     return () => { incomingRef.current.forEach(f => { if (f.url) URL.revokeObjectURL(f.url); }); };
@@ -54,7 +57,15 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
         // Agent responses to our outgoing transfers
         if (msg.type === 'ft_accept') {
           setOutgoing(prev => prev.map(f => f.id === msg.id ? { ...f, status: 'sending' } : f));
+          // Only now do we begin streaming chunks for this transfer.
+          const pending = pendingSends.current.get(msg.id as string);
+          if (pending) {
+            pendingSends.current.delete(msg.id as string);
+            pending.start();
+          }
         } else if (msg.type === 'ft_reject') {
+          const pending = pendingSends.current.get(msg.id as string);
+          if (pending) { pending.abort(); pendingSends.current.delete(msg.id as string); }
           setOutgoing(prev => prev.map(f => f.id === msg.id ? { ...f, status: 'error', errorNote: msg.reason as string } : f));
         } else if (msg.type === 'ft_progress') {
           setOutgoing(prev => prev.map(f => f.id === msg.id ? { ...f, sent: msg.received as number } : f));
@@ -68,7 +79,13 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
     return () => ftChannel.removeEventListener('message', handler);
   }, [ftChannel]);
 
-  // Bug 1 + Bug 2 fix: ft_offer message type + binary ArrayBuffer chunks
+  // Abort any in-flight/pending transfers on unmount so readers stop firing.
+  useEffect(() => {
+    const map = pendingSends.current;
+    return () => { map.forEach(p => p.abort()); map.clear(); };
+  }, []);
+
+  // Bug 9 fix: send ft_offer, then wait for ft_accept before streaming chunks.
   const handlePickFile = (file: File) => {
     if (!ftChannel || ftChannel.readyState !== 'open') return;
     const id = genId();
@@ -77,14 +94,20 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
     ftChannel.send(JSON.stringify({ type: 'ft_offer', id, name: file.name, size: file.size }));
 
     let offset = 0;
+    let aborted = false;
     const reader = new FileReader();
 
     const readNext = () => {
+      if (aborted) return;
       reader.readAsArrayBuffer(file.slice(offset, offset + CHUNK));
     };
 
     reader.onload = () => {
-      if (!(reader.result instanceof ArrayBuffer)) return;
+      if (aborted || !(reader.result instanceof ArrayBuffer)) return;
+      if (ftChannel.readyState !== 'open') {
+        setOutgoing(prev => prev.map(f => f.id === id ? { ...f, status: 'error', errorNote: 'Channel closed' } : f));
+        return;
+      }
       ftChannel.send(reader.result);
       offset += reader.result.byteLength;
       setOutgoing(prev => prev.map(f => f.id === id ? { ...f, sent: Math.min(offset, file.size) } : f));
@@ -99,7 +122,11 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
       setOutgoing(prev => prev.map(f => f.id === id ? { ...f, status: 'error' } : f));
     };
 
-    readNext();
+    // Register the send loop; it only runs once the agent sends ft_accept.
+    pendingSends.current.set(id, {
+      start: readNext,
+      abort: () => { aborted = true; try { reader.abort(); } catch { /* ignore */ } },
+    });
   };
 
   const tabBtn = (t: 'send' | 'receive'): CSSProperties => ({

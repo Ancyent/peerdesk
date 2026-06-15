@@ -1,29 +1,31 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useAgent } from '../hooks/useAgent';
-import { useSettings } from '../hooks/useSettings';
+import { useAgentContext, useSettingsContext } from '../context/AppContext';
 import { ModeDropdown } from '../components/ModeDropdown';
 import { RecentItem } from '../components/RecentItem';
 import { SecurityCodeBanner } from '../components/SecurityCodeBanner';
+import { getRecents, addRecent } from '../lib/recents';
 
 interface Props {
   onConnect: (peerId: string) => void;
 }
 
-const RECENT = [
-  { name: 'Desktop PC — Birou', peerId: '987654321', online: true },
-  { name: 'Work Server', peerId: '456789123', online: false },
-  { name: 'Laptop personal', peerId: '321654987', online: false },
-];
-
 const fmt = (id: string) => id.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
 
 export function HomeScreen({ onConnect }: Props) {
-  const { status, loading, start } = useAgent();
-  const { settings, updateSetting } = useSettings();
+  const { status, loading, start } = useAgentContext();
+  const { settings, updateSetting } = useSettingsContext();
   const [connectId, setConnectId] = useState('');
   const [newPwd, setNewPwd] = useState<string | null>(null);
   const [securityCode, setSecurityCode] = useState<string | null>(null);
+  const [recents, setRecents] = useState(() => getRecents());
+
+  const handleConnect = (peerId: string) => {
+    setRecents(addRecent(peerId));
+    onConnect(peerId);
+  };
+
+  const denied = status.approval_status === 'denied';
 
   const handleResetPwd = async () => {
     try {
@@ -66,8 +68,12 @@ export function HomeScreen({ onConnect }: Props) {
 
             <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
               {status.approval_status !== 'standalone' && (
-                <span style={{ padding: '3px 9px', borderRadius: 12, fontSize: 9, fontWeight: 600, background: '#1a3a1a', color: '#56d364' }}>
-                  ● {status.approval_status === 'pending' ? 'Pending' : 'Approved'}
+                <span style={{
+                  padding: '3px 9px', borderRadius: 12, fontSize: 9, fontWeight: 600,
+                  background: denied ? '#3a1a1a' : status.approval_status === 'pending' ? '#3a2a0a' : '#1a3a1a',
+                  color: denied ? '#f85149' : status.approval_status === 'pending' ? '#e3b341' : '#56d364',
+                }}>
+                  ● {denied ? 'Denied' : status.approval_status === 'pending' ? 'Pending' : 'Approved'}
                 </span>
               )}
               {status.server_url && (
@@ -103,12 +109,12 @@ export function HomeScreen({ onConnect }: Props) {
         <input
           value={connectId}
           onChange={e => setConnectId(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && cleanId.length === 9 && onConnect(cleanId)}
+          onKeyDown={e => e.key === 'Enter' && cleanId.length === 9 && handleConnect(cleanId)}
           placeholder="Enter Peer ID  (e.g. 987 654 321)"
           style={{ width: '100%', background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '9px 12px', fontSize: 12, color: '#c9d1d9', marginBottom: 8, boxSizing: 'border-box', outline: 'none' }}
         />
         <button
-          onClick={() => onConnect(cleanId)}
+          onClick={() => handleConnect(cleanId)}
           disabled={cleanId.length !== 9}
           style={{ width: '100%', background: '#26c6da', color: '#0d1117', border: 'none', borderRadius: 6, padding: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 16, opacity: cleanId.length !== 9 ? 0.5 : 1 }}
         >
@@ -116,9 +122,15 @@ export function HomeScreen({ onConnect }: Props) {
         </button>
 
         <div style={{ fontSize: 9, color: '#484f58', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>Recent</div>
-        {RECENT.map(r => (
-          <RecentItem key={r.peerId} {...r} onConnect={onConnect} />
-        ))}
+        {recents.length === 0 ? (
+          <div style={{ fontSize: 11, color: '#484f58', padding: '10px 0', textAlign: 'center' }}>
+            No recent connections
+          </div>
+        ) : (
+          recents.map(r => (
+            <RecentItem key={r.peerId} peerId={r.peerId} onConnect={handleConnect} />
+          ))
+        )}
       </div>
     </div>
   );

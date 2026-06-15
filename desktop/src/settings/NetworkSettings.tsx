@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useAgent } from '../hooks/useAgent';
+import { useAgentContext } from '../context/AppContext';
 
 export function NetworkSettings() {
-  const { status } = useAgent();
+  const { status } = useAgentContext();
   const [serverUrl, setServerUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);

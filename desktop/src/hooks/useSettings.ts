@@ -17,6 +17,10 @@ export function useSettings() {
       .catch(() => setLoaded(true));
   }, []);
 
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
   const updateSetting = useCallback(
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
       setSettings((prev) => {

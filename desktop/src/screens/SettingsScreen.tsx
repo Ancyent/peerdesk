@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSettings } from '../hooks/useSettings';
+import { useSettingsContext } from '../context/AppContext';
 import { AccessSettings } from '../settings/AccessSettings';
 import { NetworkSettings } from '../settings/NetworkSettings';
 import { PermissionsSettings } from '../settings/PermissionsSettings';
@@ -19,7 +19,7 @@ const NAV = [
 
 export function SettingsScreen({ onBack }: Props) {
   const [active, setActive] = useState<Page>('access');
-  const { settings, loaded, updateSetting } = useSettings();
+  const { settings, loaded, updateSetting } = useSettingsContext();
 
   if (!loaded) return null;
 
@@ -38,9 +38,6 @@ export function SettingsScreen({ onBack }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0d1117', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', color: '#e6edf3' }}>
       <div style={{ background: '#161b22', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 7, borderBottom: '1px solid #21262d' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {['#ff5f56', '#febc2e', '#27c93f'].map((c, i) => <div key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: c }} />)}
-        </div>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', fontSize: 13, marginLeft: 4 }}>← Back</button>
         <div style={{ flex: 1, textAlign: 'center', fontSize: 12, color: '#8b949e', fontWeight: 500 }}>PeerDesk · Settings</div>
       </div>

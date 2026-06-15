@@ -4,13 +4,13 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { ViewerTab } from './screens/ViewerTab';
 import { StatusBar } from './components/StatusBar';
 import { TabBar } from './components/TabBar';
-import { useAgent } from './hooks/useAgent';
+import { AppProvider, useAgentContext } from './context/AppContext';
 import type { Session, SessionState } from './types';
 
-export default function App() {
+function AppInner() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeTab, setActiveTab] = useState<'home' | 'settings' | string>('home');
-  const { status, start } = useAgent();
+  const { status, start } = useAgentContext();
 
   const signalingUrl = useMemo(() =>
     status.server_url
@@ -75,5 +75,13 @@ export default function App() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <AppInner />
+    </AppProvider>
   );
 }

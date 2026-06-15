@@ -91,7 +91,17 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
       onStateChange(session.id, 'error', 'Remote machine disconnected');
       onClose();
     }
-  }, [webrtc, session.id, onStateChange, onClose, password]));
+  }, [webrtc, session.id, onStateChange, onClose, password]),
+  useCallback(() => {
+    // WebSocket failed to open / closed abnormally — don't hang on "Establishing connection".
+    setViewState(prev => {
+      if (prev === 'connected') return prev;
+      const m = 'Could not reach signaling server';
+      setErrMsg(m);
+      onStateChange(session.id, 'error', m);
+      return 'error';
+    });
+  }, [session.id, onStateChange]));
 
   sendRef.current = send;
 
