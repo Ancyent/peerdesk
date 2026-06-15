@@ -149,6 +149,10 @@ async def test_2fa_login_flow(client):
     assert data["requires_2fa"] is True
     assert data["temp_token"] is not None
 
+    # The temp_token must NOT be usable as a real access token (no 2FA bypass).
+    bad = await client.get("/users/me", headers={"Authorization": f"Bearer {data['temp_token']}"})
+    assert bad.status_code == 401
+
     # Complete login with TOTP code
     code2 = pyotp.TOTP(secret).now()
     r4 = await client.post("/auth/login/2fa", json={"temp_token": data["temp_token"], "code": code2})

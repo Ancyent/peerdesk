@@ -35,7 +35,7 @@ async def redeem_token(body: TokenRedeemRequest, db: AsyncSession = Depends(get_
             RegistrationToken.token == body.token,
             RegistrationToken.used_at.is_(None),
             RegistrationToken.expires_at > datetime.now(timezone.utc),
-        )
+        ).with_for_update()
     )
     reg = result.scalar_one_or_none()
     if not reg:

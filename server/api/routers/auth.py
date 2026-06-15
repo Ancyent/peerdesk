@@ -5,7 +5,7 @@ from sqlalchemy import select
 from deps import get_db
 from models import User
 from schemas import UserRegister, UserLogin, TokenResponse, RefreshRequest, LoginStep2Request
-from auth import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+from auth import hash_password, verify_password, create_access_token, create_refresh_token, create_pending_2fa_token, decode_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -33,7 +33,7 @@ async def login(body: UserLogin, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if user.totp_enabled:
-        temp_token = create_access_token(user.id)
+        temp_token = create_pending_2fa_token(user.id)
         return TokenResponse(
             access_token="",
             refresh_token="",
@@ -49,7 +49,7 @@ async def login(body: UserLogin, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login/2fa", response_model=TokenResponse)
 async def login_2fa(body: LoginStep2Request, db: AsyncSession = Depends(get_db)):
-    user_id = decode_token(body.temp_token, "access")
+    user_id = decode_token(body.temp_token, "pending_2fa")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired temp token")
     result = await db.execute(select(User).where(User.id == user_id))

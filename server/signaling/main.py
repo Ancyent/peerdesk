@@ -75,6 +75,7 @@ async def health():
 async def websocket_endpoint(ws: WebSocket):
     client_ip = ws.client.host if ws.client else "unknown"
     if not _check_rate_limit(client_ip):
+        await ws.accept()
         await ws.close(code=1008, reason="rate limited")
         return
     await ws.accept()
@@ -96,8 +97,12 @@ async def websocket_endpoint(ws: WebSocket):
 
             try:
                 if msg_type == "register":
-                    peer_id = data["peer_id"]
-                    await register_agent(state, redis_client, peer_id, data["password_hash"], ws, data.get("hmac_key", ""))
+                    req_peer_id = data["peer_id"]
+                    ok = await register_agent(state, redis_client, req_peer_id, data["password_hash"], ws, data.get("hmac_key", ""))
+                    if not ok:
+                        await ws.send_text(json.dumps({"type": "error", "code": "peer_id_in_use"}))
+                        continue
+                    peer_id = req_peer_id
                     await ws.send_text(json.dumps({"type": "registered", "peer_id": peer_id}))
 
                 elif msg_type == "request_challenge":
@@ -125,18 +130,21 @@ async def websocket_endpoint(ws: WebSocket):
                     raw_key = agent_data.get(b"hmac_key") or agent_data.get("hmac_key", b"")
                     stored_key = raw_key.decode() if isinstance(raw_key, bytes) else raw_key
                     viewer_ip = ws.client.host if ws.client else "unknown"
-                    if stored_key and verify_challenge_response(nonce_str, response, stored_key):
+                    if not stored_key:
+                        audit_log("connection_attempt", peer_id_req, viewer_ip, "hmac_not_configured", method="hmac")
+                        await ws.send_json({"type": "error", "code": "hmac_not_configured"})
+                    elif verify_challenge_response(nonce_str, response, stored_key):
                         audit_log("connection_attempt", peer_id_req, viewer_ip, "approved", method="hmac")
-                        viewer_id = await handle_viewer_authenticated(state, redis_client, peer_id_req, ws)
+                        viewer_id = await handle_viewer_authenticated(state, redis_client, peer_id_req, ws, viewer_ip)
                     else:
                         audit_log("connection_attempt", peer_id_req, viewer_ip, "auth_failed", method="hmac")
                         await ws.send_json({"type": "error", "code": "auth_failed"})
 
                 elif msg_type == "join":
-                    viewer_id = await handle_join(
-                        state, redis_client, data["peer_id"], data["password"], ws
-                    )
                     viewer_ip = ws.client.host if ws.client else "unknown"
+                    viewer_id = await handle_join(
+                        state, redis_client, data["peer_id"], data["password"], ws, viewer_ip
+                    )
                     if viewer_id:
                         audit_log("connection_attempt", data["peer_id"], viewer_ip, "approved")
                     else:

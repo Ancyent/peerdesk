@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user, get_api_key
-from models import User, Machine, ApiKey
+from models import User, Machine, ApiKey, Company, Location, Group
 from schemas import MachineRegister, MachineOut, MachinePlacement, MachineRegisterViaKey, MachineApprovalStatus
 
 router = APIRouter(prefix="/machines", tags=["machines"])
@@ -166,6 +166,42 @@ async def set_placement(
     machine = result.scalar_one_or_none()
     if not machine:
         raise HTTPException(404, "Machine not found")
+
+    # Verify each non-None placement target is owned by the current user, so a
+    # user cannot place their machine into another user's company/location/group.
+    if body.company_id is not None:
+        owned = await db.execute(
+            select(Company).where(
+                Company.id == body.company_id,
+                Company.owner_id == current_user.id,
+            )
+        )
+        if not owned.scalar_one_or_none():
+            raise HTTPException(403, "Company not owned by user")
+    if body.location_id is not None:
+        owned = await db.execute(
+            select(Location)
+            .join(Company, Location.company_id == Company.id)
+            .where(
+                Location.id == body.location_id,
+                Company.owner_id == current_user.id,
+            )
+        )
+        if not owned.scalar_one_or_none():
+            raise HTTPException(403, "Location not owned by user")
+    if body.group_id is not None:
+        owned = await db.execute(
+            select(Group)
+            .join(Location, Group.location_id == Location.id)
+            .join(Company, Location.company_id == Company.id)
+            .where(
+                Group.id == body.group_id,
+                Company.owner_id == current_user.id,
+            )
+        )
+        if not owned.scalar_one_or_none():
+            raise HTTPException(403, "Group not owned by user")
+
     machine.company_id = body.company_id
     machine.location_id = body.location_id
     machine.group_id = body.group_id

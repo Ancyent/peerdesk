@@ -46,13 +46,47 @@ async def register_agent(
     password_hash: str,
     ws: WebSocket,
     hmac_key: str = "",
-) -> None:
+) -> bool:
+    """Register an agent for peer_id.
+
+    Returns True on success. If a live agent connection already exists for this
+    peer_id, the new registration is only accepted when its credentials match the
+    stored ones (i.e. the same legitimate agent reconnecting); otherwise the
+    registration is rejected (returns False) and existing state is left untouched.
+    """
+    existing_ws = state.agent_connections.get(peer_id)
+    if existing_ws is not None and existing_ws is not ws:
+        stored = await redis.hgetall(f"agent:{peer_id}")
+
+        def _field(name: str) -> str:
+            raw = stored.get(name.encode()) or stored.get(name)
+            if raw is None:
+                return ""
+            return raw.decode() if isinstance(raw, bytes) else raw
+
+        stored_hmac = _field("hmac_key")
+        stored_pw = _field("password_hash")
+        # Allow the same legitimate agent to reconnect (matching persistent
+        # credentials). Prefer the hmac_key; fall back to password_hash.
+        matches = (
+            (bool(hmac_key) and hmac_lib.compare_digest(hmac_key, stored_hmac))
+            or (bool(password_hash) and hmac_lib.compare_digest(password_hash, stored_pw))
+        )
+        if not matches:
+            return False
+        # Same agent reconnecting — close the stale socket and replace it.
+        try:
+            await existing_ws.close(code=1012, reason="reconnected")
+        except Exception:
+            pass
+
     state.agent_connections[peer_id] = ws
     await redis.hset(f"agent:{peer_id}", mapping={
         "password_hash": password_hash,
         "hmac_key": hmac_key,
     })
     await redis.expire(f"agent:{peer_id}", 3600)
+    return True
 
 
 async def unregister_agent(
@@ -94,6 +128,7 @@ async def handle_join(
     peer_id: str,
     password: str,
     viewer_ws: WebSocket,
+    remote_ip: str = "unknown",
 ) -> Optional[str]:
     """Returns viewer_session_id on success, None on failure."""
     agent_data = await redis.hgetall(f"agent:{peer_id}")
@@ -110,7 +145,7 @@ async def handle_join(
         await viewer_ws.send_text(json.dumps({"type": "error", "code": "unauthorized"}))
         return None
 
-    return await handle_viewer_authenticated(state, redis, peer_id, viewer_ws)
+    return await handle_viewer_authenticated(state, redis, peer_id, viewer_ws, remote_ip)
 
 
 async def request_approval(
@@ -152,15 +187,23 @@ async def handle_approval(
         state.viewer_connections[viewer_id] = viewer_ws
         state.viewer_to_agent[viewer_id] = peer_id
         state.agent_to_viewer[peer_id] = viewer_id
-        await viewer_ws.send_text(json.dumps({
-            "type": "joined",
-            "viewer_id": viewer_id,
-        }))
+        # The viewer may have disconnected while awaiting approval; a failed send
+        # must not propagate and kill the agent's connection coroutine.
+        try:
+            await viewer_ws.send_text(json.dumps({
+                "type": "joined",
+                "viewer_id": viewer_id,
+            }))
+        except Exception:
+            pass
     else:
-        await viewer_ws.send_text(json.dumps({
-            "type": "denied",
-            "reason": "Host denied the connection",
-        }))
+        try:
+            await viewer_ws.send_text(json.dumps({
+                "type": "denied",
+                "reason": "Host denied the connection",
+            }))
+        except Exception:
+            pass
 
 
 async def forward_to_peer(
