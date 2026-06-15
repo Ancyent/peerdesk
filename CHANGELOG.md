@@ -2,6 +2,23 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.3] — 2026-06-15
+
+### Fixed
+- **Agent:** machine registration now reaches the server. The agent derived the
+  REST API base without the `/api` prefix, so `POST /machines/register` hit the
+  web SPA and returned 405 — machines never appeared in the dashboard. The agent
+  now derives `<server>/api` (matching the same nginx that serves `/ws`).
+- **Web:** the Downloads page reads the latest GitHub release dynamically (version
+  + asset links) instead of a hardcoded `v0.3.9`, so it never goes stale.
+
+### Changed
+- **Desktop:** custom frameless title bar in the PeerDesk dark theme with working
+  minimize/maximize/close controls, replacing the native OS title bar; copy/reset
+  icons are now prominent accent-tinted chips.
+- **Docs:** added `docs/RUNBOOK.md` (architecture, server bring-up, host
+  registration flow, release process).
+
 ## [0.4.2] — 2026-06-15
 
 Comprehensive bug-fix pass across all components (agent, servers, web, desktop).
