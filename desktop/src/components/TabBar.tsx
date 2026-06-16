@@ -14,7 +14,7 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
     background: 'none',
     border: 'none',
     borderBottom: activeTab === id ? '2px solid #26c6da' : '2px solid transparent',
-    color: activeTab === id ? '#26c6da' : '#8b949e',
+    color: activeTab === id ? '#26c6da' : '#b3bdca',
     padding: '8px 14px',
     fontSize: 12,
     cursor: 'pointer',
@@ -54,7 +54,7 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
       ))}
 
       <button
-        style={{ background: 'none', border: 'none', color: '#484f58', fontSize: 11, padding: '8px 10px', cursor: 'default', opacity: 0.3 }}
+        style={{ background: 'none', border: 'none', color: '#93a0b2', fontSize: 11, padding: '8px 10px', cursor: 'default', opacity: 0.3 }}
         disabled
         title="Sessions open from Home only"
       >
@@ -65,7 +65,7 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
 
       <button
         onClick={onSettings}
-        style={{ background: 'none', border: 'none', color: '#484f58', cursor: 'pointer', fontSize: 16, padding: '4px 8px', flexShrink: 0 }}
+        style={{ background: 'none', border: 'none', color: '#93a0b2', cursor: 'pointer', fontSize: 16, padding: '4px 8px', flexShrink: 0 }}
         title="Settings"
       >
         ⚙

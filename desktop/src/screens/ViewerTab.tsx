@@ -156,15 +156,15 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
 
   const center: CSSProperties = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' };
   const card: CSSProperties = { background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 28, width: 280 };
-  const inp: CSSProperties = { width: '100%', background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '9px 12px', fontSize: 12, color: '#c9d1d9', marginBottom: 10, boxSizing: 'border-box', outline: 'none' };
+  const inp: CSSProperties = { width: '100%', background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '9px 12px', fontSize: 12, color: '#e6ebf1', marginBottom: 10, boxSizing: 'border-box', outline: 'none' };
   const btnPrimary: CSSProperties = { width: '100%', background: '#26c6da', color: '#0d1117', border: 'none', borderRadius: 6, padding: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 8 };
-  const btnGhost: CSSProperties = { width: '100%', background: 'none', border: 'none', color: '#484f58', fontSize: 12, cursor: 'pointer', padding: 4 };
+  const btnGhost: CSSProperties = { width: '100%', background: 'none', border: 'none', color: '#93a0b2', fontSize: 12, cursor: 'pointer', padding: 4 };
 
   if (viewState === 'connecting') {
     return (
       <div style={center}>
         <div style={card}>
-          <div style={{ fontSize: 9, color: '#484f58', letterSpacing: 2, fontWeight: 700, marginBottom: 16, textTransform: 'uppercase' }}>Connect to Remote</div>
+          <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, fontWeight: 700, marginBottom: 16, textTransform: 'uppercase' }}>Connect to Remote</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#26c6da', letterSpacing: 4, fontFamily: 'monospace', marginBottom: 16 }}>{fmt(session.id)}</div>
           <input
             type="password"
@@ -189,7 +189,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
       <div style={center}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#26c6da', margin: '0 auto 16px', animation: 'pulsedot 1s infinite' }} />
-          <div style={{ color: '#8b949e', fontSize: 13 }}>Establishing connection...</div>
+          <div style={{ color: '#b3bdca', fontSize: 13 }}>Establishing connection...</div>
           <button onClick={() => { webrtc.disconnect(); onClose(); }} style={{ ...btnGhost, marginTop: 16 }}>Cancel</button>
         </div>
         <style>{`@keyframes pulsedot{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
@@ -205,7 +205,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
           <button onClick={() => { setViewState('connecting'); setErrMsg(''); }} style={{ ...btnPrimary, width: 'auto', padding: '8px 20px', marginRight: 8 }}>
             Retry
           </button>
-          <button onClick={onClose} style={{ background: 'none', border: '1px solid #30363d', color: '#8b949e', borderRadius: 6, padding: '8px 20px', fontSize: 12, cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid #30363d', color: '#b3bdca', borderRadius: 6, padding: '8px 20px', fontSize: 12, cursor: 'pointer' }}>
             Close
           </button>
         </div>

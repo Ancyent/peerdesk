@@ -9,11 +9,11 @@ interface Props {
 function Radio<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, color: '#484f58', marginBottom: 8, letterSpacing: 1, textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 8, letterSpacing: 1, textTransform: 'uppercase' }}>{label}</div>
       {options.map(o => (
         <div key={o.value} onClick={() => onChange(o.value)} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, cursor: 'pointer' }}>
           <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${value === o.value ? '#26c6da' : '#30363d'}`, background: value === o.value ? '#26c6da' : 'transparent', flexShrink: 0 }} />
-          <div style={{ fontSize: 12, color: '#c9d1d9' }}>{o.label}</div>
+          <div style={{ fontSize: 12, color: '#e6ebf1' }}>{o.label}</div>
         </div>
       ))}
     </div>
@@ -36,7 +36,7 @@ export function DisplaySettings({ settings, updateSetting }: Props) {
           { key: 'hardware_acceleration' as const, label: 'Hardware acceleration' },
         ]).map((item, i) => (
           <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i === 0 ? '1px solid #1c2128' : 'none' }}>
-            <div style={{ fontSize: 12, color: '#c9d1d9' }}>{item.label}</div>
+            <div style={{ fontSize: 12, color: '#e6ebf1' }}>{item.label}</div>
             <Toggle value={settings[item.key]} onChange={v => updateSetting(item.key, v)} />
           </div>
         ))}

@@ -30,7 +30,7 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
   const btn: CSSProperties = {
     background: 'none',
     border: 'none',
-    color: '#8b949e',
+    color: '#b3bdca',
     fontSize: 11,
     cursor: 'pointer',
     padding: '4px 8px',
@@ -40,7 +40,7 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
   return (
     <div style={{ background: '#0d0d0d', borderBottom: '1px solid #1a1a1a', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
       <span style={{ width: 6, height: 6, background: '#26c6da', borderRadius: '50%', animation: 'pulsedot 2s infinite', flexShrink: 0 }} />
-      <span style={{ color: '#484f58', fontSize: 10, marginRight: 8, fontFamily: 'monospace' }}>{peerId}</span>
+      <span style={{ color: '#93a0b2', fontSize: 10, marginRight: 8, fontFamily: 'monospace' }}>{peerId}</span>
 
       <button style={btn} onClick={onFullscreen} title="Fullscreen">⛶ Fullscreen</button>
       <button style={btn} onClick={onClipboardSync} title="Sync local clipboard to remote">📋 Clipboard</button>

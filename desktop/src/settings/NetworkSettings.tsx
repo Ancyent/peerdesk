@@ -55,27 +55,27 @@ export function NetworkSettings() {
       <div style={{ fontSize: 15, fontWeight: 600, color: '#e6edf3', marginBottom: 20 }}>Network</div>
 
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 10, color: '#8b949e', letterSpacing: 1, fontWeight: 600, marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #21262d', textTransform: 'uppercase' }}>PeerDesk Server</div>
+        <div style={{ fontSize: 10, color: '#b3bdca', letterSpacing: 1, fontWeight: 600, marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #21262d', textTransform: 'uppercase' }}>PeerDesk Server</div>
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, color: '#484f58', marginBottom: 5 }}>SERVER URL</div>
+          <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 5 }}>SERVER URL</div>
           <input value={serverUrl} onChange={e => setServerUrl(e.target.value)} placeholder="https://api.example.com"
-            style={{ width: '100%', background: '#21262d', border: `1px solid ${serverUrl ? '#26c6da' : '#30363d'}`, borderRadius: 6, padding: '8px 12px', fontSize: 12, color: serverUrl ? '#26c6da' : '#c9d1d9', boxSizing: 'border-box' }} />
+            style={{ width: '100%', background: '#21262d', border: `1px solid ${serverUrl ? '#26c6da' : '#30363d'}`, borderRadius: 6, padding: '8px 12px', fontSize: 12, color: serverUrl ? '#26c6da' : '#e6ebf1', boxSizing: 'border-box' }} />
         </div>
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, color: '#484f58', marginBottom: 5 }}>API KEY</div>
+          <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 5 }}>API KEY</div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               type={showKey ? 'text' : 'password'}
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
               placeholder={status.approval_status !== 'standalone' && !apiKey ? '••• key saved — enter new key to replace' : 'pd_••••••••••••••••'}
-              style={{ flex: 1, background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#c9d1d9' }}
+              style={{ flex: 1, background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#e6ebf1' }}
             />
-            <button onClick={() => setShowKey(v => !v)} style={{ background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '0 12px', cursor: 'pointer', color: '#8b949e', fontSize: 11 }}>{showKey ? 'Hide' : 'Show'}</button>
+            <button onClick={() => setShowKey(v => !v)} style={{ background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '0 12px', cursor: 'pointer', color: '#b3bdca', fontSize: 11 }}>{showKey ? 'Hide' : 'Show'}</button>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={handlePaste} style={{ background: '#21262d', border: '1px solid #30363d', padding: '6px 12px', borderRadius: 5, fontSize: 11, color: '#8b949e', cursor: 'pointer' }}>
+          <button onClick={handlePaste} style={{ background: '#21262d', border: '1px solid #30363d', padding: '6px 12px', borderRadius: 5, fontSize: 11, color: '#b3bdca', cursor: 'pointer' }}>
             Paste config link
           </button>
           <button onClick={() => applyUrl(`peerdesk://setup?server=${encodeURIComponent(serverUrl)}&api_key=${encodeURIComponent(apiKey)}`)}
@@ -86,15 +86,15 @@ export function NetworkSettings() {
       </div>
 
       <div>
-        <div style={{ fontSize: 10, color: '#8b949e', letterSpacing: 1, fontWeight: 600, marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #21262d', textTransform: 'uppercase' }}>Connection Status</div>
+        <div style={{ fontSize: 10, color: '#b3bdca', letterSpacing: 1, fontWeight: 600, marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #21262d', textTransform: 'uppercase' }}>Connection Status</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1c2128' }}>
-          <div style={{ fontSize: 12, color: '#c9d1d9' }}>Status</div>
+          <div style={{ fontSize: 12, color: '#e6ebf1' }}>Status</div>
           <div style={{ padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600, background: '#1a3a1a', color: '#56d364' }}>
             ● {status.approval_status === 'standalone' ? 'Connected (standalone)' : status.approval_status}
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
-          <div style={{ fontSize: 12, color: '#c9d1d9' }}>Peer ID</div>
+          <div style={{ fontSize: 12, color: '#e6ebf1' }}>Peer ID</div>
           <div style={{ fontSize: 12, color: '#26c6da', fontFamily: 'monospace' }}>
             {status.peer_id.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}
           </div>

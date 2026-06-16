@@ -40,7 +40,7 @@ export function HomeScreen({ onConnect }: Props) {
     <div style={{ flex: 1, display: 'flex', gap: 12, padding: 16, overflow: 'hidden' }}>
       {/* Left: This Device */}
       <div style={{ flex: 1, background: '#161b22', borderRadius: 10, padding: 18, border: '1px solid #21262d', overflow: 'auto' }}>
-        <div style={{ fontSize: 9, color: '#484f58', letterSpacing: 2, fontWeight: 700, marginBottom: 14, textTransform: 'uppercase' }}>
+        <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, fontWeight: 700, marginBottom: 14, textTransform: 'uppercase' }}>
           This Device
         </div>
 
@@ -50,14 +50,14 @@ export function HomeScreen({ onConnect }: Props) {
               {fmt(status.peer_id)}
             </div>
 
-            <div style={{ fontSize: 10, color: '#484f58', marginBottom: 5 }}>Password</div>
+            <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 5 }}>Password</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
               {status.password ? (
                 <div style={{ fontSize: 18, color: '#26c6da', letterSpacing: 2, flex: 1, fontFamily: 'monospace', fontWeight: 600 }}>
                   {showPwd ? status.password : '•'.repeat(status.password.length)}
                 </div>
               ) : (
-                <div style={{ fontSize: 13, color: '#8b949e', flex: 1 }}>•••••• — reset to set a visible password</div>
+                <div style={{ fontSize: 13, color: '#b3bdca', flex: 1 }}>•••••• — reset to set a visible password</div>
               )}
               {status.password && (
                 <button
@@ -92,7 +92,7 @@ export function HomeScreen({ onConnect }: Props) {
 
             {newPwd && (
               <div style={{ background: '#0a2a2e', border: '1px solid #26c6da', borderRadius: 6, padding: 10, marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: '#8b949e', marginBottom: 4 }}>New password — copy now:</div>
+                <div style={{ fontSize: 10, color: '#b3bdca', marginBottom: 4 }}>New password — copy now:</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <code style={{ flex: 1, fontSize: 12, color: '#26c6da', fontFamily: 'monospace' }}>{newPwd}</code>
                   <button onClick={() => { navigator.clipboard.writeText(newPwd!); setNewPwd(null); }} style={{ background: '#26c6da', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 10, color: '#0d1117', fontWeight: 700, cursor: 'pointer' }}>Copy</button>
@@ -121,12 +121,12 @@ export function HomeScreen({ onConnect }: Props) {
               <SecurityCodeBanner code={securityCode} onDismiss={() => setSecurityCode(null)} />
             )}
 
-            <div style={{ fontSize: 10, color: '#484f58', marginBottom: 5 }}>Access mode</div>
+            <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 5 }}>Access mode</div>
             <ModeDropdown value={settings.access_mode} onChange={(m) => updateSetting('access_mode', m)} />
           </>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 12, color: '#8b949e' }}>Agent not running</div>
+            <div style={{ fontSize: 12, color: '#b3bdca' }}>Agent not running</div>
             <button onClick={start} disabled={loading} style={{ background: '#26c6da', color: '#0d1117', border: 'none', borderRadius: 6, padding: '8px 0', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
               {loading ? 'Starting…' : 'Start Agent'}
             </button>
@@ -136,7 +136,7 @@ export function HomeScreen({ onConnect }: Props) {
 
       {/* Right: Connect to Remote */}
       <div style={{ flex: 1, background: '#161b22', borderRadius: 10, padding: 18, border: '1px solid #21262d', overflow: 'auto' }}>
-        <div style={{ fontSize: 9, color: '#484f58', letterSpacing: 2, fontWeight: 700, marginBottom: 14, textTransform: 'uppercase' }}>
+        <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, fontWeight: 700, marginBottom: 14, textTransform: 'uppercase' }}>
           Connect to Remote
         </div>
 
@@ -145,7 +145,7 @@ export function HomeScreen({ onConnect }: Props) {
           onChange={e => setConnectId(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && cleanId.length === 9 && handleConnect(cleanId)}
           placeholder="Enter Peer ID  (e.g. 987 654 321)"
-          style={{ width: '100%', background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '9px 12px', fontSize: 12, color: '#c9d1d9', marginBottom: 8, boxSizing: 'border-box', outline: 'none' }}
+          style={{ width: '100%', background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '9px 12px', fontSize: 12, color: '#e6ebf1', marginBottom: 8, boxSizing: 'border-box', outline: 'none' }}
         />
         <button
           onClick={() => handleConnect(cleanId)}
@@ -155,9 +155,9 @@ export function HomeScreen({ onConnect }: Props) {
           Connect
         </button>
 
-        <div style={{ fontSize: 9, color: '#484f58', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>Recent</div>
+        <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>Recent</div>
         {recents.length === 0 ? (
-          <div style={{ fontSize: 11, color: '#484f58', padding: '10px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: '#93a0b2', padding: '10px 0', textAlign: 'center' }}>
             No recent connections
           </div>
         ) : (

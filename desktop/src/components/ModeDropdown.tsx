@@ -27,7 +27,7 @@ export function ModeDropdown({ value, onChange }: ModeDropdownProps) {
           borderRadius: 6,
           padding: '7px 12px',
           fontSize: 11,
-          color: '#c9d1d9',
+          color: '#e6ebf1',
           cursor: 'pointer',
           display: 'flex',
           justifyContent: 'space-between',
@@ -36,7 +36,7 @@ export function ModeDropdown({ value, onChange }: ModeDropdownProps) {
         }}
       >
         {current.label}
-        <span style={{ color: '#484f58', fontSize: 10 }}>{open ? '▴' : '▾'}</span>
+        <span style={{ color: '#93a0b2', fontSize: 10 }}>{open ? '▴' : '▾'}</span>
       </div>
       {open && (
         <>
@@ -85,12 +85,12 @@ export function ModeDropdown({ value, onChange }: ModeDropdownProps) {
                 <div
                   style={{
                     fontSize: 12,
-                    color: m.value === value ? '#26c6da' : '#c9d1d9',
+                    color: m.value === value ? '#26c6da' : '#e6ebf1',
                   }}
                 >
                   {m.label}
                 </div>
-                <div style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>
+                <div style={{ fontSize: 10, color: '#93a0b2', marginTop: 2 }}>
                   {m.desc}
                 </div>
               </div>

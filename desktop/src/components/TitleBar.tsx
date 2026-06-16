@@ -32,7 +32,7 @@ export function TitleBar() {
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    color: '#8b949e',
+    color: '#b3bdca',
     transition: 'background 120ms ease, color 120ms ease',
     outline: 'none',
   };
@@ -40,7 +40,7 @@ export function TitleBar() {
   const hover = (e: React.MouseEvent<HTMLButtonElement>, on: boolean, danger = false) => {
     const el = e.currentTarget;
     el.style.background = on ? (danger ? '#e5484d' : '#1f2a3c') : 'transparent';
-    el.style.color = on ? '#ffffff' : '#8b949e';
+    el.style.color = on ? '#ffffff' : '#b3bdca';
   };
 
   return (

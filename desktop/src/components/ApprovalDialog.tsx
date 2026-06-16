@@ -64,7 +64,7 @@ export function ApprovalDialog() {
         <div style={{ fontSize: 15, fontWeight: 700, color: '#e6edf3', marginBottom: 6 }}>
           Incoming connection
         </div>
-        <div style={{ fontSize: 12, color: '#8b949e', marginBottom: 16, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: '#b3bdca', marginBottom: 16, lineHeight: 1.5 }}>
           Someone wants to control this computer.
           <br />From IP <span style={{ color: '#26c6da', fontFamily: 'monospace' }}>{req.remote_ip}</span>
         </div>

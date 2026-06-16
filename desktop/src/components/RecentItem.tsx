@@ -29,11 +29,11 @@ export function RecentItem({ name, peerId, online = false, onConnect }: RecentIt
           height: 7,
           borderRadius: '50%',
           flexShrink: 0,
-          background: online ? '#56d364' : '#484f58',
+          background: online ? '#56d364' : '#93a0b2',
         }}
       />
-      <div style={{ flex: 1, fontSize: 11, color: '#c9d1d9' }}>{label}</div>
-      <div style={{ fontSize: 10, color: '#484f58', fontFamily: 'monospace' }}>
+      <div style={{ flex: 1, fontSize: 11, color: '#e6ebf1' }}>{label}</div>
+      <div style={{ fontSize: 10, color: '#93a0b2', fontFamily: 'monospace' }}>
         {peerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}
       </div>
     </div>

@@ -20,7 +20,7 @@ export function QualitySelector({ value, onChange }: Props) {
       style={{
         background: '#21262d',
         border: '1px solid #30363d',
-        color: '#8b949e',
+        color: '#b3bdca',
         fontSize: 11,
         padding: '3px 8px',
         borderRadius: 4,

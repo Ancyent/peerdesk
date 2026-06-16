@@ -132,7 +132,7 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
   const tabBtn = (t: 'send' | 'receive'): CSSProperties => ({
     flex: 1, background: 'none', border: 'none',
     borderBottom: tab === t ? '2px solid #26c6da' : '2px solid transparent',
-    color: tab === t ? '#26c6da' : '#8b949e',
+    color: tab === t ? '#26c6da' : '#b3bdca',
     padding: '8px', fontSize: 12, cursor: 'pointer', fontWeight: 500,
   });
 
@@ -147,7 +147,7 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
       >
         <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #21262d' }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3', flex: 1 }}>File Transfer</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#484f58', cursor: 'pointer', fontSize: 18 }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#93a0b2', cursor: 'pointer', fontSize: 18 }}>×</button>
         </div>
 
         <div style={{ display: 'flex', borderBottom: '1px solid #21262d' }}>
@@ -158,15 +158,15 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
         <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
           {tab === 'send' && (
             <>
-              <label style={{ display: 'block', border: '2px dashed #30363d', borderRadius: 8, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', color: '#484f58', fontSize: 12, marginBottom: 12 }}>
+              <label style={{ display: 'block', border: '2px dashed #30363d', borderRadius: 8, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', color: '#93a0b2', fontSize: 12, marginBottom: 12 }}>
                 <input type="file" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handlePickFile(e.target.files[0])} />
                 📁 Click to pick a file
               </label>
               {outgoing.map(f => (
                 <div key={f.id} style={{ background: '#0d1117', borderRadius: 6, padding: '8px 12px', marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, color: '#c9d1d9', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 11, color: '#e6ebf1', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{f.name}</span>
-                    <span style={{ color: f.status === 'done' ? '#56d364' : f.status === 'error' ? '#f85149' : '#8b949e', flexShrink: 0 }}>
+                    <span style={{ color: f.status === 'done' ? '#56d364' : f.status === 'error' ? '#f85149' : '#b3bdca', flexShrink: 0 }}>
                       {f.status === 'done' ? '✓ Done'
                         : f.status === 'error' ? `✗ ${f.errorNote ?? 'Error'}`
                         : f.status === 'pending' ? 'Waiting…'
@@ -185,16 +185,16 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
           {tab === 'receive' && (
             <>
               {incoming.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#484f58', fontSize: 12, paddingTop: 20 }}>No incoming files yet</div>
+                <div style={{ textAlign: 'center', color: '#93a0b2', fontSize: 12, paddingTop: 20 }}>No incoming files yet</div>
               )}
               {incoming.map(f => (
                 <div key={f.id} style={{ background: '#0d1117', borderRadius: 6, padding: '8px 12px', marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, color: '#c9d1d9', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 11, color: '#e6ebf1', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{f.name}</span>
                     {f.status === 'done' && f.url ? (
                       <a href={f.url} download={f.name} style={{ color: '#26c6da', fontSize: 11, textDecoration: 'none', flexShrink: 0 }}>⬇ Download</a>
                     ) : (
-                      <span style={{ color: '#8b949e', flexShrink: 0 }}>{Math.round((f.received / f.size) * 100)}%</span>
+                      <span style={{ color: '#b3bdca', flexShrink: 0 }}>{Math.round((f.received / f.size) * 100)}%</span>
                     )}
                   </div>
                   {f.status === 'receiving' && (
