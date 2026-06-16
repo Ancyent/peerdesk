@@ -172,6 +172,17 @@ impl Config {
     }
 }
 
+/// Generate a short, simple access password: 8 characters, lowercase letters
+/// and digits only — no special characters and no ambiguous look-alikes
+/// (0/o, 1/l/i removed) so it is easy to read out and type.
+pub fn generate_simple_password() -> String {
+    const CHARS: &[u8] = b"abcdefghjkmnpqrstuvwxyz23456789";
+    let mut rng = rand::thread_rng();
+    (0..8)
+        .map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char)
+        .collect()
+}
+
 pub fn generate_peer_id() -> String {
     let mut rng = rand::thread_rng();
     (0..9).map(|_| rng.gen_range(0..10).to_string()).collect()

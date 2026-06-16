@@ -163,6 +163,7 @@ async fn main() -> anyhow::Result<()> {
         display_index: 0,
         portable: cli.portable,
         cast_only: false,
+        approval_tx: None, // CLI agent auto-approves (no UI)
     })
     .await
 }

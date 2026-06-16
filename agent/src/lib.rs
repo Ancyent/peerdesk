@@ -16,6 +16,15 @@ use tracing::info;
 
 pub use config::Config;
 
+/// An incoming connection awaiting the host's decision. The agent sends one of
+/// these over `AgentConfig::approval_tx` and waits on `reply` for accept/reject.
+#[derive(Debug)]
+pub struct ApprovalRequest {
+    pub viewer_id: String,
+    pub remote_ip: String,
+    pub reply: tokio::sync::oneshot::Sender<bool>,
+}
+
 #[derive(Debug, Clone)]
 pub struct AgentConfig {
     pub password: String,
@@ -27,6 +36,10 @@ pub struct AgentConfig {
     pub portable: bool,
     /// If true, input injection disabled (view-only/cast mode).
     pub cast_only: bool,
+    /// When set, each incoming connection is sent here for an attended
+    /// accept/reject decision instead of being auto-approved. None (CLI agent)
+    /// keeps the legacy auto-approve behavior.
+    pub approval_tx: Option<tokio::sync::mpsc::Sender<ApprovalRequest>>,
 }
 
 impl Default for AgentConfig {
@@ -41,11 +54,13 @@ impl Default for AgentConfig {
                 .unwrap_or(0),
             portable: false,
             cast_only: false,
+            approval_tx: None,
         }
     }
 }
 
 pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
+    let approval_tx = agent_cfg.approval_tx.clone();
     let config_path = Config::config_path(agent_cfg.portable);
     let cfg = Config::load_or_create(
         &config_path,
@@ -194,17 +209,51 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 viewer_id,
                 remote_ip,
             }) => {
-                tracing::info!(
-                    event = "viewer_connection_request",
-                    viewer_id = %viewer_id,
-                    remote_ip = %remote_ip,
-                    action = "auto_approve",
-                    "Incoming connection request"
-                );
-                // Auto-approve: send Approve back to signaling via to_sig_tx
-                let approve = signaling::SignalingMessage::Approve { viewer_id };
-                if let Err(e) = to_sig_tx.send(approve).await {
-                    tracing::warn!("Failed to send approve: {}", e);
+                // Attended approval: ask the host UI to accept/reject. With no
+                // approval channel (CLI agent) fall back to auto-approve.
+                let approved = if let Some(tx) = &approval_tx {
+                    let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+                    let req = ApprovalRequest {
+                        viewer_id: viewer_id.clone(),
+                        remote_ip: remote_ip.clone(),
+                        reply: reply_tx,
+                    };
+                    tracing::info!(
+                        event = "viewer_connection_request",
+                        viewer_id = %viewer_id,
+                        remote_ip = %remote_ip,
+                        action = "ask_host",
+                        "Incoming connection request — waiting for host decision"
+                    );
+                    if tx.send(req).await.is_ok() {
+                        // Deny if the host does not decide within 60s.
+                        match tokio::time::timeout(
+                            std::time::Duration::from_secs(60),
+                            reply_rx,
+                        )
+                        .await
+                        {
+                            Ok(Ok(decision)) => decision,
+                            _ => {
+                                tracing::info!("No host decision within 60s — rejecting");
+                                false
+                            }
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    tracing::info!(viewer_id = %viewer_id, "Auto-approving (no host UI)");
+                    true
+                };
+
+                let msg = if approved {
+                    signaling::SignalingMessage::Approve { viewer_id }
+                } else {
+                    signaling::SignalingMessage::Deny { viewer_id }
+                };
+                if let Err(e) = to_sig_tx.send(msg).await {
+                    tracing::warn!("Failed to send approval decision: {}", e);
                 }
             }
             Some(signaling::SignalingMessage::ViewerJoined { viewer_id }) => {
