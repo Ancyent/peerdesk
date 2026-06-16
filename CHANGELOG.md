@@ -2,6 +2,13 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.6] — 2026-06-16
+
+### Changed
+- **Readability:** text and icons are considerably brighter across both the web
+  dashboard and the desktop client (lifted muted secondary/tertiary colors on
+  the dark theme).
+
 ## [0.4.5] — 2026-06-16
 
 ### Added
