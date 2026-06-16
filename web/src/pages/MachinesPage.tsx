@@ -43,6 +43,18 @@ export function MachinesPage({ onConnect }: Props) {
     load();
   };
 
+  const handleDelete = async (id: string) => {
+    if (!accessToken) return;
+    const m = machines.find(x => x.id === id);
+    if (!window.confirm(`Ștergi mașina ${m?.name ?? ''} (${m?.peer_id ?? ''})? Va trebui reînregistrată.`)) return;
+    try {
+      await api.machines.remove(accessToken, id);
+    } catch (e) {
+      console.error(e);
+    }
+    load();
+  };
+
   const filtered = machines
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()) || m.peer_id.includes(search))
     .sort((a, b) => Number(b.is_online) - Number(a.is_online));
@@ -84,7 +96,7 @@ export function MachinesPage({ onConnect }: Props) {
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(265px, 1fr))', gap: 14 }}>
-            {filtered.map(m => <MachineCard key={m.id} machine={m} onConnect={onConnect} />)}
+            {filtered.map(m => <MachineCard key={m.id} machine={m} onConnect={onConnect} onDelete={handleDelete} />)}
           </div>
         </>
       )}

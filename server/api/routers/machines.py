@@ -138,6 +138,26 @@ async def get_machine(
     return machine
 
 
+@router.delete("/{machine_id}", status_code=204)
+async def delete_machine(
+    machine_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a machine the current user owns (forces a fresh re-registration)."""
+    result = await db.execute(
+        select(Machine).where(
+            Machine.id == machine_id,
+            Machine.owner_id == current_user.id,
+        )
+    )
+    machine = result.scalar_one_or_none()
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+    await db.delete(machine)
+    await db.commit()
+
+
 @router.patch("/{peer_id}/heartbeat", status_code=204)
 async def machine_heartbeat(
     peer_id: str,

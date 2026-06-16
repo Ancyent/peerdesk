@@ -141,6 +141,11 @@ export const api = {
       request<MachineOut[]>(`/machines?status=${encodeURIComponent(status)}`, {
         headers: authHeaders(token),
       }),
+    remove: (token: string, machineId: string) =>
+      request<void>(`/machines/${machineId}`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+      }),
   },
   branding: {
     get: () => request<BrandingConfig>('/branding'),
