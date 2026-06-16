@@ -15,6 +15,13 @@ use peerdesk_agent::{
     run_agent, AgentConfig, ApprovalRequest,
 };
 
+/// An incoming connection awaiting the host's decision, held server-side until
+/// the UI polls for it and responds.
+pub struct PendingApproval {
+    pub remote_ip: String,
+    pub reply: tokio::sync::oneshot::Sender<bool>,
+}
+
 #[derive(Default)]
 pub struct AgentState {
     pub running: bool,
@@ -23,7 +30,9 @@ pub struct AgentState {
     /// Handle to abort the spawned run_agent task on stop.
     pub task: Option<tokio::task::AbortHandle>,
     /// Incoming connections awaiting a host accept/reject, keyed by viewer_id.
-    pub pending_approvals: HashMap<String, tokio::sync::oneshot::Sender<bool>>,
+    pub pending_approvals: HashMap<String, PendingApproval>,
+    /// Order in which approvals arrived (FIFO for the UI to show).
+    pub pending_order: Vec<String>,
 }
 
 /// Plaintext access password, stored 0600 next to config.json so the host can
@@ -187,8 +196,14 @@ async fn start_agent(
                 } = req;
                 {
                     let mut s = bridge_state.lock().await;
-                    s.pending_approvals.insert(viewer_id.clone(), reply);
+                    s.pending_order.push(viewer_id.clone());
+                    s.pending_approvals.insert(
+                        viewer_id.clone(),
+                        PendingApproval { remote_ip: remote_ip.clone(), reply },
+                    );
                 }
+                // Emit as a fast path; the UI also polls get_pending_approval so
+                // it works even if the event doesn't reach the webview.
                 let _ = app.emit(
                     "approval-request",
                     serde_json::json!({ "viewer_id": viewer_id, "remote_ip": remote_ip }),
@@ -371,7 +386,31 @@ async fn reset_password(state: State<'_, SharedAgentState>) -> Result<String, St
     }
 }
 
-// ── respond_approval ──────────────────────────────────────────────────────────
+// ── approval polling ──────────────────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct PendingApprovalOut {
+    viewer_id: String,
+    remote_ip: String,
+}
+
+/// The UI polls this for the oldest pending connection request. Returning it via
+/// a command (rather than relying only on an event) makes the prompt reliable.
+#[tauri::command]
+async fn get_pending_approval(
+    state: State<'_, SharedAgentState>,
+) -> Result<Option<PendingApprovalOut>, String> {
+    let s = state.lock().await;
+    for viewer_id in &s.pending_order {
+        if let Some(p) = s.pending_approvals.get(viewer_id) {
+            return Ok(Some(PendingApprovalOut {
+                viewer_id: viewer_id.clone(),
+                remote_ip: p.remote_ip.clone(),
+            }));
+        }
+    }
+    Ok(None)
+}
 
 /// Called by the UI when the host accepts/rejects an incoming connection.
 #[tauri::command]
@@ -381,8 +420,9 @@ async fn respond_approval(
     approved: bool,
 ) -> Result<(), String> {
     let mut s = state.lock().await;
-    if let Some(reply) = s.pending_approvals.remove(&viewer_id) {
-        let _ = reply.send(approved);
+    s.pending_order.retain(|v| v != &viewer_id);
+    if let Some(p) = s.pending_approvals.remove(&viewer_id) {
+        let _ = p.reply.send(approved);
     }
     Ok(())
 }
@@ -416,6 +456,7 @@ pub fn run() {
             reset_password,
             get_security_code,
             respond_approval,
+            get_pending_approval,
         ])
         .setup(|app| {
             #[cfg(desktop)]

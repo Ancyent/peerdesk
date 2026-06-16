@@ -15,15 +15,32 @@ export function ApprovalDialog() {
   const [secs, setSecs] = useState(60);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const reqRef = useRef<ApprovalReq | null>(null);
+  reqRef.current = req;
+
+  const show = (r: ApprovalReq) => {
+    if (reqRef.current) return; // already showing one
+    setReq(r);
+    setSecs(60);
+  };
+
+  // Two mechanisms so the prompt is reliable: a Tauri event (instant) and a
+  // poll of get_pending_approval (works even if the event doesn't arrive).
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    listen<ApprovalReq>('approval-request', (e) => {
-      setReq(e.payload);
-      setSecs(60);
-    })
+    listen<ApprovalReq>('approval-request', (e) => show(e.payload))
       .then((u) => { unlisten = u; })
       .catch(() => {});
-    return () => unlisten?.();
+
+    const poll = setInterval(() => {
+      if (reqRef.current) return;
+      invoke<ApprovalReq | null>('get_pending_approval')
+        .then((p) => { if (p) show(p); })
+        .catch(() => {});
+    }, 1500);
+
+    return () => { unlisten?.(); clearInterval(poll); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const respond = (approved: boolean) => {
