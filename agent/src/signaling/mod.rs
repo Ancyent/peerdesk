@@ -68,56 +68,82 @@ pub async fn run(
              use wss:// in production. Passwords and metadata are visible to network observers."
         );
     }
-    let (ws_stream, _) = connect_async(signaling_url).await?;
-    let (mut write, mut read) = ws_stream.split();
+    // Reconnect loop: keep the agent registered through transient drops
+    // (network blips, server/nginx restarts). Without this a single disconnect
+    // would silently de-register the agent until the app restarted.
+    let mut backoff_secs = 1u64;
+    let mut first = true;
+    'reconnect: loop {
+        if !first {
+            tokio::time::sleep(std::time::Duration::from_secs(backoff_secs)).await;
+        }
+        first = false;
 
-    let register = SignalingMessage::Register {
-        peer_id: peer_id.to_string(),
-        password_hash: password_hash.to_string(),
-        hmac_key: hmac_key.to_string(),
-    };
-    write
-        .send(Message::Text(serde_json::to_string(&register)?))
-        .await?;
-    tracing::info!("Registered with signaling server, peer_id={}", peer_id);
+        let (mut write, mut read) = match connect_async(signaling_url).await {
+            Ok((stream, _)) => stream.split(),
+            Err(e) => {
+                tracing::warn!("Signaling connect failed: {} — retry in {}s", e, backoff_secs);
+                backoff_secs = (backoff_secs * 2).min(15);
+                continue 'reconnect;
+            }
+        };
 
-    loop {
-        tokio::select! {
-            msg = read.next() => match msg {
-                Some(Ok(Message::Text(text))) => {
-                    match serde_json::from_str::<SignalingMessage>(&text) {
-                        Ok(parsed) => {
-                            if to_webrtc.send(parsed).await.is_err() {
-                                // WebRTC side dropped — clean shutdown
-                                break;
+        let register = SignalingMessage::Register {
+            peer_id: peer_id.to_string(),
+            password_hash: password_hash.to_string(),
+            hmac_key: hmac_key.to_string(),
+        };
+        if let Err(e) = write
+            .send(Message::Text(serde_json::to_string(&register)?))
+            .await
+        {
+            tracing::warn!("Register send failed: {} — retry", e);
+            backoff_secs = (backoff_secs * 2).min(15);
+            continue 'reconnect;
+        }
+        tracing::info!("Registered with signaling server, peer_id={}", peer_id);
+        backoff_secs = 1; // reset after a successful connection
+
+        loop {
+            tokio::select! {
+                msg = read.next() => match msg {
+                    Some(Ok(Message::Text(text))) => {
+                        match serde_json::from_str::<SignalingMessage>(&text) {
+                            Ok(parsed) => {
+                                if to_webrtc.send(parsed).await.is_err() {
+                                    return Ok(()); // WebRTC side dropped — shut down
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!("Ignoring unrecognised signaling message: {}", e);
                             }
                         }
-                        Err(e) => {
-                            tracing::warn!("Ignoring unrecognised signaling message: {}", e);
+                    }
+                    Some(Ok(_)) => {} // Ping/Pong/Binary/Close — ignore
+                    Some(Err(e)) => {
+                        tracing::warn!("Signaling read error: {} — reconnecting", e);
+                        continue 'reconnect;
+                    }
+                    None => {
+                        tracing::info!("Signaling server closed connection — reconnecting");
+                        continue 'reconnect;
+                    }
+                },
+                msg = from_webrtc.recv() => match msg {
+                    Some(msg) => {
+                        if let Err(e) = write
+                            .send(Message::Text(serde_json::to_string(&msg)?))
+                            .await
+                        {
+                            tracing::warn!("Signaling write error: {} — reconnecting", e);
+                            continue 'reconnect;
                         }
                     }
-                }
-                Some(Ok(_)) => {
-                    // Ping/Pong/Binary/Close frames — ignore
-                }
-                Some(Err(e)) => return Err(e.into()),
-                None => {
-                    tracing::info!("Signaling server closed connection");
-                    break;
-                }
-            },
-            msg = from_webrtc.recv() => match msg {
-                Some(msg) => {
-                    write.send(Message::Text(serde_json::to_string(&msg)?)).await?;
-                }
-                None => {
-                    // All WebRTC senders dropped — nothing more to forward
-                    break;
-                }
-            },
+                    None => return Ok(()), // All WebRTC senders dropped — shut down
+                },
+            }
         }
     }
-    Ok(())
 }
 
 #[cfg(test)]
