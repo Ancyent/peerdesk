@@ -63,30 +63,28 @@ def test_rate_limiter_allows_under_limit():
     import sys, os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     # Reset state for clean test
-    from main import _connection_attempts
+    from main import _connection_attempts, _RATE_LIMIT_MAX
     _connection_attempts.clear()
     from main import _check_rate_limit
-    for _ in range(9):
-        assert _check_rate_limit("10.0.0.1") is True
-    # 9 attempts allowed
-    assert _check_rate_limit("10.0.0.1") is True  # 10th — still allowed
+    for _ in range(_RATE_LIMIT_MAX):
+        assert _check_rate_limit("10.0.0.1") is True  # up to the limit — allowed
 
 
 def test_rate_limiter_blocks_over_limit():
-    from main import _check_rate_limit, _connection_attempts
+    from main import _check_rate_limit, _connection_attempts, _RATE_LIMIT_MAX
     _connection_attempts.clear()
     ip = "10.0.0.2"
-    for _ in range(10):
+    for _ in range(_RATE_LIMIT_MAX):
         _check_rate_limit(ip)
-    # 11th attempt should be blocked
+    # the next attempt should be blocked
     assert _check_rate_limit(ip) is False
 
 
 def test_rate_limiter_different_ips_independent():
-    from main import _check_rate_limit, _connection_attempts
+    from main import _check_rate_limit, _connection_attempts, _RATE_LIMIT_MAX
     _connection_attempts.clear()
     # Fill up one IP
-    for _ in range(10):
+    for _ in range(_RATE_LIMIT_MAX):
         _check_rate_limit("10.0.0.3")
     _check_rate_limit("10.0.0.3")  # blocked
     # Different IP should still be allowed

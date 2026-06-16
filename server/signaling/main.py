@@ -35,7 +35,22 @@ def audit_log(event: str, peer_id: str, viewer_ip: str, outcome: str, **extra):
 # Per-IP rate limiter: track WebSocket connection timestamps
 _connection_attempts: dict[str, list[float]] = defaultdict(list)
 _RATE_LIMIT_WINDOW = 60.0   # seconds
-_RATE_LIMIT_MAX = 10        # max new connections per window per IP
+_RATE_LIMIT_MAX = 30        # max new connections per window per IP
+
+
+def _client_ip(ws: WebSocket) -> str:
+    """Real client IP. Behind nginx every direct peer is the proxy, so prefer
+    the forwarded headers nginx sets; otherwise per-IP rate limiting would put
+    every client (agents and viewers) in one shared bucket and reject them all.
+    Safe because signaling is only reachable through nginx, which overwrites
+    these headers."""
+    xff = ws.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    xri = ws.headers.get("x-real-ip")
+    if xri:
+        return xri.strip()
+    return ws.client.host if ws.client else "unknown"
 
 
 def _check_rate_limit(client_ip: str) -> bool:
@@ -73,7 +88,7 @@ async def health():
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
-    client_ip = ws.client.host if ws.client else "unknown"
+    client_ip = _client_ip(ws)
     if not _check_rate_limit(client_ip):
         await ws.accept()
         await ws.close(code=1008, reason="rate limited")
@@ -129,7 +144,7 @@ async def websocket_endpoint(ws: WebSocket):
                     agent_data = await redis_client.hgetall(f"agent:{peer_id_req}")
                     raw_key = agent_data.get(b"hmac_key") or agent_data.get("hmac_key", b"")
                     stored_key = raw_key.decode() if isinstance(raw_key, bytes) else raw_key
-                    viewer_ip = ws.client.host if ws.client else "unknown"
+                    viewer_ip = _client_ip(ws)
                     if not stored_key:
                         audit_log("connection_attempt", peer_id_req, viewer_ip, "hmac_not_configured", method="hmac")
                         await ws.send_json({"type": "error", "code": "hmac_not_configured"})
@@ -141,7 +156,7 @@ async def websocket_endpoint(ws: WebSocket):
                         await ws.send_json({"type": "error", "code": "auth_failed"})
 
                 elif msg_type == "join":
-                    viewer_ip = ws.client.host if ws.client else "unknown"
+                    viewer_ip = _client_ip(ws)
                     viewer_id = await handle_join(
                         state, redis_client, data["peer_id"], data["password"], ws, viewer_ip
                     )
