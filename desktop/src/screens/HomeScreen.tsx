@@ -31,6 +31,9 @@ export function HomeScreen({ onConnect }: Props) {
   const handleResetPwd = async () => {
     try {
       setNewPwd(await invoke<string>('reset_password'));
+      // reset_password stops the agent so the server drops the stale key;
+      // restart after a moment so it re-registers with the new password.
+      setTimeout(() => { start(); }, 1500);
     } catch { /* ignore */ }
   };
 

@@ -334,7 +334,7 @@ async fn apply_config_link(url: String) -> Result<(), String> {
 // ── reset_password ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-async fn reset_password() -> Result<String, String> {
+async fn reset_password(state: State<'_, SharedAgentState>) -> Result<String, String> {
     #[cfg(not(target_os = "android"))]
     {
         let new_pw = generate_simple_password();
@@ -351,10 +351,24 @@ async fn reset_password() -> Result<String, String> {
         .save(&config_path)
         .map_err(|e| e.to_string())?;
         write_visible_password(&new_pw);
+
+        // The signaling server holds the hmac_key the agent registered with at
+        // startup. Stop the agent so it disconnects (server drops the stale
+        // key); the UI restarts it, re-registering with the new password.
+        {
+            let mut s = state.lock().await;
+            if let Some(h) = s.task.take() {
+                h.abort();
+            }
+            s.running = false;
+        }
         Ok(new_pw)
     }
     #[cfg(target_os = "android")]
-    Err("Not supported on Android".into())
+    {
+        let _ = &state;
+        Err("Not supported on Android".into())
+    }
 }
 
 // ── respond_approval ──────────────────────────────────────────────────────────
