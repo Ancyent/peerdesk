@@ -81,6 +81,61 @@ fn write_visible_password(pw: &str) {
 
 type SharedAgentState = Arc<Mutex<AgentState>>;
 
+// ── activity log ──────────────────────────────────────────────────────────────
+// Capture the agent's tracing output into an in-memory ring buffer so the UI
+// can show what's happening (connecting, registered, errors, reconnects).
+
+static LOG_BUFFER: std::sync::Mutex<std::collections::VecDeque<String>> =
+    std::sync::Mutex::new(std::collections::VecDeque::new());
+
+struct LogWriter;
+impl std::io::Write for LogWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if let Ok(s) = std::str::from_utf8(buf) {
+            if let Ok(mut q) = LOG_BUFFER.lock() {
+                for line in s.lines() {
+                    let line = line.trim();
+                    if !line.is_empty() {
+                        q.push_back(line.to_string());
+                        while q.len() > 300 {
+                            q.pop_front();
+                        }
+                    }
+                }
+            }
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+struct MakeLogWriter;
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeLogWriter {
+    type Writer = LogWriter;
+    fn make_writer(&'a self) -> Self::Writer {
+        LogWriter
+    }
+}
+
+fn init_logging() {
+    use tracing_subscriber::fmt;
+    let _ = fmt()
+        .with_writer(MakeLogWriter)
+        .with_ansi(false)
+        .with_target(false)
+        .try_init();
+}
+
+#[tauri::command]
+fn get_agent_log() -> Vec<String> {
+    LOG_BUFFER
+        .lock()
+        .map(|q| q.iter().cloned().collect())
+        .unwrap_or_default()
+}
+
 // ── get_agent_status ──────────────────────────────────────────────────────────
 
 #[derive(serde::Serialize, Clone)]
@@ -306,7 +361,10 @@ async fn save_settings(settings: serde_json::Value) -> Result<(), String> {
 // ── apply_config_link ─────────────────────────────────────────────────────────
 
 #[tauri::command]
-async fn apply_config_link(url: String) -> Result<(), String> {
+async fn apply_config_link(
+    state: State<'_, SharedAgentState>,
+    url: String,
+) -> Result<(), String> {
     #[cfg(not(target_os = "android"))]
     {
         let stripped = url
@@ -334,14 +392,25 @@ async fn apply_config_link(url: String) -> Result<(), String> {
         }
 
         let config_path = Config::config_path(false);
-        let pw = password.as_deref().unwrap_or("changeme");
+        // Empty password leaves an existing config's hash/hmac untouched.
+        let pw = password.as_deref().unwrap_or("");
         Config::load_or_create(&config_path, pw, server.as_deref(), api_key.as_deref())
             .map_err(|e| e.to_string())?;
+
+        // Stop the agent so the UI can restart it with the new server/key,
+        // making "Apply & Reconnect" actually reconnect and register.
+        {
+            let mut s = state.lock().await;
+            if let Some(h) = s.task.take() {
+                h.abort();
+            }
+            s.running = false;
+        }
         Ok(())
     }
     #[cfg(target_os = "android")]
     {
-        let _ = url;
+        let _ = (&state, url);
         Ok(())
     }
 }
@@ -441,6 +510,7 @@ async fn get_security_code(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    init_logging();
     let shared_state: SharedAgentState = Arc::new(Mutex::new(AgentState::default()));
 
     tauri::Builder::default()
@@ -457,6 +527,7 @@ pub fn run() {
             get_security_code,
             respond_approval,
             get_pending_approval,
+            get_agent_log,
         ])
         .setup(|app| {
             #[cfg(desktop)]

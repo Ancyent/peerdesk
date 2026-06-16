@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAgentContext } from '../context/AppContext';
+import { LogPanel } from '../components/LogPanel';
 
 export function NetworkSettings() {
-  const { status } = useAgentContext();
+  const { status, start } = useAgentContext();
   const [serverUrl, setServerUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -27,6 +28,9 @@ export function NetworkSettings() {
     try {
       await invoke('apply_config_link', { url });
       showMsg('✓ Config applied — reconnecting...', true);
+      // apply_config_link stops the agent; restart it so it registers with
+      // the new server/key.
+      setTimeout(() => { start(); }, 1500);
     } catch (e) {
       showMsg(`✗ ${String(e)}`, false);
     }
@@ -100,6 +104,8 @@ export function NetworkSettings() {
           </div>
         </div>
       </div>
+
+      <LogPanel />
     </div>
   );
 }
