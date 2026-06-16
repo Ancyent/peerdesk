@@ -2,6 +2,20 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.5] — 2026-06-16
+
+### Added
+- **Attended access:** the host now gets an Accept/Reject prompt for every
+  incoming connection (60s auto-reject), regardless of password. Bridged from
+  the agent to the desktop UI via a Tauri event + `respond_approval` command.
+- **Visible access password:** the desktop shows the host's own access password
+  (reveal toggle + copy). It is stored 0600 next to `config.json`; legacy
+  installs prompt to reset to set a visible one.
+
+### Changed
+- **Passwords are now simple:** 8 characters, lowercase letters + digits only,
+  no special or ambiguous characters (was a 12-char alphanumeric).
+
 ## [0.4.4] — 2026-06-15
 
 ### Fixed
