@@ -2,6 +2,20 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.8] — 2026-06-16
+
+### Fixed
+- **Approval prompt now appears.** The agent correctly waited for the host's
+  decision, but the Tauri event that should have shown the Accept/Reject dialog
+  never reached the webview on Windows, so connections timed out and were denied
+  after 60s. The dialog now polls `get_pending_approval` (event kept as a fast
+  path), so the prompt reliably shows.
+- **Signaling rate limiting behind nginx.** The rate limiter keyed on the proxy
+  IP, so all clients shared one bucket and the agent got rejected (`machine not
+  found`); it now uses the real client IP from `X-Forwarded-For`/`X-Real-IP`.
+- **Web:** signaling messages sent before the socket opens are queued, not
+  dropped.
+
 ## [0.4.7] — 2026-06-16
 
 ### Fixed
