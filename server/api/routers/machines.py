@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,6 +7,18 @@ from models import User, Machine, ApiKey, Company, Location, Group
 from schemas import MachineRegister, MachineOut, MachinePlacement, MachineRegisterViaKey, MachineApprovalStatus
 
 router = APIRouter(prefix="/machines", tags=["machines"])
+
+# A machine is "online" only if it sent a heartbeat recently. The agent beats
+# every 30s; allow a few misses before showing it offline. Computed on read so
+# a machine that stops (crash, app closed) goes offline on its own.
+ONLINE_STALE_AFTER = timedelta(seconds=90)
+
+
+def _apply_online(machines):
+    now = datetime.now(timezone.utc)
+    for m in machines:
+        m.is_online = m.last_seen_at is not None and (now - m.last_seen_at) < ONLINE_STALE_AFTER
+    return machines
 
 
 @router.get("", response_model=list[MachineOut])
@@ -19,7 +31,7 @@ async def list_machines(
     if status:
         query = query.where(Machine.approval_status == status)
     result = await db.execute(query)
-    return result.scalars().all()
+    return _apply_online(result.scalars().all())
 
 
 @router.post("", response_model=MachineOut, status_code=201)
@@ -135,6 +147,7 @@ async def get_machine(
     machine = result.scalar_one_or_none()
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
+    _apply_online([machine])
     return machine
 
 
