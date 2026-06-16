@@ -2,6 +2,15 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.7] — 2026-06-16
+
+### Fixed
+- **Password reset now takes effect.** Resetting the access password changed
+  `config.json` but the running agent stayed registered with the signaling
+  server under the old HMAC key, so connecting from the web with the new
+  password failed (`auth_failed`) and the approval prompt never appeared. The
+  agent now restarts on reset and re-registers with the new password.
+
 ## [0.4.6] — 2026-06-16
 
 ### Changed
