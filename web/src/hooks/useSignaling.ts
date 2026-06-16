@@ -9,10 +9,18 @@ export function useSignaling(
   const wsRef = useRef<WebSocket | null>(null);
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
+  // Messages sent before the socket opens are queued and flushed on open,
+  // otherwise an early connect/join would be silently dropped.
+  const queueRef = useRef<SignalingMessage[]>([]);
 
   useEffect(() => {
     const ws = new WebSocket(url);
     wsRef.current = ws;
+    ws.onopen = () => {
+      const q = queueRef.current;
+      queueRef.current = [];
+      for (const m of q) ws.send(JSON.stringify(m));
+    };
     ws.onmessage = (e) => {
       try {
         onMessageRef.current(JSON.parse(e.data) as SignalingMessage);
@@ -30,10 +38,11 @@ export function useSignaling(
   }, [url]);
 
   const send = useCallback((msg: SignalingMessage) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(msg));
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
     } else {
-      console.warn('Signaling send dropped: WebSocket not open', msg.type);
+      queueRef.current.push(msg); // flushed on open
     }
   }, []);
 
