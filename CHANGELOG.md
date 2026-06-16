@@ -2,6 +2,23 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.9] — 2026-06-16
+
+### Added
+- **Activity log** in the desktop Network settings — a live view of the agent's
+  connect/register/error/reconnect events so you can see what's happening.
+
+### Fixed
+- **Agent auto-reconnects to signaling.** A single disconnect (network blip,
+  server restart) used to silently de-register the agent until the app was
+  restarted; it now reconnects with backoff and re-registers.
+- **"Apply & Reconnect" actually reconnects.** Setting the server URL + API key
+  saved the config but never restarted the agent, so on a fresh setup the
+  machine never appeared in the dashboard. It now restarts and registers.
+- **Online status** is computed from the last heartbeat (offline after ~90s), so
+  a stopped machine no longer shows online forever.
+- **Delete a machine** from the dashboard (DELETE /machines/{id} + UI button).
+
 ## [0.4.8] — 2026-06-16
 
 ### Fixed
