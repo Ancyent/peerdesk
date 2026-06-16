@@ -18,6 +18,7 @@ export function HomeScreen({ onConnect }: Props) {
   const [connectId, setConnectId] = useState('');
   const [newPwd, setNewPwd] = useState<string | null>(null);
   const [securityCode, setSecurityCode] = useState<string | null>(null);
+  const [showPwd, setShowPwd] = useState(false);
   const [recents, setRecents] = useState(() => getRecents());
 
   const handleConnect = (peerId: string) => {
@@ -51,14 +52,35 @@ export function HomeScreen({ onConnect }: Props) {
 
             <div style={{ fontSize: 10, color: '#484f58', marginBottom: 5 }}>Password</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-              <div style={{ fontSize: 16, color: '#c9d1d9', letterSpacing: 3, flex: 1 }}>••••••••</div>
-              <button
-                onClick={() => navigator.clipboard.writeText(status.peer_id)}
-                title="Copy ID"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'rgba(38,198,218,0.10)', border: '1px solid rgba(38,198,218,0.30)', borderRadius: 6, color: '#26c6da', cursor: 'pointer' }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-              </button>
+              {status.password ? (
+                <div style={{ fontSize: 18, color: '#26c6da', letterSpacing: 2, flex: 1, fontFamily: 'monospace', fontWeight: 600 }}>
+                  {showPwd ? status.password : '•'.repeat(status.password.length)}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: '#8b949e', flex: 1 }}>•••••• — reset to set a visible password</div>
+              )}
+              {status.password && (
+                <button
+                  onClick={() => setShowPwd((v) => !v)}
+                  title={showPwd ? 'Hide' : 'Show'}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'rgba(38,198,218,0.10)', border: '1px solid rgba(38,198,218,0.30)', borderRadius: 6, color: '#26c6da', cursor: 'pointer' }}
+                >
+                  {showPwd ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                  )}
+                </button>
+              )}
+              {status.password && (
+                <button
+                  onClick={() => navigator.clipboard.writeText(status.password!)}
+                  title="Copy password"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'rgba(38,198,218,0.10)', border: '1px solid rgba(38,198,218,0.30)', borderRadius: 6, color: '#26c6da', cursor: 'pointer' }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                </button>
+              )}
               <button
                 onClick={handleResetPwd}
                 title="Reset password"

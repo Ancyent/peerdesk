@@ -1,5 +1,6 @@
+use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 #[cfg(desktop)]
 use tauri::{
@@ -10,8 +11,8 @@ use tokio::sync::Mutex;
 
 #[cfg(not(target_os = "android"))]
 use peerdesk_agent::{
-    config::{AccessMode, AppSettings, Config},
-    run_agent, AgentConfig,
+    config::{generate_simple_password, AccessMode, AppSettings, Config},
+    run_agent, AgentConfig, ApprovalRequest,
 };
 
 #[derive(Default)]
@@ -21,6 +22,52 @@ pub struct AgentState {
     pub security_code: Option<String>,
     /// Handle to abort the spawned run_agent task on stop.
     pub task: Option<tokio::task::AbortHandle>,
+    /// Incoming connections awaiting a host accept/reject, keyed by viewer_id.
+    pub pending_approvals: HashMap<String, tokio::sync::oneshot::Sender<bool>>,
+}
+
+/// Plaintext access password, stored 0600 next to config.json so the host can
+/// display its own password. (config.json only keeps the bcrypt hash.)
+#[cfg(not(target_os = "android"))]
+fn password_file_path() -> std::path::PathBuf {
+    Config::config_path(false)
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("password.txt")
+}
+
+#[cfg(not(target_os = "android"))]
+fn read_visible_password() -> Option<String> {
+    std::fs::read_to_string(password_file_path())
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+#[cfg(not(target_os = "android"))]
+fn write_visible_password(pw: &str) {
+    let path = password_file_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)
+        {
+            let _ = f.write_all(pw.as_bytes());
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = std::fs::write(&path, pw);
+    }
 }
 
 type SharedAgentState = Arc<Mutex<AgentState>>;
@@ -34,6 +81,8 @@ pub struct AgentStatusResponse {
     approval_status: String,
     server_url: Option<String>,
     access_mode: String,
+    /// Plaintext access password if known (null for legacy configs — reset to set one).
+    password: Option<String>,
 }
 
 #[tauri::command]
@@ -66,6 +115,7 @@ async fn get_agent_status(
             approval_status,
             server_url: cfg.and_then(|c| c.server_url),
             access_mode,
+            password: read_visible_password(),
         })
     }
 
@@ -76,6 +126,7 @@ async fn get_agent_status(
         approval_status: "standalone".to_string(),
         server_url: None,
         access_mode: "full".to_string(),
+        password: None,
     })
 }
 
@@ -83,7 +134,10 @@ async fn get_agent_status(
 
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
-async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusResponse, String> {
+async fn start_agent(
+    app: tauri::AppHandle,
+    state: State<'_, SharedAgentState>,
+) -> Result<AgentStatusResponse, String> {
     {
         let mut s = state.lock().await;
         if s.running {
@@ -95,31 +149,52 @@ async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusRe
     let settings = AppSettings::load(&AppSettings::settings_path(false)).unwrap_or_default();
     let config_path = Config::config_path(false);
 
-    let cfg = {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
-        let generated: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(12)
-            .map(char::from)
-            .collect();
-        Config::load_or_create(
-            &config_path,
-            &generated,
-            std::env::var("PEERDESK_SERVER").ok().as_deref(),
-            std::env::var("API_KEY")
-                .ok()
-                .filter(|t| !t.is_empty())
-                .as_deref(),
-        )
-        .map_err(|e| e.to_string())?
-    };
+    let was_new = !config_path.exists();
+    let generated = generate_simple_password();
+    let cfg = Config::load_or_create(
+        &config_path,
+        &generated,
+        std::env::var("PEERDESK_SERVER").ok().as_deref(),
+        std::env::var("API_KEY")
+            .ok()
+            .filter(|t| !t.is_empty())
+            .as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
+    if was_new {
+        // Brand-new config: the generated plaintext is the access password.
+        write_visible_password(&generated);
+    }
 
     let peer_id = cfg.peer_id.clone();
     let server_url = cfg.server_url.clone();
     {
         let mut s = state.lock().await;
         s.peer_id = peer_id.clone();
+    }
+
+    // Attended-approval bridge: agent → UI dialog → agent.
+    let (approval_tx, mut approval_rx) = tokio::sync::mpsc::channel::<ApprovalRequest>(8);
+    {
+        let app = app.clone();
+        let bridge_state = Arc::clone(state.inner());
+        tokio::spawn(async move {
+            while let Some(req) = approval_rx.recv().await {
+                let ApprovalRequest {
+                    viewer_id,
+                    remote_ip,
+                    reply,
+                } = req;
+                {
+                    let mut s = bridge_state.lock().await;
+                    s.pending_approvals.insert(viewer_id.clone(), reply);
+                }
+                let _ = app.emit(
+                    "approval-request",
+                    serde_json::json!({ "viewer_id": viewer_id, "remote_ip": remote_ip }),
+                );
+            }
+        });
     }
 
     let had_key = cfg.api_key.is_some();
@@ -131,6 +206,7 @@ async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusRe
         display_index: 0,
         portable: false,
         cast_only,
+        approval_tx: Some(approval_tx),
     };
 
     let state_arc = Arc::clone(state.inner());
@@ -160,6 +236,7 @@ async fn start_agent(state: State<'_, SharedAgentState>) -> Result<AgentStatusRe
         approval_status: if had_key { "approved" } else { "standalone" }.to_string(),
         server_url,
         access_mode,
+        password: read_visible_password(),
     })
 }
 
@@ -260,13 +337,7 @@ async fn apply_config_link(url: String) -> Result<(), String> {
 async fn reset_password() -> Result<String, String> {
     #[cfg(not(target_os = "android"))]
     {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
-        let new_pw: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(12)
-            .map(char::from)
-            .collect();
+        let new_pw = generate_simple_password();
         let config_path = Config::config_path(false);
         let cfg = Config::load(&config_path).map_err(|e| e.to_string())?;
         let hash = bcrypt::hash(&new_pw, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?;
@@ -279,10 +350,27 @@ async fn reset_password() -> Result<String, String> {
         }
         .save(&config_path)
         .map_err(|e| e.to_string())?;
+        write_visible_password(&new_pw);
         Ok(new_pw)
     }
     #[cfg(target_os = "android")]
     Err("Not supported on Android".into())
+}
+
+// ── respond_approval ──────────────────────────────────────────────────────────
+
+/// Called by the UI when the host accepts/rejects an incoming connection.
+#[tauri::command]
+async fn respond_approval(
+    state: State<'_, SharedAgentState>,
+    viewer_id: String,
+    approved: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().await;
+    if let Some(reply) = s.pending_approvals.remove(&viewer_id) {
+        let _ = reply.send(approved);
+    }
+    Ok(())
 }
 
 // ── get_security_code ─────────────────────────────────────────────────────────
@@ -313,6 +401,7 @@ pub fn run() {
             apply_config_link,
             reset_password,
             get_security_code,
+            respond_approval,
         ])
         .setup(|app| {
             #[cfg(desktop)]

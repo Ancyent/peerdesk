@@ -4,6 +4,7 @@ export interface AgentStatus {
   approval_status: 'pending' | 'approved' | 'denied' | 'standalone';
   server_url: string | null;
   access_mode: 'full' | 'view_only' | 'no_incoming';
+  password: string | null;
 }
 
 export interface AppSettings {

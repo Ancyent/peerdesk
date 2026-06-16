@@ -8,6 +8,7 @@ const DEFAULT_STATUS: AgentStatus = {
   approval_status: 'standalone',
   server_url: null,
   access_mode: 'full',
+  password: null,
 };
 
 export function useAgent() {
