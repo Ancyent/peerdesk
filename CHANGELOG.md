@@ -2,6 +2,14 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.11] — 2026-06-17
+
+### Added
+- **Version badge + update check** in the desktop client (bottom-right): shows
+  the current version and, when a newer GitHub release exists, an "Update
+  available" button linking to the download.
+- CI injects the release tag into the app version so it's always accurate.
+
 ## [0.4.10] — 2026-06-17
 
 ### Fixed
