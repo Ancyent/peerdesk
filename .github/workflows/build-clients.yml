@@ -67,6 +67,12 @@ jobs:
             libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
+      - name: Set app version from tag
+        shell: bash
+        run: |
+          VER="${{ github.ref_name }}"; VER="${VER#v}"
+          node -e "const fs=require('fs'),p='desktop/src-tauri/tauri.conf.json',j=JSON.parse(fs.readFileSync(p));j.version='$VER';fs.writeFileSync(p,JSON.stringify(j,null,2))"
+          echo "app version set to $VER"
       - name: Build frontend
         run: cd desktop && npm ci && npm run build
       - name: Build Linux packages
@@ -100,6 +106,12 @@ jobs:
           node-version: '20'
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
+      - name: Set app version from tag
+        shell: bash
+        run: |
+          VER="${{ github.ref_name }}"; VER="${VER#v}"
+          node -e "const fs=require('fs'),p='desktop/src-tauri/tauri.conf.json',j=JSON.parse(fs.readFileSync(p));j.version='$VER';fs.writeFileSync(p,JSON.stringify(j,null,2))"
+          echo "app version set to $VER"
       - name: Build frontend
         run: cd desktop && npm ci && npm run build
       - name: Build Windows packages
@@ -145,6 +157,12 @@ jobs:
           sudo apt-get install -y libxdo-dev libasound2-dev
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
+      - name: Set app version from tag
+        shell: bash
+        run: |
+          VER="${{ github.ref_name }}"; VER="${VER#v}"
+          node -e "const fs=require('fs'),p='desktop/src-tauri/tauri.conf.json',j=JSON.parse(fs.readFileSync(p));j.version='$VER';fs.writeFileSync(p,JSON.stringify(j,null,2))"
+          echo "app version set to $VER"
       - name: Build frontend
         run: cd desktop && npm ci && npm run build
       - name: Init Android

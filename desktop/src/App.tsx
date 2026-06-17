@@ -6,6 +6,7 @@ import { StatusBar } from './components/StatusBar';
 import { TabBar } from './components/TabBar';
 import { TitleBar } from './components/TitleBar';
 import { ApprovalDialog } from './components/ApprovalDialog';
+import { UpdateBadge } from './components/UpdateBadge';
 import { AppProvider, useAgentContext } from './context/AppContext';
 import type { Session, SessionState } from './types';
 
@@ -48,6 +49,7 @@ function AppInner() {
   return (
     <div style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background: '#0d1117', height: '100%', display: 'flex', flexDirection: 'column', color: '#e6edf3', overflow: 'hidden' }}>
       <ApprovalDialog />
+      <UpdateBadge />
       <TitleBar />
 
       <StatusBar approvalStatus={status.approval_status} serverUrl={status.server_url} />
