@@ -59,8 +59,22 @@ impl Default for AgentConfig {
     }
 }
 
+/// Aborts the agent's background tokio tasks (signaling, heartbeat, forwarding)
+/// when run_agent's future is dropped — e.g. when the Tauri host aborts the
+/// agent on restart. Without this the signaling reconnect loop would keep
+/// running as an orphan and a second peer connection would corrupt DTLS.
+struct AbortOnDrop(Vec<tokio::task::AbortHandle>);
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        for h in &self.0 {
+            h.abort();
+        }
+    }
+}
+
 pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     let approval_tx = agent_cfg.approval_tx.clone();
+    let mut task_handles: Vec<tokio::task::AbortHandle> = Vec::new();
     let config_path = Config::config_path(agent_cfg.portable);
     let cfg = Config::load_or_create(
         &config_path,
@@ -116,7 +130,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // (shown offline even after approval). Sends immediately, then every 30s.
     if let (Some(url), Some(_)) = (api_url.clone(), effective_key.clone()) {
         let hb_peer = cfg.peer_id.clone();
-        tokio::spawn(async move {
+        let hb = tokio::spawn(async move {
             loop {
                 if let Err(e) = api_client::send_heartbeat(&url, &hb_peer, true).await {
                     tracing::debug!("heartbeat error: {}", e);
@@ -124,6 +138,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
             }
         });
+        task_handles.push(hb.abort_handle());
     }
 
     info!("Waiting for connections...");
@@ -181,11 +196,12 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     let sig_url = signaling_url;
 
     // Spawn signaling client
-    tokio::spawn(async move {
+    let sig_handle = tokio::spawn(async move {
         if let Err(e) = signaling::run(&sig_url, &peer_id, &pw_hash, &hmac_key, from_sig_tx, to_sig_rx).await {
             tracing::error!("Signaling error: {}", e);
         }
     });
+    task_handles.push(sig_handle.abort_handle());
 
     // Forward outbound WebRTC messages (Answer + ICE) → signaling server
     // Use take() to extract without consuming `peer`, so it remains usable below.
@@ -194,13 +210,18 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         .take()
         .expect("from_signaling_rx must be Some");
     let to_sig_fwd = to_sig_tx.clone();
-    tokio::spawn(async move {
+    let fwd_handle = tokio::spawn(async move {
         while let Some(msg) = webrtc_out_rx.recv().await {
             if to_sig_fwd.send(msg).await.is_err() {
                 break;
             }
         }
     });
+    task_handles.push(fwd_handle.abort_handle());
+
+    // When run_agent's future is dropped (host aborts the agent on restart),
+    // abort these background tasks so no orphan signaling/peer connection lingers.
+    let _abort_guard = AbortOnDrop(task_handles);
 
     // Main event loop: handle messages from signaling server
     loop {
