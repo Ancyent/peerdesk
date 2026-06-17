@@ -2,6 +2,15 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.10] — 2026-06-17
+
+### Fixed
+- **Connected but no video.** Restarting the agent (Apply/reset) left the old
+  signaling/heartbeat tasks running as orphans; with auto-reconnect they
+  persisted and a second peer connection raced the new one, so DTLS failed
+  (`remote certificate does not match any fingerprint`) and no media flowed.
+  The agent now aborts its background tasks when it restarts.
+
 ## [0.4.9] — 2026-06-16
 
 ### Added
