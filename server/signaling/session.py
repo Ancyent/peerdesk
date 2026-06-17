@@ -72,9 +72,13 @@ async def register_agent(
             (bool(hmac_key) and hmac_lib.compare_digest(hmac_key, stored_hmac))
             or (bool(password_hash) and hmac_lib.compare_digest(password_hash, stored_pw))
         )
-        if not matches:
+        # If the stored record is gone (Redis key expired) we can't verify
+        # ownership; a lingering dead in-memory socket must not block the real
+        # agent forever, so allow the replacement in that case.
+        no_stored = not stored_hmac and not stored_pw
+        if not matches and not no_stored:
             return False
-        # Same agent reconnecting — close the stale socket and replace it.
+        # Same agent reconnecting (or replacing a stale socket) — close the old.
         try:
             await existing_ws.close(code=1012, reason="reconnected")
         except Exception:
@@ -85,7 +89,9 @@ async def register_agent(
         "password_hash": password_hash,
         "hmac_key": hmac_key,
     })
-    await redis.expire(f"agent:{peer_id}", 3600)
+    # Long TTL refreshed on every (re)register; the record is deleted on
+    # disconnect. A short TTL used to expire mid-session and break viewer auth.
+    await redis.expire(f"agent:{peer_id}", 86400)
     return True
 
 
