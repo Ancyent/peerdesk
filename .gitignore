@@ -9,3 +9,5 @@ dist/
 builds/
 peerdesk-release.jks
 android-secrets.env
+screenshots/*
+!screenshots/README.md
