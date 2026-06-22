@@ -19,7 +19,7 @@ pub fn normalize(cx: i32, cy: i32, sw: i32, sh: i32) -> Option<(f32, f32)> {
 /// (only when changed). Runs on its own thread (enigo is !Send). Returns when
 /// the receiver is dropped.
 pub fn run(tx: tokio::sync::watch::Sender<(f32, f32)>) {
-    let mut enigo = match Enigo::new(&Settings::default()) {
+    let enigo = match Enigo::new(&Settings::default()) {
         Ok(e) => e,
         Err(e) => {
             tracing::warn!("cursor reader: enigo init failed: {}", e);
