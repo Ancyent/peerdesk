@@ -115,6 +115,7 @@ export function useWebRTC(
   }, []);
 
   const getFtChannel = useCallback(() => ftChRef.current, []);
+  const getPc = useCallback(() => pcRef.current, []);
 
-  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, setQuality, getPc: () => pcRef.current, disconnect, getFtChannel };
+  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, setQuality, getPc, disconnect, getFtChannel };
 }
