@@ -2,6 +2,15 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.14] — 2026-06-22
+
+### Fixed
+- **Android build.** The desktop-viewer TURN command added in v0.4.13 didn't
+  compile for Android (which doesn't link the agent crate), failing the `.apk`
+  job. It's now stubbed on Android — that viewer falls back to public STUN until
+  it has its own server config. Re-cut so the Windows agent (a transient
+  toolchain-download failure in v0.4.13) is rebuilt too.
+
 ## [0.4.13] — 2026-06-22
 
 ### Fixed

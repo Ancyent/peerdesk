@@ -140,6 +140,7 @@ struct IceServer {
     credential: Option<String>,
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 async fn get_turn_credentials() -> Result<Vec<IceServer>, String> {
     let cfg = Config::load(&Config::config_path(false)).map_err(|e| e.to_string())?;
@@ -165,6 +166,15 @@ async fn get_turn_credentials() -> Result<Vec<IceServer>, String> {
         });
     }
     Ok(servers)
+}
+
+/// Android builds don't link the agent crate (no host capability), so there's no
+/// Config/API key to fetch TURN with — the viewer falls back to public STUN
+/// (empty list → STUN-only in the frontend).
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn get_turn_credentials() -> Result<Vec<IceServer>, String> {
+    Ok(Vec::new())
 }
 
 #[tauri::command]
