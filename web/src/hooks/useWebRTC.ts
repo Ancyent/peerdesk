@@ -12,7 +12,9 @@ export function useWebRTC(
   const clipboardChRef = useRef<RTCDataChannel | null>(null);
   const ftChRef = useRef<RTCDataChannel | null>(null);
   const controlChRef = useRef<RTCDataChannel | null>(null);
+  const cursorChRef = useRef<RTCDataChannel | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const sendSignalingRef = useRef(sendSignaling);
   sendSignalingRef.current = sendSignaling;
   const onClipboardRef = useRef(onClipboardFromAgent);
@@ -25,7 +27,9 @@ export function useWebRTC(
     clipboardChRef.current = null;
     ftChRef.current = null;
     controlChRef.current = null;
+    cursorChRef.current = null;
     setStream(null);
+    setCursor(null);
 
     // Fetch TURN/STUN config from the server so media can traverse NAT and
     // different subnets. Without a relay, peers on different networks complete
@@ -62,6 +66,13 @@ export function useWebRTC(
 
     const controlCh = pc.createDataChannel('control', { ordered: true });
     controlChRef.current = controlCh;
+
+    const cursorCh = pc.createDataChannel('cursor', { ordered: false, maxRetransmits: 0 });
+    cursorChRef.current = cursorCh;
+    cursorCh.onmessage = (e) => {
+      try { const p = JSON.parse(e.data as string); if (typeof p.x === 'number') setCursor({ x: p.x, y: p.y }); }
+      catch { /* ignore */ }
+    };
 
     pc.ontrack = (e) => {
       if (e.streams[0]) setStream(e.streams[0]);
@@ -118,11 +129,13 @@ export function useWebRTC(
     clipboardChRef.current = null;
     ftChRef.current = null;
     controlChRef.current = null;
+    cursorChRef.current = null;
     setStream(null);
+    setCursor(null);
   }, []);
 
   const getFtChannel = useCallback(() => ftChRef.current, []);
   const getPc = useCallback(() => pcRef.current, []);
 
-  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, setQuality, getPc, disconnect, getFtChannel };
+  return { startOffer, stream, cursor, handleAnswer, handleIceCandidate, sendInput, sendClipboard, setQuality, getPc, disconnect, getFtChannel };
 }
