@@ -59,6 +59,7 @@ pub async fn run(
     tx: Sender<FrameData>,
     initial_display_index: usize,
     mut switch_rx: tokio::sync::mpsc::Receiver<usize>,
+    quality_rx: tokio::sync::watch::Receiver<crate::quality::QualitySettings>,
 ) -> Result<()> {
     let mut display_index = initial_display_index;
 
@@ -87,16 +88,22 @@ pub async fn run(
 
             match capturer.frame() {
                 Ok(frame) => {
-                    let fd = FrameData {
-                        width: w,
-                        height: h,
-                        data: frame.to_vec(),
+                    let q = *quality_rx.borrow();
+                    let (dw, dh) = scale::target_dims(w, h, q.max_height);
+                    let (out_w, out_h, data) = if (dw, dh) != (w, h) {
+                        (dw, dh, scale::downscale_bgra(&frame, w, h, dw, dh))
+                    } else {
+                        (w, h, frame.to_vec())
                     };
+                    let fd = FrameData { width: out_w, height: out_h, data };
                     match tx.try_send(fd) {
                         Ok(_) => {}
                         Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {}
                         Err(_) => return Ok(()),
                     }
+                    // Pace to the target fps so we don't send more frames than asked.
+                    let frame_ms = (1000 / q.fps.max(1)) as u64;
+                    tokio::time::sleep(Duration::from_millis(frame_ms)).await;
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {
                     tokio::time::sleep(Duration::from_millis(16)).await;

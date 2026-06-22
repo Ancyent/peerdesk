@@ -34,6 +34,7 @@ impl PeerConnection {
         frame_rx: Receiver<FrameData>,
         input_tx: Sender<InputEvent>,
         ice_servers: Vec<RTCIceServer>,
+        quality_tx: tokio::sync::watch::Sender<crate::quality::QualitySettings>,
     ) -> Result<Self> {
         let mut media_engine = MediaEngine::default();
         media_engine.register_default_codecs()?;
@@ -78,10 +79,12 @@ impl PeerConnection {
         let (ft_control_tx, ft_control_rx) = tokio::sync::mpsc::channel::<String>(32);
         let clipboard_in_tx_clone = clipboard_in_tx.clone();
         let ft_in_tx_clone = ft_in_tx.clone();
+        let quality_tx_dc = quality_tx.clone();
         pc.on_data_channel(Box::new(move |dc| {
             let input_tx = input_tx_clone.clone();
             let clipboard_tx = clipboard_in_tx_clone.clone();
             let ft_tx = ft_in_tx_clone.clone();
+            let quality_tx = quality_tx_dc.clone();
             Box::pin(async move {
                 match dc.label() {
                     "input" => {
@@ -127,6 +130,25 @@ impl PeerConnection {
                             })
                         }));
                     }
+                    "control" => {
+                        let qtx = quality_tx.clone();
+                        dc.on_message(Box::new(move |msg| {
+                            let qtx = qtx.clone();
+                            let data = msg.data.to_vec();
+                            Box::pin(async move {
+                                if let Ok(text) = std::str::from_utf8(&data) {
+                                    if let Ok(crate::quality::ControlMessage::SetQuality {
+                                        bitrate_kbps, fps, max_height,
+                                    }) = serde_json::from_str(text) {
+                                        let q = crate::quality::QualitySettings {
+                                            bitrate_kbps, fps, max_height,
+                                        }.clamped();
+                                        let _ = qtx.send(q);
+                                    }
+                                }
+                            })
+                        }));
+                    }
                     _ => {}
                 }
             })
@@ -136,7 +158,8 @@ impl PeerConnection {
 
         // Spawn video frame sender
         let track = Arc::clone(&video_track);
-        tokio::spawn(async move { send_video_frames(frame_rx, track).await });
+        let video_quality_rx = quality_tx.subscribe();
+        tokio::spawn(async move { send_video_frames(frame_rx, track, video_quality_rx).await });
 
         let (to_sig_tx, to_sig_rx) = tokio::sync::mpsc::channel::<SignalingMessage>(32);
 
@@ -212,21 +235,24 @@ fn extract_fingerprint(sdp: &str) -> Option<String> {
         .map(|l| l.trim_start_matches("a=fingerprint:").to_string())
 }
 
-async fn send_video_frames(mut frame_rx: Receiver<FrameData>, track: Arc<TrackLocalStaticSample>) {
+async fn send_video_frames(
+    mut frame_rx: Receiver<FrameData>,
+    track: Arc<TrackLocalStaticSample>,
+    quality_rx: tokio::sync::watch::Receiver<crate::quality::QualitySettings>,
+) {
     let mut encoder: Option<H264Encoder> = None;
-    let mut enc_dims: (u32, u32) = (0, 0);
+    let mut enc_key: (u32, u32, u32, u32) = (0, 0, 0, 0); // w,h,fps,bitrate_bps
     while let Some(frame) = frame_rx.recv().await {
-        // Reset the encoder if the frame dimensions changed (e.g. after a
-        // display/resolution switch); otherwise encode_bgra fails forever on a
-        // dimension mismatch and video silently dies.
-        if enc_dims != (frame.width, frame.height) {
+        let q = *quality_rx.borrow();
+        let key = (frame.width, frame.height, q.fps, q.bitrate_bps());
+        if enc_key != key {
             encoder = None;
         }
         if encoder.is_none() {
-            match H264Encoder::new(frame.width, frame.height, 30, 800_000) {
+            match H264Encoder::new(frame.width, frame.height, q.fps, q.bitrate_bps()) {
                 Ok(enc) => {
                     encoder = Some(enc);
-                    enc_dims = (frame.width, frame.height);
+                    enc_key = key;
                 }
                 Err(e) => {
                     tracing::error!("H264Encoder init failed: {}", e);
@@ -264,7 +290,8 @@ mod tests {
     async fn creates_peer_connection() {
         let (_frame_tx, frame_rx) = tokio::sync::mpsc::channel(1);
         let (input_tx, _input_rx) = tokio::sync::mpsc::channel(10);
-        let result = PeerConnection::new(frame_rx, input_tx, vec![]).await;
+        let (qtx, _qrx) = tokio::sync::watch::channel(crate::quality::QualitySettings::default());
+        let result = PeerConnection::new(frame_rx, input_tx, vec![], qtx).await;
         assert!(
             result.is_ok(),
             "PeerConnection creation failed: {:?}",

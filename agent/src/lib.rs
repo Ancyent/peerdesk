@@ -203,10 +203,13 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         servers
     };
 
+    let (quality_tx, quality_rx) =
+        tokio::sync::watch::channel(crate::quality::QualitySettings::default());
     let (frame_tx, frame_rx) = tokio::sync::mpsc::channel(2);
     let (input_tx, input_rx) = tokio::sync::mpsc::channel(100);
 
-    let mut peer = webrtc_peer::PeerConnection::new(frame_rx, input_tx, ice_servers).await?;
+    let mut peer =
+        webrtc_peer::PeerConnection::new(frame_rx, input_tx, ice_servers, quality_tx).await?;
 
     // Channel: signaling server → main (Offer, IceCandidate, ViewerJoined, Error)
     let (from_sig_tx, mut from_sig_rx) =
@@ -219,12 +222,18 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // dedicated OS thread with its own single-threaded tokio runtime.
     let capture_display_index = agent_cfg.display_index;
     let (display_switch_tx, display_switch_rx) = tokio::sync::mpsc::channel::<usize>(4);
+    let capture_quality_rx = quality_rx.clone();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("capture runtime");
-        if let Err(e) = rt.block_on(capture::run(frame_tx, capture_display_index, display_switch_rx)) {
+        if let Err(e) = rt.block_on(capture::run(
+            frame_tx,
+            capture_display_index,
+            display_switch_rx,
+            capture_quality_rx,
+        )) {
             tracing::error!("Capture error: {}", e);
         }
     });
