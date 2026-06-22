@@ -264,7 +264,7 @@ mod tests {
     async fn creates_peer_connection() {
         let (_frame_tx, frame_rx) = tokio::sync::mpsc::channel(1);
         let (input_tx, _input_rx) = tokio::sync::mpsc::channel(10);
-        let result = PeerConnection::new(frame_rx, input_tx).await;
+        let result = PeerConnection::new(frame_rx, input_tx, vec![]).await;
         assert!(
             result.is_ok(),
             "PeerConnection creation failed: {:?}",
