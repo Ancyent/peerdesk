@@ -2,6 +2,18 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.16] — 2026-06-22
+
+### Added
+- **Quality presets + stats overlay in the viewer** (web and desktop). Pick an
+  image-quality preset — Good / Balanced / Optimize reaction time — or Custom
+  (set your own FPS + bitrate). The viewer sends the target bitrate, fps, and a
+  resolution cap to the host over a new `control` data channel; the host caps
+  its capture frame rate, downscales the screen, and re-encodes at the chosen
+  bitrate — so a session stays usable on a poor connection (smaller resolution
+  and traffic). A **Stats** toggle shows live FPS, throughput, delay (RTT),
+  resolution, codec, target bitrate, and packet loss.
+
 ## [0.4.15] — 2026-06-22
 
 ### Fixed
