@@ -10,7 +10,7 @@ use tokio::sync::mpsc::Receiver;
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InputEvent {
-    MouseMove { x: i32, y: i32 },
+    MouseMove { x: f32, y: f32 },
     MouseDown { button: u8 },
     MouseUp { button: u8 },
     KeyDown { key: String },
@@ -47,9 +47,13 @@ pub async fn run(mut rx: Receiver<InputEvent>) -> Result<()> {
     let mut enigo = Enigo::new(&Settings::default())?;
     while let Some(event) = rx.recv().await {
         let _ = match event {
-            InputEvent::MouseMove { x, y } => enigo
-                .move_mouse(x, y, Coordinate::Abs)
-                .map_err(|e| anyhow::anyhow!("{e:?}")),
+            InputEvent::MouseMove { x, y } => {
+                let (sw, sh) = enigo.main_display().unwrap_or((1, 1));
+                let (px, py) = norm_to_native(x, y, sw, sh);
+                enigo
+                    .move_mouse(px, py, Coordinate::Abs)
+                    .map_err(|e| anyhow::anyhow!("{e:?}"))
+            }
             InputEvent::MouseDown { button: 0 } => enigo
                 .button(enigo::Button::Left, Press)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
@@ -105,9 +109,9 @@ mod tests {
 
     #[test]
     fn parses_mouse_move_event() {
-        let json = r#"{"type":"mouse_move","x":100,"y":200}"#;
+        let json = r#"{"type":"mouse_move","x":0.5,"y":0.25}"#;
         let event: InputEvent = serde_json::from_str(json).unwrap();
-        assert!(matches!(event, InputEvent::MouseMove { x: 100, y: 200 }));
+        assert!(matches!(event, InputEvent::MouseMove { x, y } if x == 0.5 && y == 0.25));
     }
 
     #[test]
@@ -115,5 +119,28 @@ mod tests {
         let json = r#"{"type":"key_down","key":"a"}"#;
         let event: InputEvent = serde_json::from_str(json).unwrap();
         assert!(matches!(event, InputEvent::KeyDown { key } if key == "a"));
+    }
+}
+
+/// Map a normalized (0..1) pointer position to absolute screen pixels for a
+/// display of size (sw, sh). Clamps to the display bounds.
+pub fn norm_to_native(x: f32, y: f32, sw: i32, sh: i32) -> (i32, i32) {
+    let cx = (x.clamp(0.0, 1.0) * sw as f32).round() as i32;
+    let cy = (y.clamp(0.0, 1.0) * sh as f32).round() as i32;
+    (cx.clamp(0, (sw - 1).max(0)), cy.clamp(0, (sh - 1).max(0)))
+}
+
+#[cfg(test)]
+mod coord_tests {
+    use super::norm_to_native;
+    #[test]
+    fn maps_center_and_edges() {
+        assert_eq!(norm_to_native(0.5, 0.5, 1920, 1080), (960, 540));
+        assert_eq!(norm_to_native(0.0, 0.0, 1920, 1080), (0, 0));
+        assert_eq!(norm_to_native(1.0, 1.0, 1920, 1080), (1919, 1079));
+    }
+    #[test]
+    fn clamps_out_of_range() {
+        assert_eq!(norm_to_native(2.0, -1.0, 1280, 720), (1279, 0));
     }
 }
