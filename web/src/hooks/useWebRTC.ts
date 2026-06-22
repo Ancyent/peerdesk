@@ -11,6 +11,7 @@ export function useWebRTC(
   const inputChRef = useRef<RTCDataChannel | null>(null);
   const clipboardChRef = useRef<RTCDataChannel | null>(null);
   const ftChRef = useRef<RTCDataChannel | null>(null);
+  const controlChRef = useRef<RTCDataChannel | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const sendSignalingRef = useRef(sendSignaling);
   sendSignalingRef.current = sendSignaling;
@@ -23,6 +24,7 @@ export function useWebRTC(
     inputChRef.current = null;
     clipboardChRef.current = null;
     ftChRef.current = null;
+    controlChRef.current = null;
     setStream(null);
 
     // Fetch TURN/STUN config from the server so media can traverse NAT and
@@ -57,6 +59,9 @@ export function useWebRTC(
 
     const ftCh = pc.createDataChannel('filetransfer', { ordered: true });
     ftChRef.current = ftCh;
+
+    const controlCh = pc.createDataChannel('control', { ordered: true });
+    controlChRef.current = controlCh;
 
     pc.ontrack = (e) => {
       if (e.streams[0]) setStream(e.streams[0]);
@@ -99,16 +104,24 @@ export function useWebRTC(
     if (ch?.readyState === 'open') ch.send(text);
   }, []);
 
+  const setQuality = useCallback((q: { bitrate_kbps: number; fps: number; max_height: number }) => {
+    const ch = controlChRef.current;
+    const msg = JSON.stringify({ type: 'set_quality', ...q });
+    if (ch?.readyState === 'open') ch.send(msg);
+    else if (ch) ch.addEventListener('open', () => ch.send(msg), { once: true });
+  }, []);
+
   const disconnect = useCallback(() => {
     pcRef.current?.close();
     pcRef.current = null;
     inputChRef.current = null;
     clipboardChRef.current = null;
     ftChRef.current = null;
+    controlChRef.current = null;
     setStream(null);
   }, []);
 
   const getFtChannel = useCallback(() => ftChRef.current, []);
 
-  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, disconnect, getFtChannel };
+  return { startOffer, stream, handleAnswer, handleIceCandidate, sendInput, sendClipboard, setQuality, getPc: () => pcRef.current, disconnect, getFtChannel };
 }
