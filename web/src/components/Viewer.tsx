@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import { normToPx } from '../lib/viewerGeom';
 
 interface Props {
   stream: MediaStream | null;
@@ -10,6 +11,7 @@ interface Props {
   onKeyDown: (key: string) => void;
   onKeyUp: (key: string) => void;
   onScroll: (dx: number, dy: number) => void;
+  cursor?: { x: number; y: number } | null;
 }
 
 export interface ViewerHandle {
@@ -17,11 +19,12 @@ export interface ViewerHandle {
 }
 
 export const Viewer = forwardRef<ViewerHandle, Props>(function Viewer(
-  { stream, audioStream, isViewOnly = false, onMouseMove, onMouseDown, onMouseUp, onKeyDown, onKeyUp, onScroll },
+  { stream, audioStream, isViewOnly = false, onMouseMove, onMouseDown, onMouseUp, onKeyDown, onKeyUp, onScroll, cursor },
   ref
 ) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [audioMuted, setAudioMuted] = useState(true);
 
   useImperativeHandle(ref, () => ({ get videoElement() { return videoRef.current; } }));
@@ -57,12 +60,12 @@ export const Viewer = forwardRef<ViewerHandle, Props>(function Viewer(
     if (ca > va) { rH = rect.height; rW = rH * va; oX = (rect.width - rW) / 2; oY = 0; }
     else          { rW = rect.width; rH = rW / va;  oX = 0; oY = (rect.height - rH) / 2; }
     const lX = e.clientX - rect.left - oX, lY = e.clientY - rect.top - oY;
-    return { x: Math.round((lX / rW) * vw), y: Math.round((lY / rH) * vh), inBounds: lX >= 0 && lY >= 0 && lX <= rW && lY <= rH };
+    return { x: lX / rW, y: lY / rH, inBounds: lX >= 0 && lY >= 0 && lX <= rW && lY <= rH };
   };
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div ref={wrapRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
         <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain', background: '#000' }} />
         <div tabIndex={0} style={{ position: 'absolute', inset: 0, outline: 'none', cursor: isViewOnly ? 'default' : 'none' }}
           onMouseMove={e => { if (isViewOnly) return; const p = relPos(e); if (p.inBounds) onMouseMove(p.x, p.y); }}
@@ -74,6 +77,20 @@ export const Viewer = forwardRef<ViewerHandle, Props>(function Viewer(
           onMouseEnter={e => { if (!isViewOnly) (e.currentTarget as HTMLDivElement).focus(); }}
           onContextMenu={e => e.preventDefault()}
         />
+        {(() => {
+          if (!cursor || !wrapRef.current || !videoRef.current) return null;
+          const r = wrapRef.current.getBoundingClientRect();
+          const p = normToPx(cursor.x, cursor.y, { width: r.width, height: r.height },
+            videoRef.current.videoWidth, videoRef.current.videoHeight);
+          if (!p) return null;
+          return (
+            <svg width="20" height="20" viewBox="0 0 24 24" style={{ position: 'absolute',
+              left: p.left, top: p.top, pointerEvents: 'none', zIndex: 6,
+              filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.7))' }}>
+              <path d="M3 2 L3 20 L8 15 L11 21 L14 20 L11 14 L18 14 Z" fill="#fff" stroke="#000" strokeWidth="1.5" />
+            </svg>
+          );
+        })()}
         {audioStream && (
           <>
             <audio ref={audioRef} autoPlay muted={audioMuted} style={{ display: 'none' }} />
