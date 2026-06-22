@@ -267,7 +267,7 @@ async fn send_video_frames(
                     let _ = track
                         .write_sample(&Sample {
                             data: h264.into(),
-                            duration: std::time::Duration::from_millis(33),
+                            duration: std::time::Duration::from_millis((1000 / q.fps.max(1)) as u64),
                             ..Default::default()
                         })
                         .await;
