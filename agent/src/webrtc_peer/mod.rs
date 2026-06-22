@@ -35,6 +35,7 @@ impl PeerConnection {
         input_tx: Sender<InputEvent>,
         ice_servers: Vec<RTCIceServer>,
         quality_tx: tokio::sync::watch::Sender<crate::quality::QualitySettings>,
+        cursor_tx: tokio::sync::watch::Sender<(f32, f32)>,
     ) -> Result<Self> {
         let mut media_engine = MediaEngine::default();
         media_engine.register_default_codecs()?;
@@ -80,11 +81,13 @@ impl PeerConnection {
         let clipboard_in_tx_clone = clipboard_in_tx.clone();
         let ft_in_tx_clone = ft_in_tx.clone();
         let quality_tx_dc = quality_tx.clone();
+        let cursor_tx_dc = cursor_tx.clone();
         pc.on_data_channel(Box::new(move |dc| {
             let input_tx = input_tx_clone.clone();
             let clipboard_tx = clipboard_in_tx_clone.clone();
             let ft_tx = ft_in_tx_clone.clone();
             let quality_tx = quality_tx_dc.clone();
+            let cursor_tx = cursor_tx_dc.clone();
             Box::pin(async move {
                 match dc.label() {
                     "input" => {
@@ -148,6 +151,22 @@ impl PeerConnection {
                                 }
                             })
                         }));
+                    }
+                    "cursor" => {
+                        let mut rx = cursor_tx.subscribe();
+                        let dc2 = dc.clone();
+                        tokio::spawn(async move {
+                            while rx.changed().await.is_ok() {
+                                let (x, y) = *rx.borrow();
+                                if dc2
+                                    .send_text(format!("{{\"x\":{:.4},\"y\":{:.4}}}", x, y))
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
+                                }
+                            }
+                        });
                     }
                     _ => {}
                 }
@@ -291,7 +310,8 @@ mod tests {
         let (_frame_tx, frame_rx) = tokio::sync::mpsc::channel(1);
         let (input_tx, _input_rx) = tokio::sync::mpsc::channel(10);
         let (qtx, _qrx) = tokio::sync::watch::channel(crate::quality::QualitySettings::default());
-        let result = PeerConnection::new(frame_rx, input_tx, vec![], qtx).await;
+        let (ctx, _crx) = tokio::sync::watch::channel((0.5_f32, 0.5_f32));
+        let result = PeerConnection::new(frame_rx, input_tx, vec![], qtx, ctx).await;
         assert!(
             result.is_ok(),
             "PeerConnection creation failed: {:?}",

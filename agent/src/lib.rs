@@ -206,11 +206,14 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     let (quality_tx, quality_rx) =
         tokio::sync::watch::channel(crate::quality::QualitySettings::default());
+    let (cursor_tx, _cursor_rx) = tokio::sync::watch::channel((0.5_f32, 0.5_f32));
     let (frame_tx, frame_rx) = tokio::sync::mpsc::channel(2);
     let (input_tx, input_rx) = tokio::sync::mpsc::channel(100);
 
-    let mut peer =
-        webrtc_peer::PeerConnection::new(frame_rx, input_tx, ice_servers, quality_tx).await?;
+    let mut peer = webrtc_peer::PeerConnection::new(
+        frame_rx, input_tx, ice_servers, quality_tx, cursor_tx.clone(),
+    )
+    .await?;
 
     // Channel: signaling server → main (Offer, IceCandidate, ViewerJoined, Error)
     let (from_sig_tx, mut from_sig_rx) =
@@ -238,6 +241,10 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
             tracing::error!("Capture error: {}", e);
         }
     });
+
+    // Cursor position reader thread (feeds the `cursor` data channel).
+    let cursor_tx_reader = cursor_tx.clone();
+    std::thread::spawn(move || crate::cursor::run(cursor_tx_reader));
 
     // enigo (input injection) is !Send on macOS, so run on a dedicated OS thread.
     if agent_cfg.cast_only {
