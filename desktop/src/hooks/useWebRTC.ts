@@ -1,5 +1,6 @@
 // web/src/hooks/useWebRTC.ts
 import { useCallback, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { SignalingMessage } from '../types/messages';
 
 export function useWebRTC(
@@ -16,7 +17,7 @@ export function useWebRTC(
   const onClipboardRef = useRef(onClipboardFromAgent);
   onClipboardRef.current = onClipboardFromAgent;
 
-  const startOffer = useCallback(() => {
+  const startOffer = useCallback(async () => {
     // Close any existing connection before creating a new one
     pcRef.current?.close();
     inputChRef.current = null;
@@ -24,9 +25,19 @@ export function useWebRTC(
     ftChRef.current = null;
     setStream(null);
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
+    // Fetch TURN/STUN config from the server (via the Tauri backend, which holds
+    // the API key) so media can traverse NAT and different subnets. Without a
+    // relay, a cross-network viewer connects but sees a black screen. Fall back
+    // to public STUN if unavailable.
+    let iceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+    try {
+      const servers = await invoke<RTCIceServer[]>('get_turn_credentials');
+      if (servers && servers.length) iceServers = servers;
+    } catch (e) {
+      console.warn('TURN credentials unavailable, using public STUN only', e);
+    }
+
+    const pc = new RTCPeerConnection({ iceServers });
     pcRef.current = pc;
 
     inputChRef.current = pc.createDataChannel('input', { ordered: true });

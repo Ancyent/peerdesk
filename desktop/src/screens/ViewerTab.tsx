@@ -57,7 +57,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   const { send } = useSignaling(signalingUrl, useCallback(async (msg: SignalingMessage) => {
     if (msg.type === 'joined') {
       setViewState('negotiating');
-      webrtc.startOffer();
+      await webrtc.startOffer();
     } else if (msg.type === 'challenge') {
       const nonce = msg.nonce;
       computeHmacKey(password).then(hmacKey =>

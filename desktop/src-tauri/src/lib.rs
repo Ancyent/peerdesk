@@ -128,6 +128,45 @@ fn init_logging() {
         .try_init();
 }
 
+/// ICE servers (STUN + TURN relay) for the desktop viewer, fetched from the
+/// server using the agent's API key. Without the TURN relay, a viewer on a
+/// different network than the host connects but sees a black screen.
+#[derive(serde::Serialize)]
+struct IceServer {
+    urls: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    credential: Option<String>,
+}
+
+#[tauri::command]
+async fn get_turn_credentials() -> Result<Vec<IceServer>, String> {
+    let cfg = Config::load(&Config::config_path(false)).map_err(|e| e.to_string())?;
+    let api_url = cfg.api_url().ok_or_else(|| "no server configured".to_string())?;
+    let api_key = cfg
+        .api_key
+        .clone()
+        .ok_or_else(|| "no API key configured".to_string())?;
+    let t = peerdesk_agent::api_client::fetch_turn_credentials(&api_url, &api_key)
+        .await
+        .map_err(|e| e.to_string())?;
+    let stun: Vec<String> = t.urls.iter().filter(|u| u.starts_with("stun:")).cloned().collect();
+    let turn: Vec<String> = t.urls.iter().filter(|u| u.starts_with("turn:")).cloned().collect();
+    let mut servers = Vec::new();
+    if !stun.is_empty() {
+        servers.push(IceServer { urls: stun, username: None, credential: None });
+    }
+    if !turn.is_empty() {
+        servers.push(IceServer {
+            urls: turn,
+            username: Some(t.username),
+            credential: Some(t.credential),
+        });
+    }
+    Ok(servers)
+}
+
 #[tauri::command]
 fn get_agent_log() -> Vec<String> {
     LOG_BUFFER
@@ -528,6 +567,7 @@ pub fn run() {
             respond_approval,
             get_pending_approval,
             get_agent_log,
+            get_turn_credentials,
         ])
         .setup(|app| {
             #[cfg(desktop)]

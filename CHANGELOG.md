@@ -2,6 +2,16 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.13] — 2026-06-22
+
+### Fixed
+- **Desktop & Android viewer now use the TURN relay too.** v0.4.12 wired TURN
+  into the web viewer and the agent, but the desktop/Android viewer client kept
+  its own STUN-only config and still showed a black screen across networks. It
+  now fetches TURN credentials from the server (via the Tauri backend, using the
+  agent's API key) and adds the relay to its ICE servers, matching the web
+  viewer. All three clients — web, desktop, agent — now traverse NAT.
+
 ## [0.4.12] — 2026-06-22
 
 ### Fixed
