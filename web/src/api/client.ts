@@ -92,6 +92,13 @@ export interface BrandingConfig {
   accent_color: string;
 }
 
+export interface TurnCredentials {
+  urls: string[];
+  username: string;
+  credential: string;
+  ttl: number;
+}
+
 export const api = {
   auth: {
     register: (email: string, name: string, password: string) =>
@@ -208,5 +215,9 @@ export const api = {
   tokens: {
     create: (token: string, placement?: { company_id?: string; location_id?: string; group_id?: string }) =>
       request<RegistrationTokenOut>('/tokens', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(placement ?? {}) }),
+  },
+  turn: {
+    credentials: (token: string) =>
+      request<TurnCredentials>('/turn/credentials', { headers: authHeaders(token) }),
   },
 };

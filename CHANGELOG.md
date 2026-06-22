@@ -2,6 +2,24 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.12] — 2026-06-22
+
+### Fixed
+- **Black screen after connecting across networks.** When the viewer and the
+  host were on different networks/subnets, the connection established but no
+  video flowed (black screen) because only STUN was configured — there was no
+  working relay for NAT traversal. The bundled TURN server (coturn) was also
+  crash-looping on an invalid option (`--no-loopback-peers`) and was never
+  referenced by the clients.
+
+### Added
+- **TURN relay is now used end to end.** The server hands out time-limited TURN
+  credentials (`GET /turn/credentials` for the dashboard, `GET
+  /turn/agent-credentials` for the agent), and both the web viewer and the agent
+  request them and add the relay to their ICE servers. Same-LAN peers still
+  connect directly (host candidates); cross-network peers fall back to the
+  relay. Configure with `TURN_SECRET` + `TURN_HOST` in `deploy/.env`.
+
 ## [0.4.11] — 2026-06-17
 
 ### Added

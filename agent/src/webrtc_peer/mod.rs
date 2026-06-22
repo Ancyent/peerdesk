@@ -30,7 +30,11 @@ pub struct PeerConnection {
 }
 
 impl PeerConnection {
-    pub async fn new(frame_rx: Receiver<FrameData>, input_tx: Sender<InputEvent>) -> Result<Self> {
+    pub async fn new(
+        frame_rx: Receiver<FrameData>,
+        input_tx: Sender<InputEvent>,
+        ice_servers: Vec<RTCIceServer>,
+    ) -> Result<Self> {
         let mut media_engine = MediaEngine::default();
         media_engine.register_default_codecs()?;
 
@@ -45,10 +49,7 @@ impl PeerConnection {
             .build();
 
         let config = RTCConfiguration {
-            ice_servers: vec![RTCIceServer {
-                urls: vec!["stun:stun.l.google.com:19302".to_owned()],
-                ..Default::default()
-            }],
+            ice_servers,
             ..Default::default()
         };
 

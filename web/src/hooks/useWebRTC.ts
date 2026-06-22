@@ -1,6 +1,7 @@
 // web/src/hooks/useWebRTC.ts
 import { useCallback, useRef, useState } from 'react';
 import type { SignalingMessage } from '../types/messages';
+import { api } from '../api/client';
 
 export function useWebRTC(
   sendSignaling: (msg: SignalingMessage) => void,
@@ -16,7 +17,7 @@ export function useWebRTC(
   const onClipboardRef = useRef(onClipboardFromAgent);
   onClipboardRef.current = onClipboardFromAgent;
 
-  const startOffer = useCallback(() => {
+  const startOffer = useCallback(async () => {
     // Close any existing connection before creating a new one
     pcRef.current?.close();
     inputChRef.current = null;
@@ -24,9 +25,26 @@ export function useWebRTC(
     ftChRef.current = null;
     setStream(null);
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
+    // Fetch TURN/STUN config from the server so media can traverse NAT and
+    // different subnets. Without a relay, peers on different networks complete
+    // signaling/DTLS but no media flows → black screen. Fall back to public
+    // STUN if the request fails (e.g. not logged in).
+    let iceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+    try {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        const t = await api.turn.credentials(token);
+        const stun = t.urls.filter((u) => u.startsWith('stun:'));
+        const turn = t.urls.filter((u) => u.startsWith('turn:'));
+        iceServers = [];
+        if (stun.length) iceServers.push({ urls: stun });
+        if (turn.length) iceServers.push({ urls: turn, username: t.username, credential: t.credential });
+      }
+    } catch (e) {
+      console.warn('TURN credentials unavailable, using public STUN only', e);
+    }
+
+    const pc = new RTCPeerConnection({ iceServers });
     pcRef.current = pc;
 
     inputChRef.current = pc.createDataChannel('input', { ordered: true });

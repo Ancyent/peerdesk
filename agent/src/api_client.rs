@@ -95,6 +95,33 @@ pub async fn send_heartbeat(api_url: &str, peer_id: &str, online: bool) -> Resul
     Ok(())
 }
 
+#[derive(Debug, Deserialize)]
+pub struct TurnCredentials {
+    pub urls: Vec<String>,
+    pub username: String,
+    pub credential: String,
+}
+
+/// Fetch TURN/STUN ICE servers from the server, authenticated with the agent's
+/// API key. Lets media traverse NAT / different subnets via the relay. Returns
+/// Err in standalone mode or when the server has no TURN configured; the caller
+/// falls back to public STUN.
+pub async fn fetch_turn_credentials(api_url: &str, api_key: &str) -> Result<TurnCredentials> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get(format!("{}/turn/agent-credentials", api_url))
+        .header("X-API-Key", api_key)
+        .send()
+        .await?;
+    if !res.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "TURN credentials fetch failed: {}",
+            res.status()
+        ));
+    }
+    Ok(res.json::<TurnCredentials>().await?)
+}
+
 fn get_hostname() -> String {
     std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME")) // Windows

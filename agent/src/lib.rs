@@ -143,10 +143,64 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     info!("Waiting for connections...");
 
+    // ICE servers for NAT traversal. Fetch TURN (relay) + STUN config from the
+    // server so peers on different networks can exchange media; without a relay
+    // the connection establishes (signaling/DTLS) but no video flows — a black
+    // screen on the viewer. Fall back to public STUN when running standalone or
+    // if the server has no TURN configured.
+    let ice_servers = {
+        use webrtc::ice_transport::ice_server::RTCIceServer;
+        let mut servers = vec![RTCIceServer {
+            urls: vec!["stun:stun.l.google.com:19302".to_owned()],
+            ..Default::default()
+        }];
+        if let (Some(url), Some(key)) = (api_url.clone(), effective_key.clone()) {
+            match api_client::fetch_turn_credentials(&url, &key).await {
+                Ok(t) => {
+                    let stun: Vec<String> = t
+                        .urls
+                        .iter()
+                        .filter(|u| u.starts_with("stun:"))
+                        .cloned()
+                        .collect();
+                    let turn: Vec<String> = t
+                        .urls
+                        .iter()
+                        .filter(|u| u.starts_with("turn:"))
+                        .cloned()
+                        .collect();
+                    let mut s = Vec::new();
+                    if !stun.is_empty() {
+                        s.push(RTCIceServer {
+                            urls: stun,
+                            ..Default::default()
+                        });
+                    }
+                    if !turn.is_empty() {
+                        s.push(RTCIceServer {
+                            urls: turn,
+                            username: t.username,
+                            credential: t.credential,
+                            ..Default::default()
+                        });
+                    }
+                    if !s.is_empty() {
+                        servers = s;
+                        info!("Using TURN/STUN ICE config from server");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("TURN credentials unavailable, using STUN only: {}", e)
+                }
+            }
+        }
+        servers
+    };
+
     let (frame_tx, frame_rx) = tokio::sync::mpsc::channel(2);
     let (input_tx, input_rx) = tokio::sync::mpsc::channel(100);
 
-    let mut peer = webrtc_peer::PeerConnection::new(frame_rx, input_tx).await?;
+    let mut peer = webrtc_peer::PeerConnection::new(frame_rx, input_tx, ice_servers).await?;
 
     // Channel: signaling server → main (Offer, IceCandidate, ViewerJoined, Error)
     let (from_sig_tx, mut from_sig_rx) =

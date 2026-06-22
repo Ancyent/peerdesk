@@ -73,7 +73,7 @@ export default function App() {
   }, [viewerState]);
 
   const { send } = useSignaling(SIGNALING_URL, async (msg) => {
-    if (msg.type === 'joined')             { webrtc.startOffer(); }
+    if (msg.type === 'joined')             { await webrtc.startOffer(); }
     else if (msg.type === 'answer')        { await webrtc.handleAnswer(msg.sdp); setViewerState('connected'); }
     else if (msg.type === 'ice_candidate') { await webrtc.handleIceCandidate(msg.candidate); }
     else if (msg.type === 'error')         { setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found'); setViewerState('error'); setPage('connect'); }
