@@ -2,6 +2,20 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.15] — 2026-06-22
+
+### Fixed
+- **Agent stopped with "invalid turn server credentials".** The agent built its
+  TURN ICE server with the default credential type, but webrtc-rs requires
+  `Password` for TURN and rejected it (`ErrTurnCredentials`) — so the agent
+  stopped on startup whenever the server returned TURN config (i.e. always).
+  Now sets `credential_type: Password`.
+- **Approval prompt never appeared (viewer stuck on "connecting").** If the
+  agent's signaling socket was stale (e.g. just after a client upgrade), the
+  server raised an unhandled error while sending the approval request to it,
+  which killed the viewer's connection so the prompt never reached the host. It
+  now handles a dead agent socket gracefully (drops it and denies cleanly).
+
 ## [0.4.14] — 2026-06-22
 
 ### Fixed

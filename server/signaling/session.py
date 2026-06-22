@@ -165,18 +165,28 @@ async def request_approval(
     state.viewer_pending[viewer_id] = viewer_ws
     agent_ws = state.agent_connections.get(peer_id)
     if agent_ws:
-        await agent_ws.send_text(json.dumps({
-            "type": "viewer_pending",
-            "viewer_id": viewer_id,
-            "remote_ip": remote_ip,
-        }))
-    else:
-        # Agent disconnected — deny immediately
-        await viewer_ws.send_text(json.dumps({
-            "type": "denied",
-            "reason": "Host not connected",
-        }))
-        state.viewer_pending.pop(viewer_id, None)
+        try:
+            await agent_ws.send_text(json.dumps({
+                "type": "viewer_pending",
+                "viewer_id": viewer_id,
+                "remote_ip": remote_ip,
+            }))
+            return
+        except Exception:
+            # The stored agent socket is dead — e.g. the agent dropped or
+            # restarted (a client upgrade) and its disconnect wasn't processed
+            # yet. Sending used to raise an unhandled RuntimeError that killed
+            # the viewer's handler, so the approval never reached the host and
+            # the viewer hung at "connecting". Drop the stale socket so a
+            # reconnect can re-register cleanly, then fall through to deny.
+            if state.agent_connections.get(peer_id) is agent_ws:
+                state.agent_connections.pop(peer_id, None)
+    # Agent disconnected (or its socket was dead) — deny immediately
+    await viewer_ws.send_text(json.dumps({
+        "type": "denied",
+        "reason": "Host not connected",
+    }))
+    state.viewer_pending.pop(viewer_id, None)
 
 
 async def handle_approval(

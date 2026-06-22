@@ -177,11 +177,16 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                         });
                     }
                     if !turn.is_empty() {
+                        // credential_type MUST be Password: webrtc-rs rejects a
+                        // TURN server with the default (Unspecified) credential
+                        // type as ErrTurnCredentials ("invalid turn server
+                        // credentials"), which would stop the agent on startup.
                         s.push(RTCIceServer {
                             urls: turn,
                             username: t.username,
                             credential: t.credential,
-                            ..Default::default()
+                            credential_type:
+                                webrtc::ice_transport::ice_credential_type::RTCIceCredentialType::Password,
                         });
                     }
                     if !s.is_empty() {
