@@ -1,3 +1,5 @@
+pub mod scale;
+
 use anyhow::Result;
 use scrap::{Capturer, Display};
 use std::io::ErrorKind;
