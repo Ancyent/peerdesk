@@ -17,7 +17,6 @@ import { SessionToolbar } from './components/SessionToolbar';
 import type { ViewerHandle } from './components/Viewer';
 import { FileTransferBar } from './components/FileTransferBar';
 import { DisplaySelector } from './components/DisplaySelector';
-import { QualitySelector } from './components/QualitySelector';
 import { StatsOverlay } from './components/StatsOverlay';
 import { useStats } from './hooks/useStats';
 import { PRESETS, type QualitySettings } from './quality';
@@ -155,17 +154,17 @@ export default function App() {
           }}
           onToggleViewOnly={() => setIsViewOnly(v => !v)}
           onFileTransfer={() => setShowFileTransfer(v => !v)}
+          onQualityChange={(q: QualitySettings) => { webrtc.setQuality(q); setTargetKbps(q.bitrate_kbps); }}
+          showStats={showStats}
+          onToggleStats={() => setShowStats((s) => !s)}
         />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 11, display: 'flex', gap: 8 }}>
-            <QualitySelector onChange={(q: QualitySettings) => { webrtc.setQuality(q); setTargetKbps(q.bitrate_kbps); }} />
-            <button onClick={() => setShowStats((s) => !s)}>{showStats ? 'Hide stats' : 'Stats'}</button>
-          </div>
           {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
           <Viewer
             ref={viewerRef}
             stream={webrtc.stream}
             isViewOnly={isViewOnly}
+            cursor={webrtc.cursor}
             onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
             onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
             onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}

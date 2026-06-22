@@ -1,4 +1,5 @@
 import React from 'react';
+import { QualitySelector } from './QualitySelector';
 
 interface Props {
   peerId: string;
@@ -10,6 +11,9 @@ interface Props {
   onCtrlAltDel: () => void;
   onToggleViewOnly: () => void;
   onFileTransfer: () => void;
+  onQualityChange: (q: import('../quality').QualitySettings) => void;
+  showStats: boolean;
+  onToggleStats: () => void;
 }
 
 function latencyColor(ms: number | null): string {
@@ -19,7 +23,8 @@ function latencyColor(ms: number | null): string {
   return 'var(--red)';
 }
 
-export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, onDisconnect, onCtrlAltDel, onToggleViewOnly, onFileTransfer }: Props) {
+export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, onDisconnect, onCtrlAltDel, onToggleViewOnly, onFileTransfer, onQualityChange, showStats, onToggleStats }: Props) {
+  const [qOpen, setQOpen] = React.useState(false);
   const btn = (active?: boolean, danger?: boolean): React.CSSProperties => ({
     padding: '5px 11px',
     border: `1px solid ${active ? 'rgba(0,200,150,0.4)' : danger ? 'rgba(248,113,113,0.3)' : 'rgba(0,200,150,0.15)'}`,
@@ -80,6 +85,16 @@ export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, o
         👁 {isViewOnly ? 'View-Only ON' : 'View-Only'}
       </button>
       <button style={btn()} onClick={onFileTransfer}>📁 Fișiere</button>
+      <div style={{ position: 'relative' }}>
+        <button style={btn(qOpen)} onClick={() => setQOpen(o => !o)} title="Quality">⚙ Quality</button>
+        {qOpen && (
+          <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 20, background: 'var(--bg-surface)',
+            border: '1px solid var(--border-dim)', borderRadius: 8, padding: 10 }}>
+            <QualitySelector onChange={onQualityChange} />
+          </div>
+        )}
+      </div>
+      <button style={btn(showStats)} onClick={onToggleStats} title="Connection stats">📊 Stats</button>
       <div style={{ flex: 1 }} />
       <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'monospace', marginRight: 8 }}>
         {peerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1·$2·$3')}
