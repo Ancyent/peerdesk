@@ -17,6 +17,10 @@ import { SessionToolbar } from './components/SessionToolbar';
 import type { ViewerHandle } from './components/Viewer';
 import { FileTransferBar } from './components/FileTransferBar';
 import { DisplaySelector } from './components/DisplaySelector';
+import { QualitySelector } from './components/QualitySelector';
+import { StatsOverlay } from './components/StatsOverlay';
+import { useStats } from './hooks/useStats';
+import { PRESETS, type QualitySettings } from './quality';
 import { useSignaling } from './hooks/useSignaling';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useClipboard } from './hooks/useClipboard';
@@ -42,6 +46,8 @@ export default function App() {
   const [showFileTransfer, setShowFileTransfer] = useState(false);
   const [latencyMs] = useState<number | null>(null);
   const [fps, setFps] = useState<number | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
 
   const SIGNALING_URL = getConfig().signalingUrl;
 
@@ -49,6 +55,8 @@ export default function App() {
     useCallback((m: SignalingMessage) => { sendRef.current?.(m); }, []),
     useCallback((text: string) => { clipboardReceiveRef.current?.(text); }, [])
   );
+
+  const liveStats = useStats(webrtc.getPc, showStats && viewerState === 'connected');
 
   const { receiveFromAgent } = useClipboard(webrtc.stream ? webrtc.sendClipboard : null);
   clipboardReceiveRef.current = receiveFromAgent;
@@ -73,7 +81,7 @@ export default function App() {
   }, [viewerState]);
 
   const { send } = useSignaling(SIGNALING_URL, async (msg) => {
-    if (msg.type === 'joined')             { await webrtc.startOffer(); }
+    if (msg.type === 'joined')             { await webrtc.startOffer(); webrtc.setQuality(PRESETS.balanced); }
     else if (msg.type === 'answer')        { await webrtc.handleAnswer(msg.sdp); setViewerState('connected'); }
     else if (msg.type === 'ice_candidate') { await webrtc.handleIceCandidate(msg.candidate); }
     else if (msg.type === 'error')         { setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found'); setViewerState('error'); setPage('connect'); }
@@ -149,6 +157,11 @@ export default function App() {
           onFileTransfer={() => setShowFileTransfer(v => !v)}
         />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 11, display: 'flex', gap: 8 }}>
+            <QualitySelector onChange={(q: QualitySettings) => { webrtc.setQuality(q); setTargetKbps(q.bitrate_kbps); }} />
+            <button onClick={() => setShowStats((s) => !s)}>{showStats ? 'Hide stats' : 'Stats'}</button>
+          </div>
+          {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
           <Viewer
             ref={viewerRef}
             stream={webrtc.stream}
