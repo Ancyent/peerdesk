@@ -223,7 +223,7 @@ async fn send_video_frames(mut frame_rx: Receiver<FrameData>, track: Arc<TrackLo
             encoder = None;
         }
         if encoder.is_none() {
-            match H264Encoder::new(frame.width, frame.height, 30) {
+            match H264Encoder::new(frame.width, frame.height, 30, 800_000) {
                 Ok(enc) => {
                     encoder = Some(enc);
                     enc_dims = (frame.width, frame.height);
