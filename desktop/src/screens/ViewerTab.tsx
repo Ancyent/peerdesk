@@ -5,6 +5,7 @@ import { useWebRTC } from '../hooks/useWebRTC';
 import { ViewerToolbar } from '../components/ViewerToolbar';
 import { FileTransferModal } from '../components/FileTransferModal';
 import { StatsOverlay } from '../components/StatsOverlay';
+import { normToPx } from '../lib/viewerGeom';
 import { useStats } from '../hooks/useStats';
 import { PRESETS, type QualitySettings } from '../quality';
 import type { Session, SessionState } from '../types';
@@ -232,29 +233,47 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         onToggleStats={() => setShowStats((s) => !s)}
         onDisconnect={handleDisconnect}
       />
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        tabIndex={0}
-        style={{ flex: 1, width: '100%', objectFit: 'contain', display: 'block', cursor: 'crosshair', outline: 'none' }}
-        onMouseMove={e => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const vw = videoRef.current?.videoWidth ?? rect.width;
-          const vh = videoRef.current?.videoHeight ?? rect.height;
-          webrtc.sendInput({
-            type: 'mouse_move',
-            x: Math.round((e.clientX - rect.left) / rect.width * vw),
-            y: Math.round((e.clientY - rect.top) / rect.height * vh),
-          });
-        }}
-        onMouseDown={e => { e.preventDefault(); e.currentTarget.focus(); webrtc.sendInput({ type: 'mouse_down', button: e.button }); }}
-        onMouseUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_up', button: e.button }); }}
-        onContextMenu={e => e.preventDefault()}
-        onKeyDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_down', key: e.key }); }}
-        onKeyUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key }); }}
-        onWheel={e => { e.preventDefault(); webrtc.sendInput({ type: 'scroll', delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); }}
-      />
+      <div style={{ flex: 1, position: 'relative', display: 'flex', minHeight: 0 }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          tabIndex={0}
+          style={{ flex: 1, width: '100%', objectFit: 'contain', display: 'block', cursor: 'crosshair', outline: 'none' }}
+          onMouseMove={e => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const vw = videoRef.current?.videoWidth ?? 0;
+            const vh = videoRef.current?.videoHeight ?? 0;
+            if (!vw || !vh) return;
+            const ca = rect.width / rect.height, va = vw / vh;
+            let rW: number, rH: number, oX: number, oY: number;
+            if (ca > va) { rH = rect.height; rW = rH * va; oX = (rect.width - rW) / 2; oY = 0; }
+            else { rW = rect.width; rH = rW / va; oX = 0; oY = (rect.height - rH) / 2; }
+            const lX = e.clientX - rect.left - oX, lY = e.clientY - rect.top - oY;
+            webrtc.sendInput({ type: 'mouse_move', x: lX / rW, y: lY / rH });
+          }}
+          onMouseDown={e => { e.preventDefault(); e.currentTarget.focus(); webrtc.sendInput({ type: 'mouse_down', button: e.button }); }}
+          onMouseUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_up', button: e.button }); }}
+          onContextMenu={e => e.preventDefault()}
+          onKeyDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_down', key: e.key }); }}
+          onKeyUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key }); }}
+          onWheel={e => { e.preventDefault(); webrtc.sendInput({ type: 'scroll', delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); }}
+        />
+        {webrtc.cursor && videoRef.current && (() => {
+          const r = videoRef.current.getBoundingClientRect();
+          const cr = videoRef.current.parentElement?.getBoundingClientRect();
+          const p = normToPx(webrtc.cursor.x, webrtc.cursor.y, { width: r.width, height: r.height },
+            videoRef.current.videoWidth, videoRef.current.videoHeight);
+          return p ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" style={{ position: 'absolute',
+              left: (r.left - (cr?.left ?? r.left)) + p.left, top: (r.top - (cr?.top ?? r.top)) + p.top,
+              pointerEvents: 'none', zIndex: 6,
+              filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.7))' }}>
+              <path d="M3 2 L3 20 L8 15 L11 21 L14 20 L11 14 L18 14 Z" fill="#fff" stroke="#000" strokeWidth="1.5" />
+            </svg>
+          ) : null;
+        })()}
+      </div>
       {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
       {showFiles && <FileTransferModal ftChannel={webrtc.getFtChannel()} onClose={() => setShowFiles(false)} />}
     </div>

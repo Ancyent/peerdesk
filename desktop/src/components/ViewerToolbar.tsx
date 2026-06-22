@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { QualitySelector } from './QualitySelector';
 import type { QualitySettings } from '../quality';
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, onDisconnect }: Props) {
+  const [qOpen, setQOpen] = useState(false);
   const btn: CSSProperties = {
     background: 'none',
     border: 'none',
@@ -31,7 +33,15 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
       <button style={btn} onClick={onFullscreen} title="Fullscreen">⛶ Fullscreen</button>
       <button style={btn} onClick={onClipboardSync} title="Sync local clipboard to remote">📋 Clipboard</button>
       <button style={btn} onClick={onFiles} title="File transfer">📁 Files</button>
-      <QualitySelector onChange={onQualityChange} />
+      <div style={{ position: 'relative' }}>
+        <button style={btn} onClick={() => setQOpen(o => !o)} title="Quality">⚙ Quality</button>
+        {qOpen && (
+          <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 20, background: '#161b22',
+            border: '1px solid #21262d', borderRadius: 8, padding: 10 }}>
+            <QualitySelector onChange={onQualityChange} />
+          </div>
+        )}
+      </div>
       <button style={btn} onClick={onToggleStats} title="Connection stats">📊 Stats</button>
 
       <div style={{ flex: 1 }} />
