@@ -1,32 +1,18 @@
-import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { QualitySelector } from './QualitySelector';
-import type { Quality } from './QualitySelector';
-
-const BITRATES: Record<Quality, number | null> = {
-  auto: null,
-  high: 2000,
-  medium: 800,
-  low: 300,
-};
+import type { QualitySettings } from '../quality';
 
 interface Props {
   peerId: string;
   onFullscreen: () => void;
   onClipboardSync: () => void;
   onFiles: () => void;
-  onQualityChange: (kbps: number | null) => void;
+  onQualityChange: (q: QualitySettings) => void;
+  onToggleStats: () => void;
   onDisconnect: () => void;
 }
 
-export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onDisconnect }: Props) {
-  const [quality, setQuality] = useState<Quality>('auto');
-
-  const handleQuality = (q: Quality) => {
-    setQuality(q);
-    onQualityChange(BITRATES[q]);
-  };
-
+export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, onDisconnect }: Props) {
   const btn: CSSProperties = {
     background: 'none',
     border: 'none',
@@ -45,7 +31,8 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
       <button style={btn} onClick={onFullscreen} title="Fullscreen">⛶ Fullscreen</button>
       <button style={btn} onClick={onClipboardSync} title="Sync local clipboard to remote">📋 Clipboard</button>
       <button style={btn} onClick={onFiles} title="File transfer">📁 Files</button>
-      <QualitySelector value={quality} onChange={handleQuality} />
+      <QualitySelector onChange={onQualityChange} />
+      <button style={btn} onClick={onToggleStats} title="Connection stats">📊 Stats</button>
 
       <div style={{ flex: 1 }} />
 

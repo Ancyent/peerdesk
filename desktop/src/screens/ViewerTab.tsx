@@ -4,6 +4,9 @@ import { useSignaling } from '../hooks/useSignaling';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { ViewerToolbar } from '../components/ViewerToolbar';
 import { FileTransferModal } from '../components/FileTransferModal';
+import { StatsOverlay } from '../components/StatsOverlay';
+import { useStats } from '../hooks/useStats';
+import { PRESETS, type QualitySettings } from '../quality';
 import type { Session, SessionState } from '../types';
 import type { SignalingMessage } from '../types/messages';
 
@@ -45,6 +48,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   const [viewState, setViewState] = useState<'connecting' | 'pending_approval' | 'negotiating' | 'connected' | 'error'>('connecting');
   const [errMsg, setErrMsg] = useState('');
   const [showFiles, setShowFiles] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
   const videoRef = useRef<HTMLVideoElement>(null);
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
   const iceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,10 +59,13 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     useCallback((text: string) => { navigator.clipboard.writeText(text).catch(() => {}); }, []),
   );
 
+  const liveStats = useStats(webrtc.getPc, showStats);
+
   const { send } = useSignaling(signalingUrl, useCallback(async (msg: SignalingMessage) => {
     if (msg.type === 'joined') {
       setViewState('negotiating');
       await webrtc.startOffer();
+      webrtc.setQuality(PRESETS.balanced);
     } else if (msg.type === 'challenge') {
       const nonce = msg.nonce;
       computeHmacKey(password).then(hmacKey =>
@@ -214,13 +222,14 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#000' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#000', position: 'relative' }}>
       <ViewerToolbar
         peerId={fmt(session.id)}
         onFullscreen={handleFullscreen}
         onClipboardSync={handleClipboardSync}
         onFiles={() => setShowFiles(true)}
-        onQualityChange={kbps => webrtc.setMaxBitrate(kbps)}
+        onQualityChange={(q: QualitySettings) => { webrtc.setQuality(q); setTargetKbps(q.bitrate_kbps); }}
+        onToggleStats={() => setShowStats((s) => !s)}
         onDisconnect={handleDisconnect}
       />
       <video
@@ -246,6 +255,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         onKeyUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key }); }}
         onWheel={e => { e.preventDefault(); webrtc.sendInput({ type: 'scroll', delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); }}
       />
+      {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
       {showFiles && <FileTransferModal ftChannel={webrtc.getFtChannel()} onClose={() => setShowFiles(false)} />}
     </div>
   );
