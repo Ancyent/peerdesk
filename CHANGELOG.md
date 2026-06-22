@@ -2,6 +2,22 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.17] — 2026-06-22
+
+### Added
+- **Remote cursor.** The viewer now shows where the host's cursor is — a small
+  arrow drawn over the video, tracking the real host pointer (including the
+  host's own movements). The screen capture doesn't include the hardware cursor,
+  so the agent sends the cursor position over a new data channel.
+
+### Fixed
+- **Clicks land correctly on downscaled streams.** Mouse coordinates are now
+  normalized (0..1) and mapped to the host's native resolution, so picking a
+  lower-resolution quality preset no longer mis-places clicks.
+- **Quality & Stats moved into the toolbar.** The quality preset (now a "⚙
+  Quality" dropdown) and the Stats toggle live in the top toolbar instead of
+  floating over the screen.
+
 ## [0.4.16] — 2026-06-22
 
 ### Added
