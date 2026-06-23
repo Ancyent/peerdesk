@@ -42,6 +42,8 @@ pub struct AgentConfig {
     /// accept/reject decision instead of being auto-approved. None (CLI agent)
     /// keeps the legacy auto-approve behavior.
     pub approval_tx: Option<tokio::sync::mpsc::Sender<ApprovalRequest>>,
+    /// When false the agent does not send host cursor positions to the viewer.
+    pub show_remote_cursor: bool,
 }
 
 impl Default for AgentConfig {
@@ -57,6 +59,7 @@ impl Default for AgentConfig {
             portable: false,
             cast_only: false,
             approval_tx: None,
+            show_remote_cursor: true,
         }
     }
 }
@@ -244,9 +247,12 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         }
     });
 
-    // Cursor position reader thread (feeds the `cursor` data channel).
-    let cursor_tx_reader = cursor_tx.clone();
-    std::thread::spawn(move || crate::cursor::run(cursor_tx_reader));
+    // Cursor position reader thread (feeds the `cursor` data channel). Skipped
+    // when the host disabled the remote cursor.
+    if agent_cfg.show_remote_cursor {
+        let cursor_tx_reader = cursor_tx.clone();
+        std::thread::spawn(move || crate::cursor::run(cursor_tx_reader));
+    }
 
     // enigo (input injection) is !Send on macOS, so run on a dedicated OS thread.
     if agent_cfg.cast_only {
@@ -414,4 +420,13 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod agent_cfg_tests {
+    use super::AgentConfig;
+    #[test]
+    fn default_shows_remote_cursor() {
+        assert!(AgentConfig::default().show_remote_cursor);
+    }
 }
