@@ -46,6 +46,7 @@ export default function App() {
   const [latencyMs] = useState<number | null>(null);
   const [fps, setFps] = useState<number | null>(null);
   const [showStats, setShowStats] = useState(false);
+  const [showCursor, setShowCursor] = useState(true);
   const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
 
   const SIGNALING_URL = getConfig().signalingUrl;
@@ -157,6 +158,8 @@ export default function App() {
           onQualityChange={(q: QualitySettings) => { webrtc.setQuality(q); setTargetKbps(q.bitrate_kbps); }}
           showStats={showStats}
           onToggleStats={() => setShowStats((s) => !s)}
+          showCursor={showCursor}
+          onToggleCursor={() => setShowCursor((s) => !s)}
         />
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
@@ -164,7 +167,7 @@ export default function App() {
             ref={viewerRef}
             stream={webrtc.stream}
             isViewOnly={isViewOnly}
-            cursor={webrtc.cursor}
+            cursor={showCursor ? webrtc.cursor : null}
             onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
             onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
             onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}

@@ -14,6 +14,8 @@ interface Props {
   onQualityChange: (q: import('../quality').QualitySettings) => void;
   showStats: boolean;
   onToggleStats: () => void;
+  showCursor: boolean;
+  onToggleCursor: () => void;
 }
 
 function latencyColor(ms: number | null): string {
@@ -23,7 +25,7 @@ function latencyColor(ms: number | null): string {
   return 'var(--red)';
 }
 
-export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, onDisconnect, onCtrlAltDel, onToggleViewOnly, onFileTransfer, onQualityChange, showStats, onToggleStats }: Props) {
+export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, onDisconnect, onCtrlAltDel, onToggleViewOnly, onFileTransfer, onQualityChange, showStats, onToggleStats, showCursor, onToggleCursor }: Props) {
   const [qOpen, setQOpen] = React.useState(false);
   const btn = (active?: boolean, danger?: boolean): React.CSSProperties => ({
     padding: '5px 11px',
@@ -95,6 +97,7 @@ export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, o
         </div>
       </div>
       <button style={btn(showStats)} onClick={onToggleStats} title="Connection stats">📊 Stats</button>
+      <button style={btn(showCursor)} onClick={onToggleCursor} title="Show remote cursor">🖱 Cursor</button>
       <div style={{ flex: 1 }} />
       <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'monospace', marginRight: 8 }}>
         {peerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1·$2·$3')}

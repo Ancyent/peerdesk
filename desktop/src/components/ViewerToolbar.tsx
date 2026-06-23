@@ -10,10 +10,12 @@ interface Props {
   onFiles: () => void;
   onQualityChange: (q: QualitySettings) => void;
   onToggleStats: () => void;
+  showCursor: boolean;
+  onToggleCursor: () => void;
   onDisconnect: () => void;
 }
 
-export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, onDisconnect }: Props) {
+export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, showCursor, onToggleCursor, onDisconnect }: Props) {
   const [qOpen, setQOpen] = useState(false);
   const btn: CSSProperties = {
     background: 'none',
@@ -42,6 +44,7 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
         </div>
       </div>
       <button style={btn} onClick={onToggleStats} title="Connection stats">📊 Stats</button>
+      <button style={btn} onClick={onToggleCursor} title="Show remote cursor">🖱 Cursor</button>
 
       <div style={{ flex: 1 }} />
 

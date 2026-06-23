@@ -51,6 +51,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   const [errMsg, setErrMsg] = useState('');
   const [showFiles, setShowFiles] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showCursor, setShowCursor] = useState(true);
   const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
   const [displays, setDisplays] = useState<Array<{ index: number; width: number; height: number; is_primary: boolean }>>([]);
   const [currentDisplay, setCurrentDisplay] = useState(0);
@@ -241,6 +242,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         onFiles={() => setShowFiles(true)}
         onQualityChange={(q: QualitySettings) => { webrtc.setQuality(q); setTargetKbps(q.bitrate_kbps); }}
         onToggleStats={() => setShowStats((s) => !s)}
+        showCursor={showCursor}
+        onToggleCursor={() => setShowCursor((s) => !s)}
         onDisconnect={handleDisconnect}
       />
       <div style={{ flex: 1, position: 'relative', display: 'flex', minHeight: 0 }}>
@@ -270,7 +273,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
           onKeyUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key }); }}
           onWheel={e => { e.preventDefault(); webrtc.sendInput({ type: 'scroll', delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); }}
         />
-        {webrtc.cursor && videoRef.current && (() => {
+        {showCursor && webrtc.cursor && videoRef.current && (() => {
           const r = videoRef.current.getBoundingClientRect();
           const cr = videoRef.current.parentElement?.getBoundingClientRect();
           const p = normToPx(webrtc.cursor.x, webrtc.cursor.y, { width: r.width, height: r.height },
