@@ -2,6 +2,21 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.21] — 2026-06-23
+
+### Fixed
+- **Multi-monitor detection on Windows.** Replaced the `scrap` capture engine
+  with `xcap` (Windows Graphics Capture). Hosts with multiple GPUs (e.g. Intel
+  iGPU + discrete GPU) now report and capture **all** monitors instead of only
+  the primary, so the viewer's monitor picker appears and switching works.
+- Input now targets the captured monitor via the same `xcap` index used for
+  capture, removing the capture/input index-mismatch risk.
+
+### Changed
+- Monitor picker redesigned as an icon strip: numbered monitor glyphs, the
+  primary highlighted amber with a **D** (Default) badge, the selected one
+  highlighted light green. Applies to both the web and desktop viewers.
+
 ## [0.4.20] — 2026-06-23
 
 ### Fixed
