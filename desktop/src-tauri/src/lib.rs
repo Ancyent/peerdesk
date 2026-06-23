@@ -326,6 +326,7 @@ async fn start_agent(
         portable: false,
         cast_only,
         approval_tx: Some(approval_tx),
+        show_remote_cursor: settings.show_remote_cursor,
     };
 
     let state_arc = Arc::clone(state.inner());
