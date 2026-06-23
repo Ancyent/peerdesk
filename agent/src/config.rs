@@ -227,7 +227,7 @@ pub struct AppSettings {
     pub codec: String,
     #[serde(default = "default_view")]
     pub view_mode: String,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub show_remote_cursor: bool,
     #[serde(default = "default_true")]
     pub hardware_acceleration: bool,
@@ -267,7 +267,7 @@ impl Default for AppSettings {
             image_quality: default_quality(),
             codec: default_codec(),
             view_mode: default_view(),
-            show_remote_cursor: false,
+            show_remote_cursor: true,
             hardware_acceleration: true,
             start_on_boot: false,
             minimize_to_tray: true,
