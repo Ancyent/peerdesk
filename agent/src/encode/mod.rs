@@ -1,7 +1,7 @@
 use anyhow::Result;
 use openh264::{
     encoder::{Encoder, EncoderConfig},
-    formats::{BgraSliceU8, YUVBuffer},
+    formats::{RgbaSliceU8, YUVBuffer},
     OpenH264API,
 };
 
@@ -30,15 +30,15 @@ impl H264Encoder {
         Ok(Self { encoder, width, height, frame_count: 0 })
     }
 
-    pub fn encode_bgra(&mut self, bgra: &[u8]) -> Result<Vec<u8>> {
+    pub fn encode_rgba(&mut self, rgba: &[u8]) -> Result<Vec<u8>> {
         let expected = (self.width as usize)
             .checked_mul(self.height as usize)
             .and_then(|n| n.checked_mul(4))
             .ok_or_else(|| anyhow::anyhow!("frame dimensions overflow"))?;
         anyhow::ensure!(
-            bgra.len() == expected,
-            "bgra buffer length {} != expected {}",
-            bgra.len(),
+            rgba.len() == expected,
+            "rgba buffer length {} != expected {}",
+            rgba.len(),
             expected
         );
         // Force IDR keyframe every 60 frames so browsers can start decoding quickly
@@ -46,7 +46,7 @@ impl H264Encoder {
             self.encoder.force_intra_frame();
         }
         self.frame_count += 1;
-        let src = BgraSliceU8::new(bgra, (self.width as usize, self.height as usize));
+        let src = RgbaSliceU8::new(rgba, (self.width as usize, self.height as usize));
         let yuv = YUVBuffer::from_rgb_source(src);
         let bitstream = self.encoder.encode(&yuv)?;
         Ok(bitstream.to_vec())
@@ -61,9 +61,9 @@ mod tests {
     fn encodes_frame_to_h264_bytes() {
         let width = 320u32;
         let height = 240u32;
-        let bgra = vec![0u8; (width * height * 4) as usize];
+        let rgba = vec![0u8; (width * height * 4) as usize];
         let mut encoder = H264Encoder::new(width, height, 30, 800_000).expect("encoder init");
-        let nals = encoder.encode_bgra(&bgra).expect("encode");
+        let nals = encoder.encode_rgba(&rgba).expect("encode");
         assert!(!nals.is_empty(), "expected H.264 NAL units");
     }
 
@@ -77,7 +77,7 @@ mod tests {
     fn rejects_wrong_buffer_size() {
         let mut encoder = H264Encoder::new(320, 240, 30, 800_000).unwrap();
         let wrong_buf = vec![0u8; 100]; // way too small
-        let err = encoder.encode_bgra(&wrong_buf);
+        let err = encoder.encode_rgba(&wrong_buf);
         assert!(err.is_err(), "expected error for wrong buffer size");
     }
 }

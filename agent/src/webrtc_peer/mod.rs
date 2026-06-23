@@ -307,7 +307,7 @@ async fn send_video_frames(
             }
         }
         let enc = encoder.as_mut().unwrap();
-        match enc.encode_bgra(&frame.data) {
+        match enc.encode_rgba(&frame.data) {
             Ok(h264) => {
                 if !h264.is_empty() {
                     let _ = track
@@ -321,7 +321,7 @@ async fn send_video_frames(
             }
             Err(e) => {
                 // Drop the encoder so it re-inits on the next frame.
-                tracing::warn!("encode_bgra failed, resetting encoder: {}", e);
+                tracing::warn!("encode_rgba failed, resetting encoder: {}", e);
                 encoder = None;
             }
         }
