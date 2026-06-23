@@ -21,7 +21,8 @@ jobs:
           sudo apt-get install -y \
             libxdo-dev libasound2-dev libx11-dev libssl-dev libxtst-dev \
             libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev \
-            libpipewire-0.3-dev libgbm-dev libegl1-mesa-dev
+            libpipewire-0.3-dev libgbm-dev libegl1-mesa-dev \
+            libwayland-dev libxkbcommon-dev
       - name: Build agent
         run: cargo build -p peerdesk-agent --release
       - name: Rename binary
@@ -66,7 +67,8 @@ jobs:
             librsvg2-dev patchelf \
             libxdo-dev libasound2-dev libx11-dev libssl-dev libxtst-dev \
             libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev \
-            libpipewire-0.3-dev libgbm-dev libegl1-mesa-dev
+            libpipewire-0.3-dev libgbm-dev libegl1-mesa-dev \
+            libwayland-dev libxkbcommon-dev
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
       - name: Set app version from tag
