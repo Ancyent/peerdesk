@@ -25,16 +25,32 @@ pub struct DisplayInfo {
 /// to the same physical monitor everywhere. Never panics.
 pub fn list_displays() -> Vec<DisplayInfo> {
     match Monitor::all() {
-        Ok(monitors) => monitors
-            .into_iter()
-            .enumerate()
-            .map(|(i, m)| DisplayInfo {
-                index: i,
-                width: m.width().unwrap_or(0),
-                height: m.height().unwrap_or(0),
-                is_primary: m.is_primary().unwrap_or(i == 0),
-            })
-            .collect(),
+        Ok(monitors) => {
+            tracing::info!("xcap enumerated {} monitor(s)", monitors.len());
+            monitors
+                .into_iter()
+                .enumerate()
+                .map(|(i, m)| {
+                    let info = DisplayInfo {
+                        index: i,
+                        width: m.width().unwrap_or(0),
+                        height: m.height().unwrap_or(0),
+                        is_primary: m.is_primary().unwrap_or(i == 0),
+                    };
+                    tracing::info!(
+                        "  monitor[{}] {}x{} pos=({},{}) primary={} name={:?}",
+                        i,
+                        info.width,
+                        info.height,
+                        m.x().unwrap_or(0),
+                        m.y().unwrap_or(0),
+                        info.is_primary,
+                        m.name().unwrap_or_default(),
+                    );
+                    info
+                })
+                .collect()
+        }
         Err(e) => {
             tracing::warn!("Could not enumerate monitors: {}", e);
             vec![]

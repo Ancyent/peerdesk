@@ -2,6 +2,20 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.22] — 2026-06-23
+
+### Fixed
+- **Remote cursor overlay tracks the viewed monitor.** The host-cursor overlay
+  was normalized against the primary monitor's size, so on multi-monitor hosts
+  (or while viewing a secondary display) it stuck to an edge. It now normalizes
+  against the captured monitor's bounds, like mouse input does.
+
+### Added
+- The agent logs the monitors `xcap` enumerates at startup/connect (count + each
+  monitor's size, position, primary flag, name) — a diagnostic for multi-monitor
+  detection issues. Visible on the standalone agent's console, or in
+  `%LOCALAPPDATA%\peerdesk\agent.log` for the desktop app.
+
 ## [0.4.21] — 2026-06-23
 
 ### Fixed

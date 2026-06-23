@@ -249,16 +249,21 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         }
     });
 
+    // Captured-display bounds watch (origin+size of the monitor being viewed),
+    // updated on display switch. Shared by the input injector and the cursor
+    // reader so both map to the same monitor.
+    let (bounds_tx, bounds_rx) =
+        tokio::sync::watch::channel(crate::display::resolve(agent_cfg.display_index));
+
     // Cursor position reader thread (feeds the `cursor` data channel). Skipped
     // when the host disabled the remote cursor.
     if agent_cfg.show_remote_cursor {
         let cursor_tx_reader = cursor_tx.clone();
-        std::thread::spawn(move || crate::cursor::run(cursor_tx_reader));
+        let cursor_bounds_rx = bounds_rx.clone();
+        std::thread::spawn(move || crate::cursor::run(cursor_tx_reader, cursor_bounds_rx));
     }
 
     // enigo (input injection) is !Send on macOS, so run on a dedicated OS thread.
-    let (bounds_tx, bounds_rx) =
-        tokio::sync::watch::channel(crate::display::resolve(agent_cfg.display_index));
     if agent_cfg.cast_only {
         drop(input_rx);
         drop(bounds_rx);
