@@ -43,7 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   image_quality: 'balanced',
   codec: 'auto',
   view_mode: 'fit',
-  show_remote_cursor: false,
+  show_remote_cursor: true,
   hardware_acceleration: true,
   start_on_boot: false,
   minimize_to_tray: true,

@@ -32,7 +32,7 @@ export function DisplaySettings({ settings, updateSetting }: Props) {
         options={[{ value: 'fit', label: 'Scale to fit' }, { value: 'original', label: 'Original size' }, { value: 'stretch', label: 'Stretch' }]} />
       <div style={{ borderTop: '1px solid #21262d', paddingTop: 16 }}>
         {([
-          { key: 'show_remote_cursor' as const, label: 'Show remote cursor' },
+          { key: 'show_remote_cursor' as const, label: 'Show my cursor to the viewer' },
           { key: 'hardware_acceleration' as const, label: 'Hardware acceleration' },
         ]).map((item, i) => (
           <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i === 0 ? '1px solid #1c2128' : 'none' }}>
