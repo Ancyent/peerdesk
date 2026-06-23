@@ -57,7 +57,8 @@ fn pick_monitor(monitors: &[Monitor], index: usize) -> Result<Monitor> {
 
 pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
     let monitors = Monitor::all()?;
-    let monitor = pick_monitor(&monitors, usize::MAX)?; // MAX -> falls back to primary
+    // `monitors.len()` is always out of range -> pick_monitor falls back to primary.
+    let monitor = pick_monitor(&monitors, monitors.len())?;
     let img = monitor.capture_image()?;
     let (w, h) = (img.width(), img.height());
     Ok((w, h, img.into_raw()))
@@ -75,7 +76,19 @@ pub async fn run(
     let mut display_index = initial_display_index;
 
     loop {
-        let monitors = Monitor::all()?;
+        let monitors = match Monitor::all() {
+            Ok(m) if !m.is_empty() => m,
+            Ok(_) => {
+                tracing::warn!("no monitors enumerated; retrying shortly");
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                continue;
+            }
+            Err(e) => {
+                tracing::warn!("Monitor::all failed ({}); retrying shortly", e);
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                continue;
+            }
+        };
         let monitor = pick_monitor(&monitors, display_index)?;
 
         // Prefer the streaming recorder (WGC/ScreenCaptureKit/X11). Fall back to
@@ -83,7 +96,10 @@ pub async fn run(
         let (recorder, frame_rx) = match monitor.video_recorder() {
             Ok(pair) => pair,
             Err(e) => {
-                tracing::warn!("video_recorder init failed ({}); using screenshot fallback", e);
+                tracing::warn!(
+                    "video_recorder init failed ({}); using screenshot fallback",
+                    e
+                );
                 match screenshot_capture(&monitor, &tx, &mut switch_rx, &quality_rx).await {
                     Some(new_index) => {
                         display_index = new_index;
@@ -93,7 +109,16 @@ pub async fn run(
                 }
             }
         };
-        recorder.start()?;
+        if let Err(e) = recorder.start() {
+            tracing::warn!("recorder.start failed ({}); using screenshot fallback", e);
+            match screenshot_capture(&monitor, &tx, &mut switch_rx, &quality_rx).await {
+                Some(new_index) => {
+                    display_index = new_index;
+                    continue;
+                }
+                None => return Ok(()),
+            }
+        }
 
         let mut next_index: Option<usize> = None;
         'capture: loop {
@@ -131,7 +156,11 @@ pub async fn run(
                     } else {
                         (w, h, frame.raw)
                     };
-                    let _ = tx.send(std::sync::Arc::new(FrameData { width: out_w, height: out_h, data }));
+                    let _ = tx.send(std::sync::Arc::new(FrameData {
+                        width: out_w,
+                        height: out_h,
+                        data,
+                    }));
                     let frame_ms = (1000 / q.fps.max(1)) as u64;
                     tokio::time::sleep(Duration::from_millis(frame_ms)).await;
                 }
@@ -173,7 +202,11 @@ async fn screenshot_capture(
                 } else {
                     (w, h, raw)
                 };
-                let _ = tx.send(std::sync::Arc::new(FrameData { width: out_w, height: out_h, data }));
+                let _ = tx.send(std::sync::Arc::new(FrameData {
+                    width: out_w,
+                    height: out_h,
+                    data,
+                }));
                 let frame_ms = (1000 / q.fps.max(1)) as u64;
                 tokio::time::sleep(Duration::from_millis(frame_ms)).await;
             }
