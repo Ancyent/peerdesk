@@ -31,7 +31,7 @@ pub struct PeerConnection {
 
 impl PeerConnection {
     pub async fn new(
-        frame_rx: Receiver<FrameData>,
+        frame_rx: tokio::sync::broadcast::Receiver<std::sync::Arc<FrameData>>,
         input_tx: Sender<InputEvent>,
         ice_servers: Vec<RTCIceServer>,
         quality_tx: tokio::sync::watch::Sender<crate::quality::QualitySettings>,
@@ -237,6 +237,14 @@ impl PeerConnection {
         self.pc.add_ice_candidate(init).await?;
         Ok(())
     }
+
+    /// Close the peer connection. Called when a new viewer session starts so the
+    /// previous DTLS/ICE state is torn down rather than reused (a reused PC can't
+    /// renegotiate DTLS with a reconnecting browser → no video).
+    pub async fn close(&self) -> Result<()> {
+        self.pc.close().await?;
+        Ok(())
+    }
 }
 
 pub fn derive_security_code(local_fp: &str, remote_fp: &str) -> String {
@@ -255,13 +263,18 @@ fn extract_fingerprint(sdp: &str) -> Option<String> {
 }
 
 async fn send_video_frames(
-    mut frame_rx: Receiver<FrameData>,
+    mut frame_rx: tokio::sync::broadcast::Receiver<std::sync::Arc<FrameData>>,
     track: Arc<TrackLocalStaticSample>,
     quality_rx: tokio::sync::watch::Receiver<crate::quality::QualitySettings>,
 ) {
     let mut encoder: Option<H264Encoder> = None;
     let mut enc_key: (u32, u32, u32, u32) = (0, 0, 0, 0); // w,h,fps,bitrate_bps
-    while let Some(frame) = frame_rx.recv().await {
+    loop {
+        let frame = match frame_rx.recv().await {
+            Ok(f) => f,
+            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+        };
         let q = *quality_rx.borrow();
         let key = (frame.width, frame.height, q.fps, q.bitrate_bps());
         if enc_key != key {
@@ -307,7 +320,8 @@ mod tests {
 
     #[tokio::test]
     async fn creates_peer_connection() {
-        let (_frame_tx, frame_rx) = tokio::sync::mpsc::channel(1);
+        let (_frame_tx, frame_rx) =
+            tokio::sync::broadcast::channel::<std::sync::Arc<crate::capture::FrameData>>(1);
         let (input_tx, _input_rx) = tokio::sync::mpsc::channel(10);
         let (qtx, _qrx) = tokio::sync::watch::channel(crate::quality::QualitySettings::default());
         let (ctx, _crx) = tokio::sync::watch::channel((0.5_f32, 0.5_f32));

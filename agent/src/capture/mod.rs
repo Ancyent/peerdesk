@@ -4,7 +4,6 @@ use anyhow::Result;
 use scrap::{Capturer, Display};
 use std::io::ErrorKind;
 use std::time::Duration;
-use tokio::sync::mpsc::Sender;
 
 pub struct FrameData {
     pub width: u32,
@@ -56,7 +55,7 @@ pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
 }
 
 pub async fn run(
-    tx: Sender<FrameData>,
+    tx: tokio::sync::broadcast::Sender<std::sync::Arc<FrameData>>,
     initial_display_index: usize,
     mut switch_rx: tokio::sync::mpsc::Receiver<usize>,
     quality_rx: tokio::sync::watch::Receiver<crate::quality::QualitySettings>,
@@ -96,11 +95,10 @@ pub async fn run(
                         (w, h, frame.to_vec())
                     };
                     let fd = FrameData { width: out_w, height: out_h, data };
-                    match tx.try_send(fd) {
-                        Ok(_) => {}
-                        Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {}
-                        Err(_) => return Ok(()),
-                    }
+                    // Broadcast to whatever peer connection is currently
+                    // subscribed; Err just means no viewer is connected — keep
+                    // capturing so the next session starts instantly.
+                    let _ = tx.send(std::sync::Arc::new(fd));
                     // Pace to the target fps so we don't send more frames than asked.
                     let frame_ms = (1000 / q.fps.max(1)) as u64;
                     tokio::time::sleep(Duration::from_millis(frame_ms)).await;

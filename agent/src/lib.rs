@@ -207,13 +207,14 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     let (quality_tx, quality_rx) =
         tokio::sync::watch::channel(crate::quality::QualitySettings::default());
     let (cursor_tx, _cursor_rx) = tokio::sync::watch::channel((0.5_f32, 0.5_f32));
-    let (frame_tx, frame_rx) = tokio::sync::mpsc::channel(2);
+    // Frames go on a broadcast channel so each new viewer session can subscribe
+    // a fresh receiver to its own PeerConnection. Capacity is small (latest
+    // frames matter); a lagging encoder just skips.
+    let (frame_tx, _) = tokio::sync::broadcast::channel::<std::sync::Arc<capture::FrameData>>(4);
     let (input_tx, input_rx) = tokio::sync::mpsc::channel(100);
-
-    let mut peer = webrtc_peer::PeerConnection::new(
-        frame_rx, input_tx, ice_servers, quality_tx, cursor_tx.clone(),
-    )
-    .await?;
+    // The peer connection is (re)created per viewer session in the message loop
+    // below (on each Offer), so a reconnecting browser gets a fresh DTLS/ICE
+    // state instead of a stale one it can't renegotiate.
 
     // Channel: signaling server → main (Offer, IceCandidate, ViewerJoined, Error)
     let (from_sig_tx, mut from_sig_rx) =
@@ -227,13 +228,14 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     let capture_display_index = agent_cfg.display_index;
     let (display_switch_tx, display_switch_rx) = tokio::sync::mpsc::channel::<usize>(4);
     let capture_quality_rx = quality_rx.clone();
+    let capture_frame_tx = frame_tx.clone();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("capture runtime");
         if let Err(e) = rt.block_on(capture::run(
-            frame_tx,
+            capture_frame_tx,
             capture_display_index,
             display_switch_rx,
             capture_quality_rx,
@@ -280,21 +282,10 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     });
     task_handles.push(sig_handle.abort_handle());
 
-    // Forward outbound WebRTC messages (Answer + ICE) → signaling server
-    // Use take() to extract without consuming `peer`, so it remains usable below.
-    let mut webrtc_out_rx = peer
-        .from_signaling_rx
-        .take()
-        .expect("from_signaling_rx must be Some");
-    let to_sig_fwd = to_sig_tx.clone();
-    let fwd_handle = tokio::spawn(async move {
-        while let Some(msg) = webrtc_out_rx.recv().await {
-            if to_sig_fwd.send(msg).await.is_err() {
-                break;
-            }
-        }
-    });
-    task_handles.push(fwd_handle.abort_handle());
+    // The current viewer session's peer connection + the task forwarding its
+    // outbound Answer/ICE to signaling. Both are replaced on each new Offer.
+    let mut peer: Option<webrtc_peer::PeerConnection> = None;
+    let mut fwd_abort: Option<tokio::task::AbortHandle> = None;
 
     // When run_agent's future is dropped (host aborts the agent on restart),
     // abort these background tasks so no orphan signaling/peer connection lingers.
@@ -361,14 +352,50 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 let _ = to_sig_tx.send(msg).await;
             }
             Some(signaling::SignalingMessage::Offer { sdp }) => {
-                info!("Got offer — creating answer");
-                if let Err(e) = peer.handle_offer(sdp).await {
-                    tracing::error!("handle_offer failed: {}", e);
+                info!("Got offer — creating a fresh peer connection for this session");
+                // Tear down any previous session so a reconnecting viewer doesn't
+                // land on a stale PeerConnection (whose DTLS can't renegotiate).
+                if let Some(old) = peer.take() {
+                    let _ = old.close().await;
+                }
+                if let Some(h) = fwd_abort.take() {
+                    h.abort();
+                }
+                match webrtc_peer::PeerConnection::new(
+                    frame_tx.subscribe(),
+                    input_tx.clone(),
+                    ice_servers.clone(),
+                    quality_tx.clone(),
+                    cursor_tx.clone(),
+                )
+                .await
+                {
+                    Ok(mut p) => {
+                        // Forward this session's Answer + ICE to the signaling server.
+                        if let Some(mut out_rx) = p.from_signaling_rx.take() {
+                            let to_sig_fwd = to_sig_tx.clone();
+                            let h = tokio::spawn(async move {
+                                while let Some(msg) = out_rx.recv().await {
+                                    if to_sig_fwd.send(msg).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            });
+                            fwd_abort = Some(h.abort_handle());
+                        }
+                        if let Err(e) = p.handle_offer(sdp).await {
+                            tracing::error!("handle_offer failed: {}", e);
+                        }
+                        peer = Some(p);
+                    }
+                    Err(e) => tracing::error!("PeerConnection::new failed: {}", e),
                 }
             }
             Some(signaling::SignalingMessage::IceCandidate { candidate }) => {
-                if let Err(e) = peer.add_ice_candidate(candidate).await {
-                    tracing::warn!("add_ice_candidate failed: {}", e);
+                if let Some(p) = &peer {
+                    if let Err(e) = p.add_ice_candidate(candidate).await {
+                        tracing::warn!("add_ice_candidate failed: {}", e);
+                    }
                 }
             }
             Some(signaling::SignalingMessage::Error { code }) => {
