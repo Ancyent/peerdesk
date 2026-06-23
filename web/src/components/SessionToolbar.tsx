@@ -59,6 +59,7 @@ export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, o
   return (
     <div style={{
       height: 42,
+      position: 'relative', zIndex: 10,
       background: 'rgba(10,15,24,0.98)',
       backdropFilter: 'blur(12px)',
       borderBottom: '1px solid rgba(0,200,150,0.25)',
