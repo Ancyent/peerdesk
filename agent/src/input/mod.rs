@@ -1,3 +1,5 @@
+pub mod mouse;
+
 use anyhow::Result;
 use enigo::{
     Coordinate,
