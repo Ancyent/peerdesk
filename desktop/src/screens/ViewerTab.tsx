@@ -5,6 +5,7 @@ import { useWebRTC } from '../hooks/useWebRTC';
 import { ViewerToolbar } from '../components/ViewerToolbar';
 import { FileTransferModal } from '../components/FileTransferModal';
 import { StatsOverlay } from '../components/StatsOverlay';
+import { DisplaySelector } from '../components/DisplaySelector';
 import { normToPx } from '../lib/viewerGeom';
 import { useStats } from '../hooks/useStats';
 import { PRESETS, type QualitySettings } from '../quality';
@@ -51,6 +52,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   const [showFiles, setShowFiles] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
+  const [displays, setDisplays] = useState<Array<{ index: number; width: number; height: number; is_primary: boolean }>>([]);
+  const [currentDisplay, setCurrentDisplay] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
   const iceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,6 +97,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
       setErrMsg(m);
       setViewState('error');
       onStateChange(session.id, 'error', m);
+    } else if (msg.type === 'display_list') {
+      setDisplays(msg.displays);
     } else if (msg.type === 'agent_disconnected') {
       if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
       webrtc.disconnect();
@@ -155,6 +160,11 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     } else {
       videoRef.current?.requestFullscreen().catch(() => {});
     }
+  };
+
+  const handleDisplaySwitch = (index: number) => {
+    setCurrentDisplay(index);
+    sendRef.current?.({ type: 'switch_display', index });
   };
 
   const handleClipboardSync = () => {
@@ -234,6 +244,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         onDisconnect={handleDisconnect}
       />
       <div style={{ flex: 1, position: 'relative', display: 'flex', minHeight: 0 }}>
+        <DisplaySelector displays={displays} current={currentDisplay} onChange={handleDisplaySwitch} />
         <video
           ref={videoRef}
           autoPlay
