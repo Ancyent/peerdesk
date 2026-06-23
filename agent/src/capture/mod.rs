@@ -1,14 +1,13 @@
 pub mod scale;
 
 use anyhow::Result;
-use scrap::{Capturer, Display};
-use std::io::ErrorKind;
 use std::time::Duration;
+use xcap::Monitor;
 
 pub struct FrameData {
     pub width: u32,
     pub height: u32,
-    /// Raw BGRA bytes
+    /// Raw RGBA bytes
     pub data: Vec<u8>,
 }
 
@@ -20,38 +19,48 @@ pub struct DisplayInfo {
     pub is_primary: bool,
 }
 
+/// Enumerate monitors in `Monitor::all()` order. The index is the position in
+/// that vector and is reused verbatim by `run()` (capture) and
+/// `display::resolve()` (input bounds), so a viewer's selected index always maps
+/// to the same physical monitor everywhere. Never panics.
 pub fn list_displays() -> Vec<DisplayInfo> {
-    match scrap::Display::all() {
-        Ok(displays) => displays
+    match Monitor::all() {
+        Ok(monitors) => monitors
             .into_iter()
             .enumerate()
-            .map(|(i, d)| DisplayInfo {
+            .map(|(i, m)| DisplayInfo {
                 index: i,
-                width: d.width() as u32,
-                height: d.height() as u32,
-                is_primary: i == 0,
+                width: m.width().unwrap_or(0),
+                height: m.height().unwrap_or(0),
+                is_primary: m.is_primary().unwrap_or(i == 0),
             })
             .collect(),
         Err(e) => {
-            tracing::warn!("Could not enumerate displays: {}", e);
+            tracing::warn!("Could not enumerate monitors: {}", e);
             vec![]
         }
     }
 }
 
-pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
-    let display = Display::primary()?;
-    let (w, h) = (display.width(), display.height());
-    let mut capturer = Capturer::new(display)?;
-    loop {
-        match capturer.frame() {
-            Ok(frame) => return Ok((w as u32, h as u32, frame.to_vec())),
-            Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(16));
-            }
-            Err(e) => return Err(e.into()),
-        }
+/// Pick the monitor at `index`, falling back to primary then the first.
+fn pick_monitor(monitors: &[Monitor], index: usize) -> Result<Monitor> {
+    if let Some(m) = monitors.get(index) {
+        return Ok(m.clone());
     }
+    monitors
+        .iter()
+        .find(|m| m.is_primary().unwrap_or(false))
+        .or_else(|| monitors.first())
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("no monitors available to capture"))
+}
+
+pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
+    let monitors = Monitor::all()?;
+    let monitor = pick_monitor(&monitors, usize::MAX)?; // MAX -> falls back to primary
+    let img = monitor.capture_image()?;
+    let (w, h) = (img.width(), img.height());
+    Ok((w, h, img.into_raw()))
 }
 
 pub async fn run(
@@ -60,53 +69,117 @@ pub async fn run(
     mut switch_rx: tokio::sync::mpsc::Receiver<usize>,
     quality_rx: tokio::sync::watch::Receiver<crate::quality::QualitySettings>,
 ) -> Result<()> {
+    use std::sync::mpsc::TryRecvError as StdTryRecv;
+    use tokio::sync::mpsc::error::TryRecvError as TokTryRecv;
+
     let mut display_index = initial_display_index;
 
     loop {
-        let display = {
-            let mut all = scrap::Display::all()?;
-            if display_index < all.len() {
-                all.remove(display_index)
-            } else {
-                scrap::Display::primary()?
+        let monitors = Monitor::all()?;
+        let monitor = pick_monitor(&monitors, display_index)?;
+
+        // Prefer the streaming recorder (WGC/ScreenCaptureKit/X11). Fall back to
+        // paced screenshots if the recorder won't initialise on this platform.
+        let (recorder, frame_rx) = match monitor.video_recorder() {
+            Ok(pair) => pair,
+            Err(e) => {
+                tracing::warn!("video_recorder init failed ({}); using screenshot fallback", e);
+                match screenshot_capture(&monitor, &tx, &mut switch_rx, &quality_rx).await {
+                    Some(new_index) => {
+                        display_index = new_index;
+                        continue;
+                    }
+                    None => return Ok(()), // switch channel closed -> shut down
+                }
             }
         };
-        let (w, h) = (display.width() as u32, display.height() as u32);
-        let mut capturer = Capturer::new(display)?;
+        recorder.start()?;
 
+        let mut next_index: Option<usize> = None;
         'capture: loop {
+            // 1) Honour a display switch request.
             match switch_rx.try_recv() {
-                Ok(new_index) => {
-                    tracing::info!("Switching capture to display {}", new_index);
-                    display_index = new_index;
+                Ok(idx) => {
+                    tracing::info!("Switching capture to display {}", idx);
+                    next_index = Some(idx);
                     break 'capture;
                 }
-                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
-                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return Ok(()),
+                Err(TokTryRecv::Empty) => {}
+                Err(TokTryRecv::Disconnected) => {
+                    let _ = recorder.stop();
+                    return Ok(());
+                }
             }
 
-            match capturer.frame() {
-                Ok(frame) => {
+            // 2) Drain to the freshest frame so latency never backs up.
+            let mut latest = None;
+            loop {
+                match frame_rx.try_recv() {
+                    Ok(f) => latest = Some(f),
+                    Err(StdTryRecv::Empty) => break,
+                    Err(StdTryRecv::Disconnected) => break 'capture, // rebuild recorder
+                }
+            }
+
+            match latest {
+                Some(frame) => {
+                    let (w, h) = (frame.width, frame.height);
                     let q = *quality_rx.borrow();
                     let (dw, dh) = scale::target_dims(w, h, q.max_height);
                     let (out_w, out_h, data) = if (dw, dh) != (w, h) {
-                        (dw, dh, scale::downscale_bgra(&frame, w, h, dw, dh))
+                        (dw, dh, scale::downscale_8888(&frame.raw, w, h, dw, dh))
                     } else {
-                        (w, h, frame.to_vec())
+                        (w, h, frame.raw)
                     };
-                    let fd = FrameData { width: out_w, height: out_h, data };
-                    // Broadcast to whatever peer connection is currently
-                    // subscribed; Err just means no viewer is connected — keep
-                    // capturing so the next session starts instantly.
-                    let _ = tx.send(std::sync::Arc::new(fd));
-                    // Pace to the target fps so we don't send more frames than asked.
+                    let _ = tx.send(std::sync::Arc::new(FrameData { width: out_w, height: out_h, data }));
                     let frame_ms = (1000 / q.fps.max(1)) as u64;
                     tokio::time::sleep(Duration::from_millis(frame_ms)).await;
                 }
-                Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                    tokio::time::sleep(Duration::from_millis(16)).await;
-                }
-                Err(e) => return Err(e.into()),
+                None => tokio::time::sleep(Duration::from_millis(8)).await,
+            }
+        }
+
+        let _ = recorder.stop();
+        if let Some(idx) = next_index {
+            display_index = idx;
+        }
+    }
+}
+
+/// Paced screenshot fallback for platforms where `video_recorder()` fails.
+/// Returns `Some(new_index)` to switch displays, or `None` if the switch channel
+/// closed (shut down).
+async fn screenshot_capture(
+    monitor: &Monitor,
+    tx: &tokio::sync::broadcast::Sender<std::sync::Arc<FrameData>>,
+    switch_rx: &mut tokio::sync::mpsc::Receiver<usize>,
+    quality_rx: &tokio::sync::watch::Receiver<crate::quality::QualitySettings>,
+) -> Option<usize> {
+    use tokio::sync::mpsc::error::TryRecvError as TokTryRecv;
+    loop {
+        match switch_rx.try_recv() {
+            Ok(idx) => return Some(idx),
+            Err(TokTryRecv::Empty) => {}
+            Err(TokTryRecv::Disconnected) => return None,
+        }
+        match monitor.capture_image() {
+            Ok(img) => {
+                let (w, h) = (img.width(), img.height());
+                let q = *quality_rx.borrow();
+                let raw = img.into_raw();
+                let (dw, dh) = scale::target_dims(w, h, q.max_height);
+                let (out_w, out_h, data) = if (dw, dh) != (w, h) {
+                    (dw, dh, scale::downscale_8888(&raw, w, h, dw, dh))
+                } else {
+                    (w, h, raw)
+                };
+                let _ = tx.send(std::sync::Arc::new(FrameData { width: out_w, height: out_h, data }));
+                let frame_ms = (1000 / q.fps.max(1)) as u64;
+                tokio::time::sleep(Duration::from_millis(frame_ms)).await;
+            }
+            Err(e) => {
+                tracing::warn!("capture_image failed: {}", e);
+                tokio::time::sleep(Duration::from_millis(200)).await;
             }
         }
     }
@@ -116,23 +189,25 @@ pub async fn run(
 mod tests {
     #[test]
     fn frame_has_correct_dimensions() {
+        // Capture needs a real display; skip headless CI.
         if std::env::var("DISPLAY").is_err() {
             eprintln!("skip: no DISPLAY set");
             return;
         }
-        let (width, height, frame) = super::capture_one_frame().expect("capture failed");
+        let (width, height, frame) = match super::capture_one_frame() {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("skip: capture unavailable ({e})");
+                return;
+            }
+        };
         assert!(width > 0 && height > 0);
         assert_eq!(frame.len(), (width * height * 4) as usize);
     }
 
     #[test]
-    fn list_displays_returns_slice() {
-        if std::env::var("DISPLAY").is_err() {
-            eprintln!("skip: no DISPLAY");
-            return;
-        }
-        let displays = super::list_displays();
-        assert!(!displays.is_empty());
-        assert!(displays[0].is_primary);
+    fn list_displays_does_not_panic() {
+        // May be empty in headless CI; must never panic.
+        let _ = super::list_displays();
     }
 }

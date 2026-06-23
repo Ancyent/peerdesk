@@ -1,4 +1,4 @@
-//! Fast box-average BGRA downscaler for the capture path. Only ever shrinks;
+//! Fast box-average 8888 (4-byte/pixel) downscaler for the capture path. Only ever shrinks;
 //! output dimensions are forced even (the H.264 encoder requires it).
 
 /// Even-rounded target dims preserving aspect ratio, capping height to
@@ -13,9 +13,10 @@ pub fn target_dims(w: u32, h: u32, max_height: u32) -> (u32, u32) {
     (nw & !1, nh & !1)
 }
 
-/// Box-average downscale of a BGRA buffer from (sw,sh) to (dw,dh).
+/// Box-average downscale of a 4-byte-per-pixel buffer from (sw,sh) to (dw,dh).
+/// Channel-order agnostic (each of the 4 bytes is averaged independently).
 /// Caller guarantees dw<=sw, dh<=sh, and src.len() == sw*sh*4.
-pub fn downscale_bgra(src: &[u8], sw: u32, sh: u32, dw: u32, dh: u32) -> Vec<u8> {
+pub fn downscale_8888(src: &[u8], sw: u32, sh: u32, dw: u32, dh: u32) -> Vec<u8> {
     let (sw, sh, dw, dh) = (sw as usize, sh as usize, dw as usize, dh as usize);
     let mut dst = vec![0u8; dw * dh * 4];
     for dy in 0..dh {
@@ -70,7 +71,7 @@ mod tests {
             0, 0, 0, 255, 100, 100, 100, 255, // row 0
             200, 200, 200, 255, 40, 40, 40, 255, // row 1
         ];
-        let out = downscale_bgra(&src, 2, 2, 1, 1);
+        let out = downscale_8888(&src, 2, 2, 1, 1);
         assert_eq!(out.len(), 4);
         assert_eq!(out[0], ((0 + 100 + 200 + 40) / 4) as u8); // 85
         assert_eq!(out[3], 255);

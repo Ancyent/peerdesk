@@ -227,7 +227,8 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // Channel: main → signaling server (Answer, outbound ICE from webrtc)
     let (to_sig_tx, to_sig_rx) = tokio::sync::mpsc::channel::<signaling::SignalingMessage>(32);
 
-    // capture::run uses scrap::Capturer which is !Send, so run it on a
+    // capture::run drives an xcap recorder/screenshot loop whose platform
+    // handles are not Send-safe across the shared runtime, so run it on a
     // dedicated OS thread with its own single-threaded tokio runtime.
     let capture_display_index = agent_cfg.display_index;
     let (display_switch_tx, display_switch_rx) = tokio::sync::mpsc::channel::<usize>(4);

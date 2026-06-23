@@ -1,6 +1,6 @@
 //! Resolves the on-screen bounds (virtual-desktop origin + size) of a captured
-//! display, so mouse input can target the right monitor. scrap gives size but
-//! not origin; `display-info` supplies both, matched by resolution + primary.
+//! display, so mouse input can target the right monitor. `xcap` supplies both
+//! origin and size, matched by resolution + primary.
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DisplayBounds {
@@ -16,7 +16,7 @@ impl Default for DisplayBounds {
     }
 }
 
-/// A monitor as reported by `display-info`: (x, y, width, height, is_primary).
+/// A monitor as reported by `xcap`: (x, y, width, height, is_primary).
 pub type Monitor = (i32, i32, u32, u32, bool);
 
 /// Find the monitor matching the captured display's (width, height, is_primary)
@@ -35,23 +35,31 @@ pub fn match_bounds(target_w: u32, target_h: u32, target_primary: bool, monitors
     DisplayBounds { ox: 0, oy: 0, w: target_w as i32, h: target_h as i32 }
 }
 
-/// Resolve bounds for the captured display at `index` (scrap order). Reads the
-/// live monitor list from `display-info` and the scrap display size for the
+/// Resolve bounds for the captured display at `index` (xcap order). Reads the
+/// live monitor list from `xcap` and the captured display size for the
 /// index, then matches. Never panics; returns a sane default on failure.
 pub fn resolve(index: usize) -> DisplayBounds {
-    let scrap = crate::capture::list_displays();
-    let target = scrap.iter().find(|d| d.index == index).or_else(|| scrap.first());
+    let displays = crate::capture::list_displays();
+    let target = displays.iter().find(|d| d.index == index).or_else(|| displays.first());
     let (tw, th, tp) = match target {
         Some(d) => (d.width, d.height, d.is_primary),
         None => return DisplayBounds::default(),
     };
-    let monitors: Vec<Monitor> = match display_info::DisplayInfo::all() {
+    let monitors: Vec<Monitor> = match xcap::Monitor::all() {
         Ok(list) => list
             .into_iter()
-            .map(|m| (m.x, m.y, m.width, m.height, m.is_primary))
+            .filter_map(|m| {
+                Some((
+                    m.x().ok()?,
+                    m.y().ok()?,
+                    m.width().ok()?,
+                    m.height().ok()?,
+                    m.is_primary().unwrap_or(false),
+                ))
+            })
             .collect(),
         Err(e) => {
-            tracing::warn!("display-info failed ({}); input maps to primary-origin", e);
+            tracing::warn!("xcap monitor enumeration failed ({}); input maps to primary-origin", e);
             Vec::new()
         }
     };
