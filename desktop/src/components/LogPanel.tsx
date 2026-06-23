@@ -6,6 +6,9 @@ import { invoke } from '@tauri-apps/api/core';
 export function LogPanel() {
   const [lines, setLines] = useState<string[]>([]);
   const boxRef = useRef<HTMLDivElement>(null);
+  // Auto-scroll to newest only while the user is already at the bottom; if they
+  // scroll up to read older lines, leave them there.
+  const stickRef = useRef(true);
 
   useEffect(() => {
     let alive = true;
@@ -19,8 +22,13 @@ export function LogPanel() {
   }, []);
 
   useEffect(() => {
-    if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
+    if (stickRef.current && boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [lines]);
+
+  const onScroll = () => {
+    const b = boxRef.current;
+    if (b) stickRef.current = b.scrollHeight - b.scrollTop - b.clientHeight < 24;
+  };
 
   const color = (l: string) =>
     /\bERROR\b/.test(l) ? '#f0a0a0' : /\bWARN\b/.test(l) ? '#e3b341' : '#9fb0c3';
@@ -32,6 +40,7 @@ export function LogPanel() {
       </div>
       <div
         ref={boxRef}
+        onScroll={onScroll}
         style={{
           height: 170, overflow: 'auto', background: '#0a0e14',
           border: '1px solid #21262d', borderRadius: 6, padding: '8px 10px',
