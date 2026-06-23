@@ -88,12 +88,11 @@ export function SessionToolbar({ peerId, latencyMs, fps, isViewOnly, videoRef, o
       <button style={btn()} onClick={onFileTransfer}>📁 Fișiere</button>
       <div style={{ position: 'relative' }}>
         <button style={btn(qOpen)} onClick={() => setQOpen(o => !o)} title="Quality">⚙ Quality</button>
-        {qOpen && (
-          <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 20, background: 'var(--bg-surface)',
-            border: '1px solid var(--border-dim)', borderRadius: 8, padding: 10 }}>
-            <QualitySelector onChange={onQualityChange} />
-          </div>
-        )}
+        <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 20, background: '#0d1117',
+          border: '1px solid #30363d', borderRadius: 8, padding: 8, display: qOpen ? 'block' : 'none',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+          <QualitySelector onChange={onQualityChange} />
+        </div>
       </div>
       <button style={btn(showStats)} onClick={onToggleStats} title="Connection stats">📊 Stats</button>
       <div style={{ flex: 1 }} />

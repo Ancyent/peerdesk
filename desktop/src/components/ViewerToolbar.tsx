@@ -35,12 +35,11 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
       <button style={btn} onClick={onFiles} title="File transfer">📁 Files</button>
       <div style={{ position: 'relative' }}>
         <button style={btn} onClick={() => setQOpen(o => !o)} title="Quality">⚙ Quality</button>
-        {qOpen && (
-          <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 20, background: '#161b22',
-            border: '1px solid #21262d', borderRadius: 8, padding: 10 }}>
-            <QualitySelector onChange={onQualityChange} />
-          </div>
-        )}
+        <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 20, background: '#0d1117',
+          border: '1px solid #30363d', borderRadius: 8, padding: 8, display: qOpen ? 'block' : 'none',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+          <QualitySelector onChange={onQualityChange} />
+        </div>
       </div>
       <button style={btn} onClick={onToggleStats} title="Connection stats">📊 Stats</button>
 
