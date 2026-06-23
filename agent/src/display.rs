@@ -1,6 +1,7 @@
 //! Resolves the on-screen bounds (virtual-desktop origin + size) of a captured
-//! display, so mouse input can target the right monitor. `xcap` supplies both
-//! origin and size, matched by resolution + primary.
+//! display so mouse input targets the right monitor. Uses `xcap::Monitor::all()`
+//! — the SAME source and ordering as `capture::run` — so the captured monitor
+//! and the input target always share one index space.
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DisplayBounds {
@@ -16,69 +17,65 @@ impl Default for DisplayBounds {
     }
 }
 
-/// A monitor as reported by `xcap`: (x, y, width, height, is_primary).
+/// A monitor as (x, y, width, height, is_primary).
 pub type Monitor = (i32, i32, u32, u32, bool);
 
-/// Find the monitor matching the captured display's (width, height, is_primary)
-/// and return its bounds. Falls back to the primary monitor, then to a 0-origin
-/// box of the target size. Pure + unit-testable.
-pub fn match_bounds(target_w: u32, target_h: u32, target_primary: bool, monitors: &[Monitor]) -> DisplayBounds {
-    if let Some(&(x, y, w, h, _)) = monitors
-        .iter()
-        .find(|&&(_, _, w, h, p)| w == target_w && h == target_h && p == target_primary)
-    {
+/// Bounds of the monitor at `index`. Falls back to the primary monitor, then to
+/// the default box. Pure + unit-testable.
+pub fn bounds_at_index(index: usize, monitors: &[Monitor]) -> DisplayBounds {
+    if let Some(&(x, y, w, h, _)) = monitors.get(index) {
+        if w > 0 && h > 0 {
+            return DisplayBounds { ox: x, oy: y, w: w as i32, h: h as i32 };
+        }
+    }
+    if let Some(&(x, y, w, h, _)) = monitors.iter().find(|&&(_, _, w, h, p)| p && w > 0 && h > 0) {
         return DisplayBounds { ox: x, oy: y, w: w as i32, h: h as i32 };
     }
-    if let Some(&(x, y, w, h, _)) = monitors.iter().find(|&&(_, _, _, _, p)| p) {
-        return DisplayBounds { ox: x, oy: y, w: w as i32, h: h as i32 };
-    }
-    DisplayBounds { ox: 0, oy: 0, w: target_w as i32, h: target_h as i32 }
+    DisplayBounds::default()
 }
 
-/// Resolve bounds for the captured display at `index` (xcap order). Reads the
-/// live monitor list from `xcap` and the captured display size for the
-/// index, then matches. Never panics; returns a sane default on failure.
+/// Resolve bounds for the captured display at `index` from the live monitor list.
+/// Never panics; returns the default box on failure.
 pub fn resolve(index: usize) -> DisplayBounds {
-    let displays = crate::capture::list_displays();
-    let target = displays.iter().find(|d| d.index == index).or_else(|| displays.first());
-    let (tw, th, tp) = match target {
-        Some(d) => (d.width, d.height, d.is_primary),
-        None => return DisplayBounds::default(),
-    };
-    let monitors: Vec<Monitor> = match xcap::Monitor::all() {
-        Ok(list) => list
-            .into_iter()
-            .filter_map(|m| {
-                Some((
-                    m.x().ok()?,
-                    m.y().ok()?,
-                    m.width().ok()?,
-                    m.height().ok()?,
-                    m.is_primary().unwrap_or(false),
-                ))
-            })
-            .collect(),
+    let monitors = match xcap::Monitor::all() {
+        Ok(list) => list,
         Err(e) => {
-            tracing::warn!("xcap monitor enumeration failed ({}); input maps to primary-origin", e);
-            Vec::new()
+            tracing::warn!("Monitor::all failed ({}); input maps to default bounds", e);
+            return DisplayBounds::default();
         }
     };
-    match_bounds(tw, th, tp, &monitors)
+    let geom: Vec<Monitor> = monitors
+        .iter()
+        .map(|m| {
+            (
+                m.x().unwrap_or(0),
+                m.y().unwrap_or(0),
+                m.width().unwrap_or(0),
+                m.height().unwrap_or(0),
+                m.is_primary().unwrap_or(false),
+            )
+        })
+        .collect();
+    bounds_at_index(index, &geom)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn matches_by_resolution_and_primary() {
-        let mons = vec![(0, 0, 1920, 1080, true), (1920, 0, 2560, 1440, false)];
-        assert_eq!(match_bounds(2560, 1440, false, &mons), DisplayBounds { ox: 1920, oy: 0, w: 2560, h: 1440 });
-        assert_eq!(match_bounds(1920, 1080, true, &mons), DisplayBounds { ox: 0, oy: 0, w: 1920, h: 1080 });
+    // (x, y, width, height, is_primary)
+    fn sample() -> Vec<Monitor> {
+        vec![(0, 0, 1920, 1080, true), (1920, 0, 2560, 1440, false)]
     }
+
     #[test]
-    fn falls_back_to_primary_then_origin() {
-        let mons = vec![(0, 0, 1920, 1080, true)];
-        assert_eq!(match_bounds(3440, 1440, false, &mons), DisplayBounds { ox: 0, oy: 0, w: 1920, h: 1080 });
-        assert_eq!(match_bounds(1280, 720, false, &[]), DisplayBounds { ox: 0, oy: 0, w: 1280, h: 720 });
+    fn picks_monitor_at_index() {
+        assert_eq!(bounds_at_index(1, &sample()), DisplayBounds { ox: 1920, oy: 0, w: 2560, h: 1440 });
+        assert_eq!(bounds_at_index(0, &sample()), DisplayBounds { ox: 0, oy: 0, w: 1920, h: 1080 });
+    }
+
+    #[test]
+    fn out_of_range_falls_back_to_primary_then_default() {
+        assert_eq!(bounds_at_index(9, &sample()), DisplayBounds { ox: 0, oy: 0, w: 1920, h: 1080 });
+        assert_eq!(bounds_at_index(0, &[]), DisplayBounds::default());
     }
 }
