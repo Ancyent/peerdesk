@@ -2,6 +2,19 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.18] — 2026-06-23
+
+### Fixed
+- **Reconnecting now works without restarting the host agent.** The agent reused
+  a single WebRTC peer connection for its whole lifetime, so a second viewer
+  (e.g. after a browser refresh) landed on a stale connection that couldn't
+  renegotiate — no video until the agent was restarted. The agent now builds a
+  fresh peer connection per viewer session.
+- **Quality dropdown shows over the video.** The "⚙ Quality" menu was being
+  painted behind the video; the toolbar now stacks above it.
+- **Activity log** (desktop Network settings) no longer yanks you back to the
+  newest line while you've scrolled up to read older entries.
+
 ## [0.4.17] — 2026-06-22
 
 ### Added
