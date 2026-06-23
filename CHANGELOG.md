@@ -2,6 +2,15 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.20] — 2026-06-23
+
+### Fixed
+- **Clicks land on the correct monitor — including secondary displays.** Mouse
+  input was always mapped to the host's primary monitor, so clicking while
+  viewing a second screen landed on the wrong place. On Windows the agent now
+  injects absolute mouse moves over the whole virtual desktop and maps to the
+  currently viewed display's bounds (resolved via `display-info`).
+
 ## [0.4.19] — 2026-06-23
 
 ### Added
