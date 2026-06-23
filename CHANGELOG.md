@@ -2,6 +2,20 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.19] — 2026-06-23
+
+### Added
+- **Switch host displays from the desktop client.** The desktop viewer now has
+  the monitor picker the web viewer already had — pick which of the host's
+  screens to view.
+- **Hide the remote cursor.** A "🖱 Cursor" button in the viewer toolbar (web +
+  desktop) shows/hides the remote cursor locally, and a host setting ("Show my
+  cursor to the viewer") stops the host from sending it at all.
+
+### Note
+- Correct mouse input on a **secondary** monitor is still pending (needs
+  Windows-specific work); switching displays for *viewing* works now.
+
 ## [0.4.18] — 2026-06-23
 
 ### Fixed
