@@ -45,16 +45,27 @@ fn web_key_to_enigo(key: &str) -> Option<Key> {
     })
 }
 
-pub async fn run(mut rx: Receiver<InputEvent>) -> Result<()> {
+pub async fn run(
+    mut rx: Receiver<InputEvent>,
+    bounds_rx: tokio::sync::watch::Receiver<crate::display::DisplayBounds>,
+) -> Result<()> {
     let mut enigo = Enigo::new(&Settings::default())?;
     while let Some(event) = rx.recv().await {
         let _ = match event {
             InputEvent::MouseMove { x, y } => {
-                let (sw, sh) = enigo.main_display().unwrap_or((1, 1));
-                let (px, py) = norm_to_native(x, y, sw, sh);
-                enigo
-                    .move_mouse(px, py, Coordinate::Abs)
-                    .map_err(|e| anyhow::anyhow!("{e:?}"))
+                let b = *bounds_rx.borrow();
+                #[cfg(windows)]
+                {
+                    mouse::move_abs(b.ox, b.oy, b.w, b.h, x, y);
+                    Ok::<(), anyhow::Error>(())
+                }
+                #[cfg(not(windows))]
+                {
+                    let (px, py) = mouse::target_pixel(b.ox, b.oy, b.w, b.h, x, y);
+                    enigo
+                        .move_mouse(px, py, Coordinate::Abs)
+                        .map_err(|e| anyhow::anyhow!("{e:?}"))
+                }
             }
             InputEvent::MouseDown { button: 0 } => enigo
                 .button(enigo::Button::Left, Press)
@@ -121,28 +132,5 @@ mod tests {
         let json = r#"{"type":"key_down","key":"a"}"#;
         let event: InputEvent = serde_json::from_str(json).unwrap();
         assert!(matches!(event, InputEvent::KeyDown { key } if key == "a"));
-    }
-}
-
-/// Map a normalized (0..1) pointer position to absolute screen pixels for a
-/// display of size (sw, sh). Clamps to the display bounds.
-pub fn norm_to_native(x: f32, y: f32, sw: i32, sh: i32) -> (i32, i32) {
-    let cx = (x.clamp(0.0, 1.0) * sw as f32).round() as i32;
-    let cy = (y.clamp(0.0, 1.0) * sh as f32).round() as i32;
-    (cx.clamp(0, (sw - 1).max(0)), cy.clamp(0, (sh - 1).max(0)))
-}
-
-#[cfg(test)]
-mod coord_tests {
-    use super::norm_to_native;
-    #[test]
-    fn maps_center_and_edges() {
-        assert_eq!(norm_to_native(0.5, 0.5, 1920, 1080), (960, 540));
-        assert_eq!(norm_to_native(0.0, 0.0, 1920, 1080), (0, 0));
-        assert_eq!(norm_to_native(1.0, 1.0, 1920, 1080), (1919, 1079));
-    }
-    #[test]
-    fn clamps_out_of_range() {
-        assert_eq!(norm_to_native(2.0, -1.0, 1280, 720), (1279, 0));
     }
 }

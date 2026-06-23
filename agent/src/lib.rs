@@ -256,8 +256,11 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     }
 
     // enigo (input injection) is !Send on macOS, so run on a dedicated OS thread.
+    let (bounds_tx, bounds_rx) =
+        tokio::sync::watch::channel(crate::display::resolve(agent_cfg.display_index));
     if agent_cfg.cast_only {
         drop(input_rx);
+        drop(bounds_rx);
         tracing::info!("Cast-only mode: input injection disabled");
     } else {
         std::thread::spawn(move || {
@@ -265,7 +268,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 .enable_all()
                 .build()
                 .expect("input runtime");
-            if let Err(e) = rt.block_on(input::run(input_rx)) {
+            if let Err(e) = rt.block_on(input::run(input_rx, bounds_rx)) {
                 tracing::warn!("Input error: {}", e);
             }
         });
@@ -411,6 +414,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
             Some(signaling::SignalingMessage::SwitchDisplay { index }) => {
                 info!("Switching to display {}", index);
                 let _ = display_switch_tx.send(index).await;
+                let _ = bounds_tx.send(crate::display::resolve(index));
             }
             Some(_) => {} // Registered, Answer, etc. — ignore in main loop
             None => {
