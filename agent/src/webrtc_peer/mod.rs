@@ -27,6 +27,9 @@ pub struct PeerConnection {
     pub ft_in_tx: tokio::sync::mpsc::Sender<crate::file_transfer::FtMessage>,
     pub ft_control_rx: Option<tokio::sync::mpsc::Receiver<String>>,
     pub security_code: Arc<std::sync::Mutex<Option<String>>>,
+    /// Aborts the per-session video encode/send task when this PeerConnection is
+    /// dropped (on reconnect), so old encoders don't pile up.
+    video_task: tokio::task::AbortHandle,
 }
 
 impl PeerConnection {
@@ -178,7 +181,9 @@ impl PeerConnection {
         // Spawn video frame sender
         let track = Arc::clone(&video_track);
         let video_quality_rx = quality_tx.subscribe();
-        tokio::spawn(async move { send_video_frames(frame_rx, track, video_quality_rx).await });
+        let video_task =
+            tokio::spawn(async move { send_video_frames(frame_rx, track, video_quality_rx).await })
+                .abort_handle();
 
         let (to_sig_tx, to_sig_rx) = tokio::sync::mpsc::channel::<SignalingMessage>(32);
 
@@ -207,6 +212,7 @@ impl PeerConnection {
             ft_in_tx,
             ft_control_rx: Some(ft_control_rx),
             security_code: Arc::new(std::sync::Mutex::new(None)),
+            video_task,
         })
     }
 
@@ -244,6 +250,14 @@ impl PeerConnection {
     pub async fn close(&self) -> Result<()> {
         self.pc.close().await?;
         Ok(())
+    }
+}
+
+impl Drop for PeerConnection {
+    fn drop(&mut self) {
+        // Stop the per-session video encode/send loop so a reconnect doesn't
+        // leave an orphan H.264 encoder running.
+        self.video_task.abort();
     }
 }
 
