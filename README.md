@@ -72,37 +72,20 @@ Pre-built installers pe [Releases page](https://github.com/Ancyent/peerdesk/rele
 | Clipboard sync | ✅ |
 | File transfer (drag & drop) | ✅ |
 | Audio streaming | ✅ |
-| Multi-monitor support | ✅ |
+| Multi-monitor capture + runtime switching | ✅ |
+| Quality presets + live stats overlay | ✅ |
+| Remote cursor overlay | ✅ |
+| Collapsible / draggable overlay controls (web) | ✅ |
+| Attended connection approval (host prompt) | ✅ |
 | User accounts + JWT auth | ✅ |
 | 2FA / TOTP | ✅ |
 | Machine registry + dashboard | ✅ |
 | White-label branding | ✅ |
 | Unattended access (systemd) | ✅ |
-| Tauri native client (scaffold) | 🚧 |
+| Tauri native client (desktop viewer + host) | ✅ |
 | Hardware-accelerated encoding | 📋 |
 | Mobile viewer | 📋 |
 | SSO / OIDC | 📋 |
-
----
-
-## Quick Start — Self-Hosted
-
-```bash
-git clone https://github.com/your-org/peerdesk
-cd peerdesk/deploy
-bash install.sh
-```
-
-The installer will:
-1. Check Docker is installed (offer to install if missing)
-2. Ask for your domain / server IP
-3. Ask if you want HTTPS (Let's Encrypt)
-4. Generate random secrets
-5. Build and start all services
-6. Run database migrations
-7. Print your dashboard URL
-
-> **Minimum:** Ubuntu 20.04+, Debian 11+, CentOS 8+. Docker + Docker Compose v2.
 
 ---
 
@@ -219,12 +202,13 @@ cargo tauri build    # produces .deb / .AppImage
 
 ### Prerequisites
 
-- Ubuntu 24.04 (or similar)
+- Ubuntu 24.04+ (the agent's screen capture uses `xcap`, which needs pipewire ≥ 1.0 headers — 22.04 is too old)
 - Rust 1.78+ (`rustup`)
 - Node.js 20 (`nvm`)
 - Python 3.12
 - Docker + Docker Compose v2
-- System deps: `libx11-dev libxcb1-dev libssl-dev clang libxdo-dev libasound2-dev`
+- Agent build system deps (Linux):
+  `libx11-dev libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev libxtst-dev libxdo-dev libasound2-dev libssl-dev clang libwayland-dev libxkbcommon-dev libpipewire-0.3-dev libgbm-dev libegl1-mesa-dev`
 
 ### Dev stack — tot în Docker
 
@@ -329,7 +313,7 @@ The branding is served from `GET /api/branding` and loaded by every client on bo
 - **JWT tokens** — 15-min access tokens + 7-day refresh tokens
 - **2FA / TOTP** — optional per-account (Google Authenticator, Authy, etc.)
 - **Rate limiting** — 10 WebSocket connections/minute per IP on signaling server
-- **Connection approval** — agent auto-approves (configurable UI prompt in roadmap)
+- **Connection approval** — attended approval: the host gets an accept/reject prompt with a security code (CLI agent without a host UI auto-approves)
 - **Config file** — stored with `0o600` permissions (Unix)
 
 ---
