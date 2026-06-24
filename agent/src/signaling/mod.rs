@@ -49,6 +49,9 @@ pub enum SignalingMessage {
     DisplayList {
         displays: Vec<crate::capture::DisplayInfo>,
     },
+    SessionMode {
+        mode: String,
+    },
 }
 
 pub async fn run(
