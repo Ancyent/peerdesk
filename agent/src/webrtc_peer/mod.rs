@@ -34,11 +34,14 @@ pub struct PeerConnection {
 
 impl PeerConnection {
     pub async fn new(
+        mode: crate::mode::SessionMode,
         frame_rx: tokio::sync::broadcast::Receiver<std::sync::Arc<FrameData>>,
         input_tx: Sender<InputEvent>,
         ice_servers: Vec<RTCIceServer>,
         quality_tx: tokio::sync::watch::Sender<crate::quality::QualitySettings>,
         cursor_tx: tokio::sync::watch::Sender<(f32, f32)>,
+        pty_output: tokio::sync::broadcast::Sender<Vec<u8>>,
+        pty_input_tx: tokio::sync::mpsc::Sender<crate::terminal::ClientMsg>,
     ) -> Result<Self> {
         let mut media_engine = MediaEngine::default();
         media_engine.register_default_codecs()?;
@@ -60,18 +63,22 @@ impl PeerConnection {
 
         let pc = Arc::new(api.new_peer_connection(config).await?);
 
-        let video_track = Arc::new(TrackLocalStaticSample::new(
-            RTCRtpCodecCapability {
-                mime_type: "video/H264".to_owned(),
-                ..Default::default()
-            },
-            "video".to_owned(),
-            "peerdesk".to_owned(),
-        ));
-
-        pc.add_track(Arc::clone(&video_track)
-            as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>)
-            .await?;
+        let video_track = if mode == crate::mode::SessionMode::Gui {
+            let t = Arc::new(TrackLocalStaticSample::new(
+                RTCRtpCodecCapability {
+                    mime_type: "video/H264".to_owned(),
+                    ..Default::default()
+                },
+                "video".to_owned(),
+                "peerdesk".to_owned(),
+            ));
+            pc.add_track(Arc::clone(&t)
+                as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>)
+                .await?;
+            Some(t)
+        } else {
+            None
+        };
 
         // Handle incoming data channels from viewer (input events, clipboard, file transfer)
         let input_tx_clone = input_tx.clone();
@@ -85,12 +92,16 @@ impl PeerConnection {
         let ft_in_tx_clone = ft_in_tx.clone();
         let quality_tx_dc = quality_tx.clone();
         let cursor_tx_dc = cursor_tx.clone();
+        let pty_out_dc = pty_output.clone();
+        let pty_in_dc = pty_input_tx.clone();
         pc.on_data_channel(Box::new(move |dc| {
             let input_tx = input_tx_clone.clone();
             let clipboard_tx = clipboard_in_tx_clone.clone();
             let ft_tx = ft_in_tx_clone.clone();
             let quality_tx = quality_tx_dc.clone();
             let cursor_tx = cursor_tx_dc.clone();
+            let pty_output = pty_out_dc.clone();
+            let pty_input = pty_in_dc.clone();
             Box::pin(async move {
                 match dc.label() {
                     "input" => {
@@ -171,6 +182,25 @@ impl PeerConnection {
                             }
                         });
                     }
+                    "terminal" => {
+                        let to_pty = pty_input.clone();
+                        dc.on_message(Box::new(move |msg| {
+                            let to_pty = to_pty.clone();
+                            let data = msg.data.to_vec();
+                            Box::pin(async move {
+                                let _ = to_pty.send(crate::terminal::parse_client_msg(&data)).await;
+                            })
+                        }));
+                        let mut rx = pty_output.subscribe();
+                        let dc2 = dc.clone();
+                        tokio::spawn(async move {
+                            while let Ok(buf) = rx.recv().await {
+                                if dc2.send(&bytes::Bytes::from(buf)).await.is_err() {
+                                    break;
+                                }
+                            }
+                        });
+                    }
                     _ => {}
                 }
             })
@@ -178,12 +208,21 @@ impl PeerConnection {
 
         tokio::spawn(crate::file_transfer::run(ft_in_rx, ft_control_tx));
 
-        // Spawn video frame sender
-        let track = Arc::clone(&video_track);
-        let video_quality_rx = quality_tx.subscribe();
-        let video_task =
-            tokio::spawn(async move { send_video_frames(frame_rx, track, video_quality_rx).await })
-                .abort_handle();
+        // Spawn video frame sender (GUI mode only; terminal mode adds no video track)
+        let video_task = match &video_track {
+            Some(track) => {
+                let track = Arc::clone(track);
+                let video_quality_rx = quality_tx.subscribe();
+                tokio::spawn(async move {
+                    send_video_frames(frame_rx, track, video_quality_rx).await
+                })
+                .abort_handle()
+            }
+            None => {
+                drop(frame_rx);
+                tokio::spawn(async {}).abort_handle()
+            }
+        };
 
         let (to_sig_tx, to_sig_rx) = tokio::sync::mpsc::channel::<SignalingMessage>(32);
 
@@ -339,7 +378,20 @@ mod tests {
         let (input_tx, _input_rx) = tokio::sync::mpsc::channel(10);
         let (qtx, _qrx) = tokio::sync::watch::channel(crate::quality::QualitySettings::default());
         let (ctx, _crx) = tokio::sync::watch::channel((0.5_f32, 0.5_f32));
-        let result = PeerConnection::new(frame_rx, input_tx, vec![], qtx, ctx).await;
+        let (pty_out, _pty_out_rx) = tokio::sync::broadcast::channel::<Vec<u8>>(16);
+        let (pty_in_tx, _pty_in_rx) =
+            tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(16);
+        let result = PeerConnection::new(
+            crate::mode::SessionMode::Gui,
+            frame_rx,
+            input_tx,
+            vec![],
+            qtx,
+            ctx,
+            pty_out,
+            pty_in_tx,
+        )
+        .await;
         assert!(
             result.is_ok(),
             "PeerConnection creation failed: {:?}",

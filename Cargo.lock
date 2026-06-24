@@ -2895,6 +2895,7 @@ dependencies = [
  "anyhow",
  "arboard",
  "bcrypt",
+ "bytes",
  "clap",
  "cpal",
  "dirs",
