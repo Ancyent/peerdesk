@@ -87,7 +87,13 @@ export default function App() {
     else if (msg.type === 'error')         { setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found'); setViewerState('error'); setPage('connect'); }
     else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg('Remote machine disconnected'); setViewerState('error'); setPage('machines'); }
     else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? 'Connection denied'); setViewerState('error'); setPage('connect'); }
-    else if (msg.type === 'display_list')  { setDisplays(msg.displays); }
+    else if (msg.type === 'display_list')  {
+      setDisplays(msg.displays);
+      // Always start a fresh connection on the default (primary) monitor, not
+      // wherever a previous session was left.
+      const primary = msg.displays.find(d => d.is_primary) ?? msg.displays[0];
+      if (primary) { setCurrentDisplay(primary.index); send({ type: 'switch_display', index: primary.index }); }
+    }
   });
   sendRef.current = send;
 
