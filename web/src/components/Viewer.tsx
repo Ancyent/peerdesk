@@ -8,8 +8,8 @@ interface Props {
   onMouseMove: (x: number, y: number) => void;
   onMouseDown: (button: number) => void;
   onMouseUp: (button: number) => void;
-  onKeyDown: (key: string) => void;
-  onKeyUp: (key: string) => void;
+  onKeyDown: (key: string, code: string) => void;
+  onKeyUp: (key: string, code: string) => void;
   onScroll: (dx: number, dy: number) => void;
   cursor?: { x: number; y: number } | null;
 }
@@ -71,8 +71,8 @@ export const Viewer = forwardRef<ViewerHandle, Props>(function Viewer(
           onMouseMove={e => { if (isViewOnly) return; const p = relPos(e); if (p.inBounds) onMouseMove(p.x, p.y); }}
           onMouseDown={e => { if (isViewOnly) return; e.preventDefault(); const p = relPos(e); if (p.inBounds) onMouseDown(e.button); }}
           onMouseUp={e => { if (isViewOnly) return; e.preventDefault(); const p = relPos(e); if (p.inBounds) onMouseUp(e.button); }}
-          onKeyDown={e => { if (isViewOnly) return; e.preventDefault(); onKeyDown(e.key); }}
-          onKeyUp={e => { if (isViewOnly) return; e.preventDefault(); onKeyUp(e.key); }}
+          onKeyDown={e => { if (isViewOnly) return; e.preventDefault(); onKeyDown(e.key, e.code); }}
+          onKeyUp={e => { if (isViewOnly) return; e.preventDefault(); onKeyUp(e.key, e.code); }}
           onWheel={e => { if (isViewOnly) return; e.preventDefault(); onScroll(Math.round(e.deltaX), Math.round(e.deltaY)); }}
           onMouseEnter={e => { if (!isViewOnly) (e.currentTarget as HTMLDivElement).focus(); }}
           onContextMenu={e => e.preventDefault()}

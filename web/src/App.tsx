@@ -158,8 +158,8 @@ export default function App() {
               onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
               onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
               onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
-              onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
-              onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
+              onKeyDown={(key, code) => webrtc.sendInput({ type: 'key_down', key, code })}
+              onKeyUp={(key, code) => webrtc.sendInput({ type: 'key_up', key, code })}
               onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
             />}
         <OverlayControls
@@ -171,12 +171,12 @@ export default function App() {
           fullscreenTargetRef={fsRef}
           onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); setPage('machines'); setIsViewOnly(false); setShowFileTransfer(false); setSessionMode('gui'); }}
           onCtrlAltDel={() => {
-            webrtc.sendInput({ type: 'key_down', key: 'Control' });
-            webrtc.sendInput({ type: 'key_down', key: 'Alt' });
-            webrtc.sendInput({ type: 'key_down', key: 'Delete' });
-            webrtc.sendInput({ type: 'key_up', key: 'Delete' });
-            webrtc.sendInput({ type: 'key_up', key: 'Alt' });
-            webrtc.sendInput({ type: 'key_up', key: 'Control' });
+            webrtc.sendInput({ type: 'key_down', key: 'Control', code: 'ControlLeft' });
+            webrtc.sendInput({ type: 'key_down', key: 'Alt', code: 'AltLeft' });
+            webrtc.sendInput({ type: 'key_down', key: 'Delete', code: 'Delete' });
+            webrtc.sendInput({ type: 'key_up', key: 'Delete', code: 'Delete' });
+            webrtc.sendInput({ type: 'key_up', key: 'Alt', code: 'AltLeft' });
+            webrtc.sendInput({ type: 'key_up', key: 'Control', code: 'ControlLeft' });
           }}
           onToggleViewOnly={() => setIsViewOnly(v => !v)}
           onFileTransfer={() => setShowFileTransfer(v => !v)}
