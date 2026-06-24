@@ -2,6 +2,14 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.25] — 2026-06-24
+
+### Added
+- **Headless Linux terminal mode.** The agent auto-detects when there is no
+  graphical display and serves an interactive shell (PTY) instead of a screen;
+  the web viewer renders a terminal (xterm.js) automatically. A server with a
+  virtual display (`Xvfb`) is still detected as GUI and captured.
+
 ## [0.4.24] — 2026-06-24
 
 ### Fixed

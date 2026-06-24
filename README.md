@@ -154,6 +154,24 @@ cargo build -p peerdesk-agent --release
 sudo bash scripts/install-agent.sh ./target/release/peerdesk-agent
 ```
 
+**Headless Linux server (agent only).** The agent auto-detects its environment.
+With no graphical display it runs in **terminal mode** — a viewer connecting gets
+an interactive shell (xterm) instead of a screen. The binary links the capture
+libraries, so install them once even on a headless box:
+
+```bash
+sudo apt-get install -y libwayland-client0 libxcb1 libxcb-randr0 libpipewire-0.3-0 libgbm1 libegl1
+```
+
+Want a *graphical* desktop on a headless server instead? Start a virtual display
+before the agent — it is then detected as GUI mode and captured:
+
+```bash
+Xvfb :99 -screen 0 1920x1080x24 &
+DISPLAY=:99 fluxbox &
+DISPLAY=:99 ./peerdesk-agent --server=... --token=...
+```
+
 ### Signaling Server (`server/signaling/`)
 
 WebSocket server that brokers WebRTC handshakes.
