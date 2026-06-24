@@ -5,7 +5,7 @@ use anyhow::Result;
 use enigo::{
     Coordinate,
     Direction::{Press, Release},
-    Enigo, Key, Keyboard, Mouse, Settings,
+    Enigo, Keyboard, Mouse, Settings,
 };
 use serde::Deserialize;
 use tokio::sync::mpsc::Receiver;
@@ -16,34 +16,17 @@ pub enum InputEvent {
     MouseMove { x: f32, y: f32 },
     MouseDown { button: u8 },
     MouseUp { button: u8 },
-    KeyDown { key: String },
-    KeyUp { key: String },
+    KeyDown {
+        key: String,
+        #[serde(default)]
+        code: String,
+    },
+    KeyUp {
+        key: String,
+        #[serde(default)]
+        code: String,
+    },
     Scroll { delta_x: i32, delta_y: i32 },
-}
-
-fn web_key_to_enigo(key: &str) -> Option<Key> {
-    Some(match key {
-        "Enter" => Key::Return,
-        "Escape" => Key::Escape,
-        "Backspace" => Key::Backspace,
-        "Tab" => Key::Tab,
-        " " => Key::Space,
-        "Delete" => Key::Delete,
-        "Home" => Key::Home,
-        "End" => Key::End,
-        "PageUp" => Key::PageUp,
-        "PageDown" => Key::PageDown,
-        "ArrowLeft" => Key::LeftArrow,
-        "ArrowRight" => Key::RightArrow,
-        "ArrowUp" => Key::UpArrow,
-        "ArrowDown" => Key::DownArrow,
-        "Control" => Key::Control,
-        "Shift" => Key::Shift,
-        "Alt" => Key::Alt,
-        "Meta" => Key::Meta,
-        k if k.len() == 1 => Key::Unicode(k.chars().next().unwrap()),
-        _ => return None,
-    })
 }
 
 pub async fn run(
@@ -51,6 +34,9 @@ pub async fn run(
     bounds_rx: tokio::sync::watch::Receiver<crate::display::DisplayBounds>,
 ) -> Result<()> {
     let mut enigo = Enigo::new(&Settings::default())?;
+    let mut held_mods: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // macOS hosts translate Ctrl<->Cmd so a Windows/Linux viewer's Ctrl+C copies.
+    let translate_cmd = cfg!(target_os = "macos");
     while let Some(event) = rx.recv().await {
         let _ = match event {
             InputEvent::MouseMove { x, y } => {
@@ -89,19 +75,26 @@ pub async fn run(
                 .button(enigo::Button::Right, Release)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
             InputEvent::MouseUp { .. } => Ok(()),
-            InputEvent::KeyDown { ref key } => {
-                if let Some(k) = web_key_to_enigo(key) {
-                    enigo.key(k, Press).map_err(|e| anyhow::anyhow!("{e:?}"))
-                } else {
-                    Ok(())
+            InputEvent::KeyDown { ref key, ref code } => {
+                if keymap::is_shortcut_modifier(code) {
+                    held_mods.insert(code.clone());
+                }
+                let modifier_held = !held_mods.is_empty();
+                match keymap::resolve(code, key, modifier_held, translate_cmd) {
+                    Some(k) => enigo.key(k, Press).map_err(|e| anyhow::anyhow!("{e:?}")),
+                    None => Ok(()),
                 }
             }
-            InputEvent::KeyUp { ref key } => {
-                if let Some(k) = web_key_to_enigo(key) {
-                    enigo.key(k, Release).map_err(|e| anyhow::anyhow!("{e:?}"))
-                } else {
-                    Ok(())
+            InputEvent::KeyUp { ref key, ref code } => {
+                let modifier_held = !held_mods.is_empty();
+                let res = match keymap::resolve(code, key, modifier_held, translate_cmd) {
+                    Some(k) => enigo.key(k, Release).map_err(|e| anyhow::anyhow!("{e:?}")),
+                    None => Ok(()),
+                };
+                if keymap::is_shortcut_modifier(code) {
+                    held_mods.remove(code);
                 }
+                res
             }
             InputEvent::Scroll { delta_x, delta_y } => {
                 if delta_x != 0 {
@@ -133,6 +126,6 @@ mod tests {
     fn parses_key_down_event() {
         let json = r#"{"type":"key_down","key":"a"}"#;
         let event: InputEvent = serde_json::from_str(json).unwrap();
-        assert!(matches!(event, InputEvent::KeyDown { key } if key == "a"));
+        assert!(matches!(event, InputEvent::KeyDown { key, .. } if key == "a"));
     }
 }
