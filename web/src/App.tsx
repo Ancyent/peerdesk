@@ -13,10 +13,9 @@ import { AppShell, type AppPage } from './components/AppShell';
 import { OrgTree, type OrgNode } from './components/OrgTree';
 import { ConnectForm } from './components/ConnectForm';
 import { Viewer } from './components/Viewer';
-import { SessionToolbar } from './components/SessionToolbar';
+import { OverlayControls } from './components/OverlayControls';
 import type { ViewerHandle } from './components/Viewer';
 import { FileTransferBar } from './components/FileTransferBar';
-import { DisplaySelector } from './components/DisplaySelector';
 import { StatsOverlay } from './components/StatsOverlay';
 import { useStats } from './hooks/useStats';
 import { PRESETS, type QualitySettings } from './quality';
@@ -41,6 +40,7 @@ export default function App() {
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
   const clipboardReceiveRef = useRef<((text: string) => void) | null>(null);
   const viewerRef = useRef<ViewerHandle>(null);
+  const fsRef = useRef<HTMLDivElement | null>(null);
   const [isViewOnly, setIsViewOnly] = useState(false);
   const [showFileTransfer, setShowFileTransfer] = useState(false);
   const [latencyMs] = useState<number | null>(null);
@@ -137,13 +137,27 @@ export default function App() {
       </div>
     );
     if (viewerState === 'connected') return (
-      <div style={{ width: '100vw', height: '100vh', background: '#000', display: 'flex', flexDirection: 'column' }}>
-        <SessionToolbar
+      <div ref={fsRef} style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', overflow: 'hidden' }}>
+        {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
+        <Viewer
+          ref={viewerRef}
+          stream={webrtc.stream}
+          isViewOnly={isViewOnly}
+          cursor={showCursor ? webrtc.cursor : null}
+          onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
+          onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
+          onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
+          onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
+          onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
+          onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
+        />
+        <OverlayControls
           peerId={connectPeerId}
           latencyMs={latencyMs}
           fps={fps}
           isViewOnly={isViewOnly}
           videoRef={{ current: viewerRef.current?.videoElement ?? null } as React.RefObject<HTMLVideoElement | null>}
+          fullscreenTargetRef={fsRef}
           onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); setPage('machines'); setIsViewOnly(false); setShowFileTransfer(false); }}
           onCtrlAltDel={() => {
             webrtc.sendInput({ type: 'key_down', key: 'Control' });
@@ -160,26 +174,13 @@ export default function App() {
           onToggleStats={() => setShowStats((s) => !s)}
           showCursor={showCursor}
           onToggleCursor={() => setShowCursor((s) => !s)}
+          displays={displays}
+          currentDisplay={currentDisplay}
+          onDisplayChange={handleDisplaySwitch}
         />
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
-          <Viewer
-            ref={viewerRef}
-            stream={webrtc.stream}
-            isViewOnly={isViewOnly}
-            cursor={showCursor ? webrtc.cursor : null}
-            onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
-            onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
-            onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
-            onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
-            onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
-            onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
-          />
-          <DisplaySelector displays={displays} current={currentDisplay} onChange={handleDisplaySwitch} />
-          {(showFileTransfer || transfer) && (
-            <FileTransferBar transfer={transfer} onSendFile={sendFile} />
-          )}
-        </div>
+        {(showFileTransfer || transfer) && (
+          <FileTransferBar transfer={transfer} onSendFile={sendFile} />
+        )}
       </div>
     );
     return (

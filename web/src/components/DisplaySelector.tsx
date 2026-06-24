@@ -11,6 +11,9 @@ interface Props {
   displays: DisplayInfo[];
   current: number;
   onChange: (index: number) => void;
+  // When true, render as a plain inline row (no absolute overlay positioning) so
+  // a parent (e.g. the controls panel) can place it.
+  inline?: boolean;
 }
 
 // Show the primary (Default) monitor first so it is numbered 1; others follow in
@@ -22,10 +25,13 @@ function ordered(displays: DisplayInfo[]): DisplayInfo[] {
   );
 }
 
-export function DisplaySelector({ displays, current, onChange }: Props) {
+export function DisplaySelector({ displays, current, onChange, inline = false }: Props) {
   if (displays.length <= 1) return null;
+  const wrap = inline
+    ? { display: 'flex', gap: 6 }
+    : { position: 'absolute' as const, top: 8, left: 8, zIndex: 5, display: 'flex', gap: 6 };
   return (
-    <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 5, display: 'flex', gap: 6 }}>
+    <div style={wrap}>
       {ordered(displays).map((d, pos) => {
         const c = pickerItemColors(d.is_primary, d.index === current);
         return (
