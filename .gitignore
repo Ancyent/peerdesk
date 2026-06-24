@@ -11,3 +11,12 @@ peerdesk-release.jks
 android-secrets.env
 screenshots/*
 !screenshots/README.md
+
+# Local tooling / editor / OS junk — not part of the project
+.claude/
+.superpowers/
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.pid

@@ -1,5 +1,0 @@
-{"type":"server-started","port":64586,"host":"0.0.0.0","url_host":"localhost","url":"http://localhost:64586","screen_dir":"/root/peerdesk/.superpowers/brainstorm/1670905-1778686640/content","state_dir":"/root/peerdesk/.superpowers/brainstorm/1670905-1778686640/state"}
-{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/1670905-1778686640/content/viewer-open-style.html"}
-{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/1670905-1778686640/content/viewer-open-v2.html"}
-{"source":"user-event","type":"click","text":"Home\n            987 654 321 ×\n            +\n          \n        \n        \n        \n          ⛶ fullscreen\n          📋 clipboard\n          \n          ● Connected\n          ✕\n        \n        \n        \n          \n            🖥\n            Remote Desktop\n          \n        \n      \n    \n    \n      C — Tabs (ca un browser)\n      Home + sesiuni ca tab-uri. Switch rapid. Toolbar cu clipboard, fullscreen. Multiple sesiuni simultane.","choice":"c","id":null,"timestamp":1778687079616}
-{"type":"server-stopped","reason":"idle timeout"}

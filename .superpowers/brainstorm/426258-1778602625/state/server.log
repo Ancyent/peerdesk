@@ -1,8 +1,0 @@
-{"type":"server-started","port":57675,"host":"0.0.0.0","url_host":"192.168.200.223","url":"http://192.168.200.223:57675","screen_dir":"/root/peerdesk/.superpowers/brainstorm/426258-1778602625/content","state_dir":"/root/peerdesk/.superpowers/brainstorm/426258-1778602625/state"}
-{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/426258-1778602625/content/nav-layout.html"}
-{"source":"user-event","type":"click","text":"⬛\n          🖥\n          🏢\n          ⬇️\n          ⚙️\n        \n        \n          Organizare\n          ▼ 🏢 Firma ABC\n          ▼ 📍 HQ\n          📁 IT\n          📁 Dev\n          ▶ 📍 Depozit\n        \n        \n          IT — 3 mașini\n          \n            \n              PC-Birou-01\n              \n                \n                ▶\n              \n            \n            \n              Server-Backup\n              \n                \n                ▶\n              \n            \n          \n        \n      \n    \n    \n      C — Icon bar + arbore ierarhic\n      Icon bar îngust + panou cu arbore Company→Location→Group expandabil. Stil VS Code / Linear. Cel mai compact, ideal pentru multe mașini.","choice":"hybrid","id":null,"timestamp":1778602769904}
-{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/426258-1778602625/content/waiting-1.html"}
-{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/426258-1778602625/content/agent-page.html"}
-{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/426258-1778602625/content/full-dashboard.html"}
-{"type":"screen-added","file":"/root/peerdesk/.superpowers/brainstorm/426258-1778602625/content/waiting-2.html"}
-{"type":"server-stopped","reason":"idle timeout"}
