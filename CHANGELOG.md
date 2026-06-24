@@ -2,6 +2,18 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.27] — 2026-06-24
+
+### Fixed
+- **Keyboard shortcuts and special keys now work.** The viewer sends the physical
+  key (`e.code`) alongside the character, and the agent injects the physical key
+  when a modifier is held — so Ctrl+C / Ctrl+V / Ctrl+Z / Alt+F4 / Ctrl+Shift+…
+  and the function keys (F1–F12) work. Plain typing stays layout-correct.
+
+### Added
+- **macOS Ctrl↔Cmd translation.** On a macOS host the agent maps a viewer's
+  Control to Command, so a Windows/Linux viewer gets native Cmd+C / Cmd+V.
+
 ## [0.4.26] — 2026-06-24
 
 ### Fixed
