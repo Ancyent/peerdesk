@@ -99,7 +99,10 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     if let (Some(url), Some(key)) = (&api_url, &effective_key) {
         match api_client::register_machine(url, key, &cfg.peer_id).await {
             Ok(machine) => {
-                info!("Registered — machine_id={} status={}", machine.id, machine.approval_status);
+                info!(
+                    "Registered — machine_id={} status={}",
+                    machine.id, machine.approval_status
+                );
 
                 if machine.approval_status == "pending" {
                     info!("Waiting for admin approval (polling every 30s)...");
@@ -303,15 +306,23 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                     while let Some(msg) = pty_input_rx.blocking_recv() {
                         match msg {
                             crate::terminal::ClientMsg::Bytes(b) => pty.write_input(&b),
-                            crate::terminal::ClientMsg::Resize { cols, rows } => pty.resize(cols, rows),
+                            crate::terminal::ClientMsg::Resize { cols, rows } => {
+                                pty.resize(cols, rows)
+                            }
                         }
                     }
                 });
                 let shared = pty_output.clone();
                 let mut sub = pty_out.subscribe();
                 tokio::spawn(async move {
-                    while let Ok(buf) = sub.recv().await {
-                        let _ = shared.send(buf);
+                    loop {
+                        match sub.recv().await {
+                            Ok(buf) => {
+                                let _ = shared.send(buf);
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                        }
                     }
                 });
             }
@@ -331,7 +342,16 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     // Spawn signaling client
     let sig_handle = tokio::spawn(async move {
-        if let Err(e) = signaling::run(&sig_url, &peer_id, &pw_hash, &hmac_key, from_sig_tx, to_sig_rx).await {
+        if let Err(e) = signaling::run(
+            &sig_url,
+            &peer_id,
+            &pw_hash,
+            &hmac_key,
+            from_sig_tx,
+            to_sig_rx,
+        )
+        .await
+        {
             tracing::error!("Signaling error: {}", e);
         }
     });
@@ -371,11 +391,8 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                     );
                     if tx.send(req).await.is_ok() {
                         // Deny if the host does not decide within 60s.
-                        match tokio::time::timeout(
-                            std::time::Duration::from_secs(60),
-                            reply_rx,
-                        )
-                        .await
+                        match tokio::time::timeout(std::time::Duration::from_secs(60), reply_rx)
+                            .await
                         {
                             Ok(Ok(decision)) => decision,
                             _ => {
@@ -402,9 +419,11 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
             }
             Some(signaling::SignalingMessage::ViewerJoined { viewer_id }) => {
                 info!("Viewer {} joined — waiting for WebRTC offer", viewer_id);
-                let displays = capture::list_displays();
-                let msg = signaling::SignalingMessage::DisplayList { displays };
-                let _ = to_sig_tx.send(msg).await;
+                if session_mode == crate::mode::SessionMode::Gui {
+                    let displays = capture::list_displays();
+                    let msg = signaling::SignalingMessage::DisplayList { displays };
+                    let _ = to_sig_tx.send(msg).await;
+                }
             }
             Some(signaling::SignalingMessage::Offer { sdp }) => {
                 info!("Got offer — creating a fresh peer connection for this session");
@@ -412,9 +431,15 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 // (screen vs terminal). The attended-approval flow never delivers a
                 // ViewerJoined to the agent, so the Offer (which always arrives) is
                 // the reliable point to publish session metadata.
-                let mode_str = if session_mode == crate::mode::SessionMode::Gui { "gui" } else { "terminal" };
+                let mode_str = if session_mode == crate::mode::SessionMode::Gui {
+                    "gui"
+                } else {
+                    "terminal"
+                };
                 let _ = to_sig_tx
-                    .send(signaling::SignalingMessage::SessionMode { mode: mode_str.to_string() })
+                    .send(signaling::SignalingMessage::SessionMode {
+                        mode: mode_str.to_string(),
+                    })
                     .await;
                 if session_mode == crate::mode::SessionMode::Gui {
                     let displays = capture::list_displays();

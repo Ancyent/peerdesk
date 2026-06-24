@@ -33,6 +33,9 @@ pub struct PeerConnection {
 }
 
 impl PeerConnection {
+    // GUI/terminal mode plus media + 4 channels genuinely need this many; grouping
+    // them adds indirection without clarity.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         mode: crate::mode::SessionMode,
         frame_rx: tokio::sync::broadcast::Receiver<std::sync::Arc<FrameData>>,
@@ -72,9 +75,10 @@ impl PeerConnection {
                 "video".to_owned(),
                 "peerdesk".to_owned(),
             ));
-            pc.add_track(Arc::clone(&t)
-                as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>)
-                .await?;
+            pc.add_track(
+                Arc::clone(&t) as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>
+            )
+            .await?;
             Some(t)
         } else {
             None
@@ -155,11 +159,17 @@ impl PeerConnection {
                             Box::pin(async move {
                                 if let Ok(text) = std::str::from_utf8(&data) {
                                     if let Ok(crate::quality::ControlMessage::SetQuality {
-                                        bitrate_kbps, fps, max_height,
-                                    }) = serde_json::from_str(text) {
+                                        bitrate_kbps,
+                                        fps,
+                                        max_height,
+                                    }) = serde_json::from_str(text)
+                                    {
                                         let q = crate::quality::QualitySettings {
-                                            bitrate_kbps, fps, max_height,
-                                        }.clamped();
+                                            bitrate_kbps,
+                                            fps,
+                                            max_height,
+                                        }
+                                        .clamped();
                                         let _ = qtx.send(q);
                                     }
                                 }
@@ -213,9 +223,9 @@ impl PeerConnection {
             Some(track) => {
                 let track = Arc::clone(track);
                 let video_quality_rx = quality_tx.subscribe();
-                tokio::spawn(async move {
-                    send_video_frames(frame_rx, track, video_quality_rx).await
-                })
+                tokio::spawn(
+                    async move { send_video_frames(frame_rx, track, video_quality_rx).await },
+                )
                 .abort_handle()
             }
             None => {
@@ -261,7 +271,9 @@ impl PeerConnection {
         let answer = self.pc.create_answer(None).await?;
         self.pc.set_local_description(answer.clone()).await?;
         self.to_signaling_tx
-            .send(SignalingMessage::Answer { sdp: answer.sdp.clone() })
+            .send(SignalingMessage::Answer {
+                sdp: answer.sdp.clone(),
+            })
             .await?;
         // Derive security code from DTLS fingerprints in SDP
         let local_fp = extract_fingerprint(&answer.sdp).unwrap_or_default();
@@ -352,7 +364,9 @@ async fn send_video_frames(
                     let _ = track
                         .write_sample(&Sample {
                             data: h264.into(),
-                            duration: std::time::Duration::from_millis((1000 / q.fps.max(1)) as u64),
+                            duration: std::time::Duration::from_millis(
+                                (1000 / q.fps.max(1)) as u64,
+                            ),
                             ..Default::default()
                         })
                         .await;
@@ -379,8 +393,7 @@ mod tests {
         let (qtx, _qrx) = tokio::sync::watch::channel(crate::quality::QualitySettings::default());
         let (ctx, _crx) = tokio::sync::watch::channel((0.5_f32, 0.5_f32));
         let (pty_out, _pty_out_rx) = tokio::sync::broadcast::channel::<Vec<u8>>(16);
-        let (pty_in_tx, _pty_in_rx) =
-            tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(16);
+        let (pty_in_tx, _pty_in_rx) = tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(16);
         let result = PeerConnection::new(
             crate::mode::SessionMode::Gui,
             frame_rx,
