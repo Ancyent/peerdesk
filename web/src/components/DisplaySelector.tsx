@@ -13,17 +13,26 @@ interface Props {
   onChange: (index: number) => void;
 }
 
+// Show the primary (Default) monitor first so it is numbered 1; others follow in
+// xcap order. The button still switches by the real `index`, only the displayed
+// number is the friendly position.
+function ordered(displays: DisplayInfo[]): DisplayInfo[] {
+  return [...displays].sort(
+    (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.index - b.index,
+  );
+}
+
 export function DisplaySelector({ displays, current, onChange }: Props) {
   if (displays.length <= 1) return null;
   return (
     <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 5, display: 'flex', gap: 6 }}>
-      {displays.map(d => {
+      {ordered(displays).map((d, pos) => {
         const c = pickerItemColors(d.is_primary, d.index === current);
         return (
           <button
             key={d.index}
             onClick={() => onChange(d.index)}
-            title={`Monitor ${d.index + 1} (${d.width}×${d.height})${d.is_primary ? ' — Default' : ''}`}
+            title={`Monitor ${pos + 1} (${d.width}×${d.height})${d.is_primary ? ' — Default' : ''}`}
             style={{
               position: 'relative',
               width: 46,
@@ -57,7 +66,7 @@ export function DisplaySelector({ displays, current, onChange }: Props) {
                 pointerEvents: 'none',
               }}
             >
-              {d.index + 1}
+              {pos + 1}
             </span>
             {c.showDefaultBadge && (
               <span
