@@ -12,4 +12,5 @@ export type SignalingMessage =
   | { type: 'approved' }
   | { type: 'denied'; reason: string }
   | { type: 'switch_display'; index: number }
+  | { type: 'session_mode'; mode: 'gui' | 'terminal' }
   | { type: 'display_list'; displays: Array<{ index: number; width: number; height: number; is_primary: boolean }> };

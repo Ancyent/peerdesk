@@ -13,6 +13,7 @@ export function useWebRTC(
   const ftChRef = useRef<RTCDataChannel | null>(null);
   const controlChRef = useRef<RTCDataChannel | null>(null);
   const cursorChRef = useRef<RTCDataChannel | null>(null);
+  const terminalChRef = useRef<RTCDataChannel | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const sendSignalingRef = useRef(sendSignaling);
@@ -28,6 +29,7 @@ export function useWebRTC(
     ftChRef.current = null;
     controlChRef.current = null;
     cursorChRef.current = null;
+    terminalChRef.current = null;
     setStream(null);
     setCursor(null);
 
@@ -73,6 +75,9 @@ export function useWebRTC(
       try { const p = JSON.parse(e.data as string); if (typeof p.x === 'number') setCursor({ x: p.x, y: p.y }); }
       catch { /* ignore */ }
     };
+
+    const terminalCh = pc.createDataChannel('terminal', { ordered: true });
+    terminalChRef.current = terminalCh;
 
     pc.ontrack = (e) => {
       if (e.streams[0]) setStream(e.streams[0]);
@@ -130,6 +135,7 @@ export function useWebRTC(
     ftChRef.current = null;
     controlChRef.current = null;
     cursorChRef.current = null;
+    terminalChRef.current = null;
     setStream(null);
     setCursor(null);
   }, []);
@@ -137,5 +143,5 @@ export function useWebRTC(
   const getFtChannel = useCallback(() => ftChRef.current, []);
   const getPc = useCallback(() => pcRef.current, []);
 
-  return { startOffer, stream, cursor, handleAnswer, handleIceCandidate, sendInput, sendClipboard, setQuality, getPc, disconnect, getFtChannel };
+  return { startOffer, stream, cursor, handleAnswer, handleIceCandidate, sendInput, sendClipboard, setQuality, getPc, disconnect, getFtChannel, getTerminalChannel: () => terminalChRef.current };
 }

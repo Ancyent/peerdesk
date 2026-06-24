@@ -13,6 +13,7 @@ import { AppShell, type AppPage } from './components/AppShell';
 import { OrgTree, type OrgNode } from './components/OrgTree';
 import { ConnectForm } from './components/ConnectForm';
 import { Viewer } from './components/Viewer';
+import { TerminalView } from './components/TerminalView';
 import { OverlayControls } from './components/OverlayControls';
 import type { ViewerHandle } from './components/Viewer';
 import { FileTransferBar } from './components/FileTransferBar';
@@ -48,6 +49,7 @@ export default function App() {
   const [showStats, setShowStats] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
   const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
+  const [sessionMode, setSessionMode] = useState<'gui' | 'terminal'>('gui');
 
   const SIGNALING_URL = getConfig().signalingUrl;
 
@@ -87,6 +89,7 @@ export default function App() {
     else if (msg.type === 'error')         { setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found'); setViewerState('error'); setPage('connect'); }
     else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg('Remote machine disconnected'); setViewerState('error'); setPage('machines'); }
     else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? 'Connection denied'); setViewerState('error'); setPage('connect'); }
+    else if (msg.type === 'session_mode')  { setSessionMode(msg.mode); }
     else if (msg.type === 'display_list')  {
       setDisplays(msg.displays);
       // Always start a fresh connection on the default (primary) monitor, not
@@ -145,18 +148,20 @@ export default function App() {
     if (viewerState === 'connected') return (
       <div ref={fsRef} style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', overflow: 'hidden' }}>
         {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
-        <Viewer
-          ref={viewerRef}
-          stream={webrtc.stream}
-          isViewOnly={isViewOnly}
-          cursor={showCursor ? webrtc.cursor : null}
-          onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
-          onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
-          onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
-          onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
-          onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
-          onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
-        />
+        {sessionMode === 'terminal'
+          ? <TerminalView channel={webrtc.getTerminalChannel()} />
+          : <Viewer
+              ref={viewerRef}
+              stream={webrtc.stream}
+              isViewOnly={isViewOnly}
+              cursor={showCursor ? webrtc.cursor : null}
+              onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
+              onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
+              onMouseUp={(b) => webrtc.sendInput({ type: 'mouse_up', button: b })}
+              onKeyDown={(key) => webrtc.sendInput({ type: 'key_down', key })}
+              onKeyUp={(key) => webrtc.sendInput({ type: 'key_up', key })}
+              onScroll={(dx, dy) => webrtc.sendInput({ type: 'scroll', delta_x: dx, delta_y: dy })}
+            />}
         <OverlayControls
           peerId={connectPeerId}
           latencyMs={latencyMs}
@@ -164,7 +169,7 @@ export default function App() {
           isViewOnly={isViewOnly}
           videoRef={{ current: viewerRef.current?.videoElement ?? null } as React.RefObject<HTMLVideoElement | null>}
           fullscreenTargetRef={fsRef}
-          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); setPage('machines'); setIsViewOnly(false); setShowFileTransfer(false); }}
+          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); setPage('machines'); setIsViewOnly(false); setShowFileTransfer(false); setSessionMode('gui'); }}
           onCtrlAltDel={() => {
             webrtc.sendInput({ type: 'key_down', key: 'Control' });
             webrtc.sendInput({ type: 'key_down', key: 'Alt' });
