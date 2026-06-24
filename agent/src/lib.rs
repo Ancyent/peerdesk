@@ -13,6 +13,7 @@ pub mod mode;
 pub mod quality;
 pub mod service;
 pub mod signaling;
+pub mod terminal;
 pub mod webrtc_peer;
 
 use anyhow::Result;
