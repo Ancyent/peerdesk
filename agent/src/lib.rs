@@ -232,24 +232,28 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // capture::run drives an xcap recorder/screenshot loop whose platform
     // handles are not Send-safe across the shared runtime, so run it on a
     // dedicated OS thread with its own single-threaded tokio runtime.
+    let session_mode = crate::mode::detect();
+
     let capture_display_index = agent_cfg.display_index;
     let (display_switch_tx, display_switch_rx) = tokio::sync::mpsc::channel::<usize>(4);
     let capture_quality_rx = quality_rx.clone();
     let capture_frame_tx = frame_tx.clone();
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("capture runtime");
-        if let Err(e) = rt.block_on(capture::run(
-            capture_frame_tx,
-            capture_display_index,
-            display_switch_rx,
-            capture_quality_rx,
-        )) {
-            tracing::error!("Capture error: {}", e);
-        }
-    });
+    if session_mode == crate::mode::SessionMode::Gui {
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("capture runtime");
+            if let Err(e) = rt.block_on(capture::run(
+                capture_frame_tx,
+                capture_display_index,
+                display_switch_rx,
+                capture_quality_rx,
+            )) {
+                tracing::error!("Capture error: {}", e);
+            }
+        });
+    }
 
     // Captured-display bounds watch (origin+size of the monitor being viewed),
     // updated on display switch. Shared by the input injector and the cursor
@@ -257,29 +261,62 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     let (bounds_tx, bounds_rx) =
         tokio::sync::watch::channel(crate::display::resolve(agent_cfg.display_index));
 
-    // Cursor position reader thread (feeds the `cursor` data channel). Skipped
-    // when the host disabled the remote cursor.
-    if agent_cfg.show_remote_cursor {
-        let cursor_tx_reader = cursor_tx.clone();
-        let cursor_bounds_rx = bounds_rx.clone();
-        std::thread::spawn(move || crate::cursor::run(cursor_tx_reader, cursor_bounds_rx));
+    if session_mode == crate::mode::SessionMode::Gui {
+        // Cursor position reader thread (feeds the `cursor` data channel). Skipped
+        // when the host disabled the remote cursor.
+        if agent_cfg.show_remote_cursor {
+            let cursor_tx_reader = cursor_tx.clone();
+            let cursor_bounds_rx = bounds_rx.clone();
+            std::thread::spawn(move || crate::cursor::run(cursor_tx_reader, cursor_bounds_rx));
+        }
+
+        // enigo (input injection) is !Send on macOS, so run on a dedicated OS thread.
+        if agent_cfg.cast_only {
+            drop(input_rx);
+            drop(bounds_rx);
+            tracing::info!("Cast-only mode: input injection disabled");
+        } else {
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("input runtime");
+                if let Err(e) = rt.block_on(input::run(input_rx, bounds_rx)) {
+                    tracing::warn!("Input error: {}", e);
+                }
+            });
+        }
     }
 
-    // enigo (input injection) is !Send on macOS, so run on a dedicated OS thread.
-    if agent_cfg.cast_only {
-        drop(input_rx);
-        drop(bounds_rx);
-        tracing::info!("Cast-only mode: input injection disabled");
-    } else {
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("input runtime");
-            if let Err(e) = rt.block_on(input::run(input_rx, bounds_rx)) {
-                tracing::warn!("Input error: {}", e);
+    // PTY plumbing: in terminal mode the agent serves a shell over a data
+    // channel instead of screen capture/input injection.
+    let (pty_output, _pty_out_keep): (tokio::sync::broadcast::Sender<Vec<u8>>, _) =
+        tokio::sync::broadcast::channel(256);
+    let (pty_input_tx, mut pty_input_rx) =
+        tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(256);
+
+    if session_mode == crate::mode::SessionMode::Terminal {
+        match crate::terminal::PtySession::spawn(80, 24) {
+            Ok(mut pty) => {
+                let pty_out = pty.output.clone();
+                std::thread::spawn(move || {
+                    while let Some(msg) = pty_input_rx.blocking_recv() {
+                        match msg {
+                            crate::terminal::ClientMsg::Bytes(b) => pty.write_input(&b),
+                            crate::terminal::ClientMsg::Resize { cols, rows } => pty.resize(cols, rows),
+                        }
+                    }
+                });
+                let shared = pty_output.clone();
+                let mut sub = pty_out.subscribe();
+                tokio::spawn(async move {
+                    while let Ok(buf) = sub.recv().await {
+                        let _ = shared.send(buf);
+                    }
+                });
             }
-        });
+            Err(e) => tracing::error!("failed to start shell: {}", e),
+        }
     }
 
     // Audio capture is not yet wired into the WebRTC pipeline. Previously an
@@ -371,13 +408,20 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
             }
             Some(signaling::SignalingMessage::Offer { sdp }) => {
                 info!("Got offer — creating a fresh peer connection for this session");
-                // Publish the monitor list to the viewer now. The attended-approval
-                // flow never delivers a ViewerJoined to the agent, so the Offer (which
-                // always arrives) is the reliable point to send the display list.
-                let displays = capture::list_displays();
+                // Announce the session mode so the viewer renders the right surface
+                // (screen vs terminal). The attended-approval flow never delivers a
+                // ViewerJoined to the agent, so the Offer (which always arrives) is
+                // the reliable point to publish session metadata.
+                let mode_str = if session_mode == crate::mode::SessionMode::Gui { "gui" } else { "terminal" };
                 let _ = to_sig_tx
-                    .send(signaling::SignalingMessage::DisplayList { displays })
+                    .send(signaling::SignalingMessage::SessionMode { mode: mode_str.to_string() })
                     .await;
+                if session_mode == crate::mode::SessionMode::Gui {
+                    let displays = capture::list_displays();
+                    let _ = to_sig_tx
+                        .send(signaling::SignalingMessage::DisplayList { displays })
+                        .await;
+                }
                 // Tear down any previous session so a reconnecting viewer doesn't
                 // land on a stale PeerConnection (whose DTLS can't renegotiate).
                 if let Some(old) = peer.take() {
@@ -387,11 +431,14 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                     h.abort();
                 }
                 match webrtc_peer::PeerConnection::new(
+                    session_mode,
                     frame_tx.subscribe(),
                     input_tx.clone(),
                     ice_servers.clone(),
                     quality_tx.clone(),
                     cursor_tx.clone(),
+                    pty_output.clone(),
+                    pty_input_tx.clone(),
                 )
                 .await
                 {
