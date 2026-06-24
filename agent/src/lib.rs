@@ -9,6 +9,7 @@ pub mod encode;
 pub mod file_transfer;
 pub mod input;
 pub mod logging;
+pub mod mode;
 pub mod quality;
 pub mod service;
 pub mod signaling;
