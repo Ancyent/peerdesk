@@ -165,7 +165,13 @@ async def websocket_endpoint(ws: WebSocket):
                     else:
                         audit_log("connection_attempt", data.get("peer_id", ""), viewer_ip, "auth_failed")
 
-                elif msg_type in ("offer", "answer", "ice_candidate"):
+                elif msg_type in (
+                    "offer",
+                    "answer",
+                    "ice_candidate",
+                    "display_list",
+                    "switch_display",
+                ):
                     await forward_to_peer(state, peer_id, viewer_id, data)
 
                 elif msg_type == "approve":

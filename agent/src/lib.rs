@@ -369,6 +369,13 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
             }
             Some(signaling::SignalingMessage::Offer { sdp }) => {
                 info!("Got offer — creating a fresh peer connection for this session");
+                // Publish the monitor list to the viewer now. The attended-approval
+                // flow never delivers a ViewerJoined to the agent, so the Offer (which
+                // always arrives) is the reliable point to send the display list.
+                let displays = capture::list_displays();
+                let _ = to_sig_tx
+                    .send(signaling::SignalingMessage::DisplayList { displays })
+                    .await;
                 // Tear down any previous session so a reconnecting viewer doesn't
                 // land on a stale PeerConnection (whose DTLS can't renegotiate).
                 if let Some(old) = peer.take() {

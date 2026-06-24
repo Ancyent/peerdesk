@@ -212,6 +212,17 @@ async def handle_approval(
             }))
         except Exception:
             pass
+        # Tell the agent the viewer joined so it publishes its monitor list
+        # (the agent only sends `display_list` in response to `viewer_joined`).
+        agent_ws = state.agent_connections.get(peer_id)
+        if agent_ws:
+            try:
+                await agent_ws.send_text(json.dumps({
+                    "type": "viewer_joined",
+                    "viewer_id": viewer_id,
+                }))
+            except Exception:
+                pass
     else:
         try:
             await viewer_ws.send_text(json.dumps({
