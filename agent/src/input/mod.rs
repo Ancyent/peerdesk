@@ -1,3 +1,4 @@
+pub mod keymap;
 pub mod mouse;
 
 use anyhow::Result;
