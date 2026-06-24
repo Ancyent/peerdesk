@@ -269,8 +269,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
           onMouseDown={e => { e.preventDefault(); e.currentTarget.focus(); webrtc.sendInput({ type: 'mouse_down', button: e.button }); }}
           onMouseUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_up', button: e.button }); }}
           onContextMenu={e => e.preventDefault()}
-          onKeyDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_down', key: e.key }); }}
-          onKeyUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key }); }}
+          onKeyDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_down', key: e.key, code: e.code }); }}
+          onKeyUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key, code: e.code }); }}
           onWheel={e => { e.preventDefault(); webrtc.sendInput({ type: 'scroll', delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); }}
         />
         {showCursor && webrtc.cursor && videoRef.current && (() => {
