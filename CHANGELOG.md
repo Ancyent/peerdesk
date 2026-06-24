@@ -2,6 +2,16 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.24] — 2026-06-24
+
+### Fixed
+- **Fluid streaming on monitors driven by a second GPU.** The agent now uses
+  Windows Graphics Capture (`xcap`'s `wgc` feature) for the video recorder
+  instead of DXGI Desktop Duplication. DXGI duplication can't capture a monitor
+  attached to a secondary GPU (hybrid graphics) — it failed with `E_INVALIDARG`
+  and the agent fell back to slower screenshot capture. WGC captures any monitor
+  regardless of GPU, so all displays now stream smoothly.
+
 ## [0.4.23] — 2026-06-24
 
 ### Fixed

@@ -16,7 +16,11 @@ tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-xcap = "0.9"
+# `wgc` = Windows Graphics Capture recorder. Without it xcap falls back to DXGI
+# Desktop Duplication, which can't capture a monitor driven by a secondary GPU
+# (hybrid graphics) — it fails with E_INVALIDARG. WGC captures any monitor.
+# Windows-only feature; no effect on the Linux/macOS build.
+xcap = { version = "0.9", features = ["wgc"] }
 openh264 = "0.6"
 webrtc = "0.11"
 enigo = "0.2"
