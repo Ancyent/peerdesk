@@ -104,8 +104,20 @@ pub async fn run(
         tracing::info!("Registered with signaling server, peer_id={}", peer_id);
         backoff_secs = 1; // reset after a successful connection
 
+        // Keepalive: ping the server every 30s so an idle connection isn't dropped
+        // by a NAT/firewall idle timeout. A dropped idle socket leaves the host
+        // unable to receive connection requests until the agent reconnects.
+        let mut keepalive = tokio::time::interval(std::time::Duration::from_secs(30));
+        keepalive.tick().await; // consume the immediate first tick
+
         loop {
             tokio::select! {
+                _ = keepalive.tick() => {
+                    if let Err(e) = write.send(Message::Ping(Vec::new())).await {
+                        tracing::warn!("Signaling keepalive ping failed: {} — reconnecting", e);
+                        continue 'reconnect;
+                    }
+                }
                 msg = read.next() => match msg {
                     Some(Ok(Message::Text(text))) => {
                         match serde_json::from_str::<SignalingMessage>(&text) {

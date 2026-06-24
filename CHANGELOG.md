@@ -2,6 +2,17 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.23] — 2026-06-24
+
+### Fixed
+- **Idle signaling connection kept alive.** The agent now pings the signaling
+  server every 30s so a NAT/firewall idle timeout can't silently drop the
+  connection — which previously left the host unable to show the approval prompt
+  until the agent was restarted.
+- The agent also publishes its monitor list on the WebRTC offer (not only on the
+  legacy `viewer_joined` event), so the viewer reliably receives all displays in
+  the attended-approval flow.
+
 ## [0.4.22] — 2026-06-23
 
 ### Fixed
