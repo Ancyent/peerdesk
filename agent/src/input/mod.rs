@@ -67,24 +67,25 @@ pub async fn run(
                         .map_err(|e| anyhow::anyhow!("{e:?}"))
                 }
             }
+            // Browser MouseEvent.button is the W3C standard: 0=left, 1=middle, 2=right.
             InputEvent::MouseDown { button: 0 } => enigo
                 .button(enigo::Button::Left, Press)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
             InputEvent::MouseDown { button: 1 } => enigo
-                .button(enigo::Button::Right, Press)
+                .button(enigo::Button::Middle, Press)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
             InputEvent::MouseDown { button: 2 } => enigo
-                .button(enigo::Button::Middle, Press)
+                .button(enigo::Button::Right, Press)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
             InputEvent::MouseDown { .. } => Ok(()),
             InputEvent::MouseUp { button: 0 } => enigo
                 .button(enigo::Button::Left, Release)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
             InputEvent::MouseUp { button: 1 } => enigo
-                .button(enigo::Button::Right, Release)
+                .button(enigo::Button::Middle, Release)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
             InputEvent::MouseUp { button: 2 } => enigo
-                .button(enigo::Button::Middle, Release)
+                .button(enigo::Button::Right, Release)
                 .map_err(|e| anyhow::anyhow!("{e:?}")),
             InputEvent::MouseUp { .. } => Ok(()),
             InputEvent::KeyDown { ref key } => {

@@ -2,6 +2,14 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.26] — 2026-06-24
+
+### Fixed
+- **Right-click and middle-click were swapped.** The agent mapped the browser's
+  `MouseEvent.button` codes incorrectly (1 and 2 reversed), so a right-click was
+  injected as a middle-click on the host. Now mapped to the W3C standard
+  (0=left, 1=middle, 2=right).
+
 ## [0.4.25] — 2026-06-24
 
 ### Added
