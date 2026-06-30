@@ -30,7 +30,7 @@ import type { SignalingMessage } from './types/messages';
 type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer';
 
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, setSessionActive } = useAuth();
   const [page, setPage] = useState<FullPage>('machines');
   const [connectPeerId, setConnectPeerId] = useState('');
   const [viewerState, setViewerState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
@@ -71,6 +71,16 @@ export default function App() {
     if (!ch) return;
     ch.onmessage = (e: MessageEvent) => handleFtMessage(e.data as string | ArrayBuffer);
   }, [webrtc.stream, handleFtMessage, webrtc]);
+
+  useEffect(() => {
+    setSessionActive(viewerState === 'connected');
+  }, [viewerState, setSessionActive]);
+
+  useEffect(() => {
+    if (viewerState !== 'connected') return;
+    const id = setInterval(() => setSessionActive(true), 60_000);
+    return () => clearInterval(id);
+  }, [viewerState, setSessionActive]);
 
   useEffect(() => {
     if (viewerState !== 'connected') return;
