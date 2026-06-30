@@ -12,6 +12,7 @@ export function LoginPage({ onGoRegister }: Props) {
   const { brand_name, logo_data_url } = useBrandingContext();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +21,7 @@ export function LoginPage({ onGoRegister }: Props) {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, remember);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed');
     } finally {
@@ -41,6 +42,10 @@ export function LoginPage({ onGoRegister }: Props) {
           style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid var(--border-dim)', background:'var(--bg-surface)', color:'var(--text-1)' }} required />
         <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
           style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid var(--border-dim)', background:'var(--bg-surface)', color:'var(--text-1)' }} required />
+        <label style={{ display:'flex', alignItems:'center', gap:8, color:'var(--text-2)', fontSize:14, cursor:'pointer' }}>
+          <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
+          Remember me for 24h
+        </label>
         <button type="submit" disabled={loading}
           style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? 'Signing in…' : 'Sign In'}

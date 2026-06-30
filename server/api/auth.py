@@ -1,3 +1,4 @@
+import hashlib
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -8,6 +9,8 @@ SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+IDLE_TIMEOUT = timedelta(hours=24)
+ABSOLUTE_CAP = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 PENDING_2FA_TOKEN_EXPIRE_MINUTES = 5
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -26,9 +29,29 @@ def create_access_token(user_id: str) -> str:
     return jwt.encode({"sub": user_id, "exp": expire, "type": "access"}, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def create_refresh_token(user_id: str) -> str:
+def create_refresh_token(user_id: str, sid: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    return jwt.encode({"sub": user_id, "exp": expire, "type": "refresh"}, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(
+        {"sub": user_id, "sid": sid, "exp": expire, "type": "refresh"},
+        SECRET_KEY, algorithm=ALGORITHM,
+    )
+
+
+def decode_refresh_token(token: str) -> Optional[tuple[str, str]]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            return None
+        sub, sid = payload.get("sub"), payload.get("sid")
+        if not sub or not sid:
+            return None
+        return sub, sid
+    except JWTError:
+        return None
+
+
+def hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def create_pending_2fa_token(user_id: str) -> str:

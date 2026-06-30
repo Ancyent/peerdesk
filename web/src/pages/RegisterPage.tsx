@@ -21,7 +21,7 @@ export function RegisterPage({ onGoLogin }: Props) {
     setError('');
     setLoading(true);
     try {
-      await register(email, name, password);
+      await register(email, name, password, true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Registration failed');
     } finally {

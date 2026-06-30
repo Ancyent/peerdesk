@@ -2,6 +2,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { SignalingMessage } from '../types/messages';
 import { api } from '../api/client';
+import { getTokens } from '../auth/tokenStore';
 
 export function useWebRTC(
   sendSignaling: (msg: SignalingMessage) => void,
@@ -39,7 +40,7 @@ export function useWebRTC(
     // STUN if the request fails (e.g. not logged in).
     let iceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
     try {
-      const token = localStorage.getItem('access_token');
+      const token = getTokens()?.access;
       if (token) {
         const t = await api.turn.credentials(token);
         const stun = t.urls.filter((u) => u.startsWith('stun:'));

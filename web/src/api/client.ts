@@ -1,4 +1,8 @@
 import { getConfig } from '../config';
+import { singleFlight } from '../lib/singleFlight';
+import { getTokens, setTokens as storeSetTokens, clear as clearStore, getStorageKind } from '../auth/tokenStore';
+
+export { storeSetTokens as setTokens };
 
 export class ApiError extends Error {
   status: number;
@@ -8,11 +12,40 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let onAuthFailure: (() => void) | null = null;
+export function setOnAuthFailure(cb: () => void) { onAuthFailure = cb; }
+
+export const refreshAccessToken = singleFlight(async (): Promise<void> => {
+  const tokens = getTokens();
+  if (!tokens) throw new ApiError(401, 'No session');
+  const res = await fetch(`${getConfig().apiUrl}/auth/refresh`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: tokens.refresh }),
+  });
+  if (!res.ok) throw new ApiError(res.status, 'Refresh failed');
+  const data = await res.json();
+  const persist = getStorageKind() === 'local';
+  storeSetTokens({ access: data.access_token, refresh: data.refresh_token }, persist);
+});
+
+async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
   const res = await fetch(`${getConfig().apiUrl}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options.headers },
   });
+  if (res.status === 401 && !retried && !path.startsWith('/auth/')) {
+    try {
+      await refreshAccessToken();
+    } catch {
+      clearStore();
+      onAuthFailure?.();
+      throw new ApiError(401, 'Session expired');
+    }
+    const fresh = getTokens();
+    const headers = { ...options.headers } as Record<string, string>;
+    if (fresh && headers.Authorization) headers.Authorization = `Bearer ${fresh.access}`;
+    return request<T>(path, { ...options, headers }, true);
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
     const detail = body.detail;
@@ -101,21 +134,18 @@ export interface TurnCredentials {
 
 export const api = {
   auth: {
-    register: (email: string, name: string, password: string) =>
+    register: (email: string, name: string, password: string, remember_me = false) =>
       request<TokenResponse>('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ email, name, password }),
+        body: JSON.stringify({ email, name, password, remember_me }),
       }),
-    login: (email: string, password: string) =>
+    login: (email: string, password: string, remember_me = false) =>
       request<TokenResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, remember_me }),
       }),
-    refresh: (refresh_token: string) =>
-      request<TokenResponse>('/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({ refresh_token }),
-      }),
+    logout: (refresh_token: string) =>
+      request<void>('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token }) }),
   },
   users: {
     me: (token: string) =>

@@ -108,6 +108,32 @@ class Session(Base):
         super().__init__(**kwargs)
 
 
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    remember_me: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "remember_me" not in kwargs:
+            kwargs["remember_me"] = False
+        now = utcnow()
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = now
+        if "last_used_at" not in kwargs:
+            kwargs["last_used_at"] = kwargs["created_at"]
+        if "revoked" not in kwargs:
+            kwargs["revoked"] = False
+        super().__init__(**kwargs)
+
+
 class Branding(Base):
     __tablename__ = "branding"
 

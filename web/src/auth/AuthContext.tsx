@@ -1,75 +1,113 @@
-import { createContext, useCallback, useEffect, useState } from 'react';
+import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api } from '../api/client';
+import { api, setOnAuthFailure, refreshAccessToken } from '../api/client';
 import type { UserOut } from '../api/client';
+import { getTokens, setTokens as storeSetTokens, clear as clearStore } from './tokenStore';
+import { isIdleExpired, IDLE_THRESHOLD_MS } from './idle';
+import { tokenExpiringSoon } from './jwt';
+import { useActivityTracker } from '../hooks/useActivityTracker';
 
 interface AuthState {
   accessToken: string | null;
-  refreshToken: string | null;
   user: UserOut | null;
   loading: boolean;
 }
 
 export interface AuthContextValue extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, name: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+  register: (email: string, name: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
+  setSessionActive: (active: boolean) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
-    accessToken: localStorage.getItem('access_token'),
-    refreshToken: localStorage.getItem('refresh_token'),
+    accessToken: getTokens()?.access ?? null,
     user: null,
     loading: true,
   });
+  const lastActivity = useRef<number>(Date.now());
+  const sessionActive = useRef<boolean>(false);
+  const pendingLogout = useRef<boolean>(false);
 
-  const setTokens = (access: string, refresh: string) => {
-    localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
-    setState(s => ({ ...s, accessToken: access, refreshToken: refresh }));
-  };
+  const doLogout = useCallback(() => {
+    const refresh = getTokens()?.refresh;
+    if (refresh) api.auth.logout(refresh).catch(() => {});
+    clearStore();
+    setState({ accessToken: null, user: null, loading: false });
+  }, []);
 
-  // On mount: validate stored token and load user
+  // Forced logout from the API layer (refresh failed). Defer while a viewer session is active.
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      setState(s => ({ ...s, loading: false }));
-      return;
+    setOnAuthFailure(() => {
+      if (sessionActive.current) { pendingLogout.current = true; return; }
+      clearStore();
+      setState({ accessToken: null, user: null, loading: false });
+    });
+  }, []);
+
+  const setSessionActive = useCallback((active: boolean) => {
+    sessionActive.current = active;
+    if (active) lastActivity.current = Date.now();
+    if (!active && pendingLogout.current) {
+      pendingLogout.current = false;
+      clearStore();
+      setState({ accessToken: null, user: null, loading: false });
     }
-    api.users.me(token)
-      .then(user => setState(s => ({ ...s, user, loading: false })))
-      .catch(() => {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        setState({ accessToken: null, refreshToken: null, user: null, loading: false });
-      });
+  }, []);
+
+  useActivityTracker(useCallback(() => { lastActivity.current = Date.now(); }, []));
+
+  // On mount: validate stored token and load user.
+  useEffect(() => {
+    const tokens = getTokens();
+    if (!tokens) { setState(s => ({ ...s, loading: false })); return; }
+    api.users.me(tokens.access)
+      .then(user => setState(s => ({ ...s, user, accessToken: getTokens()?.access ?? null, loading: false })))
+      .catch(() => { clearStore(); setState({ accessToken: null, user: null, loading: false }); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const login = useCallback(async (email: string, password: string) => {
-    const tokens = await api.auth.login(email, password);
-    setTokens(tokens.access_token, tokens.refresh_token);
-    const user = await api.users.me(tokens.access_token);
-    setState(s => ({ ...s, user }));
+  // Session keeper + idle mirror: tick every 60s.
+  useEffect(() => {
+    if (!state.user) return;
+    const id = setInterval(() => {
+      const now = Date.now();
+      const idle = isIdleExpired(lastActivity.current, now, IDLE_THRESHOLD_MS);
+      if (idle && !sessionActive.current) { doLogout(); return; }
+      // proactively refresh only when recently active AND the access token is near expiry
+      const recentlyActive = now - lastActivity.current < IDLE_THRESHOLD_MS;
+      if (recentlyActive && tokenExpiringSoon(getTokens()?.access, now, 2 * 60 * 1000)) {
+        refreshAccessToken()
+          .then(() => setState(s => ({ ...s, accessToken: getTokens()?.access ?? s.accessToken })))
+          .catch(() => {}); // a real failure surfaces via the next API call's interceptor
+      }
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [state.user, doLogout]);
+
+  const finishAuth = async (access: string) => {
+    const user = await api.users.me(access);
+    setState(s => ({ ...s, user, accessToken: access }));
+  };
+
+  const login = useCallback(async (email: string, password: string, rememberMe = false) => {
+    const tokens = await api.auth.login(email, password, rememberMe);
+    storeSetTokens({ access: tokens.access_token, refresh: tokens.refresh_token }, rememberMe);
+    lastActivity.current = Date.now();
+    await finishAuth(tokens.access_token);
   }, []);
 
-  const register = useCallback(async (email: string, name: string, password: string) => {
-    const tokens = await api.auth.register(email, name, password);
-    setTokens(tokens.access_token, tokens.refresh_token);
-    const user = await api.users.me(tokens.access_token);
-    setState(s => ({ ...s, user }));
-  }, []);
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setState({ accessToken: null, refreshToken: null, user: null, loading: false });
+  const register = useCallback(async (email: string, name: string, password: string, rememberMe = false) => {
+    const tokens = await api.auth.register(email, name, password, rememberMe);
+    storeSetTokens({ access: tokens.access_token, refresh: tokens.refresh_token }, rememberMe);
+    lastActivity.current = Date.now();
+    await finishAuth(tokens.access_token);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout }}>
+    <AuthContext.Provider value={{ ...state, login, register, logout: doLogout, setSessionActive }}>
       {children}
     </AuthContext.Provider>
   );
