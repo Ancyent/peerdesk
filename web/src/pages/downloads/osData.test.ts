@@ -47,3 +47,17 @@ describe('AGENT_ARGS', () => {
     expect(AGENT_ARGS.every(a => a.meaning.length > 0)).toBe(true);
   });
 });
+
+import { coerceOs } from './osData';
+
+describe('coerceOs', () => {
+  it('returns the matching enabled os id', () => {
+    expect(coerceOs('windows')).toBe('windows');
+    expect(coerceOs('android')).toBe('android');
+  });
+  it('null / unknown / disabled → linux', () => {
+    expect(coerceOs(null)).toBe('linux');
+    expect(coerceOs('bogus')).toBe('linux');
+    expect(coerceOs('macos')).toBe('linux'); // macos tab is disabled
+  });
+});
