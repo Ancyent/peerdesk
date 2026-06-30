@@ -56,6 +56,20 @@ export default function App() {
   const [sessionMode, setSessionMode] = useState<'gui' | 'terminal'>('gui');
 
   const navigate = useRoute((p, sub) => {
+    // Fix 1: tear down WebRTC session when navigating back from viewer or connect
+    if (page === 'viewer' || page === 'connect') {
+      webrtc.disconnect();
+      setViewerState('idle');
+      setIsViewOnly(false);
+      setShowFileTransfer(false);
+      setSessionMode('gui');
+    }
+    // Fix 2: if an authed user pops back to a login/register URL, redirect to machines
+    if (user && (p === 'login' || p === 'register')) {
+      window.history.replaceState({}, '', '/machines');
+      setPage('machines');
+      return;
+    }
     setPage(p);
     if (p === 'downloads') setDownloadsOs(coerceOs(sub));
   });
@@ -151,7 +165,10 @@ export default function App() {
     return <LoginPage onGoRegister={() => go('register')} />;
   }
 
-  if (page === 'viewer') {
+  // Fix 2: an authed user who navigated back to /login or /register sees machines
+  const effectivePage: FullPage = user && (page === 'login' || page === 'register') ? 'machines' : page;
+
+  if (effectivePage === 'viewer') {
     if (viewerState === 'connecting') return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -239,24 +256,24 @@ export default function App() {
     );
   }
 
-  if (page === 'connect') return (
+  if (effectivePage === 'connect') return (
     <ConnectForm onConnect={handleConnect} initialPeerId={connectPeerId} error={errMsg || undefined} />
   );
 
-  const shellPage: AppPage = ['login', 'register', 'connect', 'viewer'].includes(page) ? 'machines' : page as AppPage;
+  const shellPage: AppPage = ['login', 'register', 'connect', 'viewer'].includes(effectivePage) ? 'machines' : effectivePage as AppPage;
 
-  const orgPanel = page === 'organization'
+  const orgPanel = effectivePage === 'organization'
     ? <OrgTree selected={orgNode} onSelect={setOrgNode} machineCounts={{}} />
     : undefined;
 
   return (
     <AppShell page={shellPage} onNavigate={p => go(p)} contextPanel={orgPanel}>
-      {page === 'machines'      && <MachinesPage onConnect={handleDashboardConnect} />}
-      {page === 'organization'  && <OrganizationPage onConnect={handleDashboardConnect} orgNode={orgNode} />}
-      {page === 'api-keys'      && <ApiKeysPage />}
-      {page === 'downloads'     && <DownloadsPage os={downloadsOs} onOsChange={(o) => go('downloads', o)} />}
-      {page === 'branding'      && <BrandingPage onBack={() => go('machines')} />}
-      {page === 'settings'      && <SettingsPage />}
+      {effectivePage === 'machines'      && <MachinesPage onConnect={handleDashboardConnect} />}
+      {effectivePage === 'organization'  && <OrganizationPage onConnect={handleDashboardConnect} orgNode={orgNode} />}
+      {effectivePage === 'api-keys'      && <ApiKeysPage />}
+      {effectivePage === 'downloads'     && <DownloadsPage os={downloadsOs} onOsChange={(o) => go('downloads', o)} />}
+      {effectivePage === 'branding'      && <BrandingPage onBack={() => go('machines')} />}
+      {effectivePage === 'settings'      && <SettingsPage />}
     </AppShell>
   );
 }
