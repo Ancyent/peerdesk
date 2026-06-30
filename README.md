@@ -169,7 +169,7 @@ before the agent — it is then detected as GUI mode and captured:
 ```bash
 Xvfb :99 -screen 0 1920x1080x24 &
 DISPLAY=:99 fluxbox &
-DISPLAY=:99 ./peerdesk-agent --server=... --token=...
+DISPLAY=:99 ./peerdesk-agent --server=... --api-key=...
 ```
 
 ### Signaling Server (`server/signaling/`)
@@ -467,23 +467,23 @@ MIT
 ### Quick install — Linux (as root)
 ```bash
 curl -sSL https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.sh \
-  | sudo bash -s -- --server=https://your-server.com --token=YOUR_TOKEN
+  | sudo bash -s -- --server=https://your-server.com --api-key=YOUR_TOKEN
 ```
 
 ### Quick install — Windows (as Administrator)
 ```powershell
 irm https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.ps1 | iex
 # Or with parameters:
-.\install.ps1 -Server "https://your-server.com" -Token "YOUR_TOKEN"
+.\install.ps1 -Server "https://your-server.com" -ApiKey "YOUR_TOKEN"
 ```
 
 ### Manual / portable
 ```bash
 # Get peer ID (creates config on first run):
-./peerdesk-agent --server=https://your-server.com --token=YOUR_TOKEN --get-id
+./peerdesk-agent --server=https://your-server.com --api-key=YOUR_TOKEN --get-id
 
 # Install as service (Linux):
-sudo ./peerdesk-agent --install-service --server=https://your-server.com --token=YOUR_TOKEN
+sudo ./peerdesk-agent --install-service --server=https://your-server.com --api-key=YOUR_TOKEN
 
 # Portable mode (config stored next to binary):
 ./peerdesk-agent --portable --server=https://your-server.com
@@ -494,7 +494,7 @@ sudo ./peerdesk-agent --install-service --server=https://your-server.com --token
 | Flag | Description |
 |---|---|
 | `--server=URL` | Base URL of PeerDesk server |
-| `--token=TOKEN` | Registration token from dashboard |
+| `--api-key=TOKEN` | Registration token from dashboard (used once) |
 | `--password=PW` | Override connection password |
 | `--silent` | Log to file, no stdout (used by service) |
 | `--portable` | Store config next to binary |

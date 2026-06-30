@@ -2,7 +2,7 @@
 # PeerDesk Agent — Linux installer
 # Usage:
 #   curl -sSL https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.sh \
-#     | sudo bash -s -- --server=https://api.example.com --token=YOUR_TOKEN
+#     | sudo bash -s -- --server=https://api.example.com --api-key=YOUR_TOKEN
 
 set -euo pipefail
 
@@ -10,13 +10,13 @@ GITHUB_REPO="Ancyent/peerdesk"
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="peerdesk-agent"
 
-TOKEN=""
+API_KEY=""
 SERVER=""
 
 for arg in "$@"; do
   case $arg in
-    --token=*)  TOKEN="${arg#*=}" ;;
-    --server=*) SERVER="${arg#*=}" ;;
+    --api-key=*) API_KEY="${arg#*=}" ;;
+    --server=*)  SERVER="${arg#*=}" ;;
     *) echo "Unknown argument: $arg"; exit 1 ;;
   esac
 done
@@ -43,8 +43,8 @@ chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
 echo "==> Installed to ${INSTALL_DIR}/${BINARY_NAME}"
 
 ARGS=""
-[[ -n "$SERVER" ]] && ARGS="$ARGS --server=$SERVER"
-[[ -n "$TOKEN"  ]] && ARGS="$ARGS --token=$TOKEN"
+[[ -n "$SERVER"  ]] && ARGS="$ARGS --server=$SERVER"
+[[ -n "$API_KEY" ]] && ARGS="$ARGS --api-key=$API_KEY"
 
 echo "==> Installing systemd service..."
 # shellcheck disable=SC2086

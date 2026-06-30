@@ -41,7 +41,7 @@ describe('assetLabel', () => {
 describe('AGENT_ARGS', () => {
   it('documents all nine binary flags', () => {
     const flags = AGENT_ARGS.map(a => a.flag);
-    for (const f of ['--server=URL','--token=TOKEN','--password=PW','--silent','--portable','--get-id','--reset-password','--install-service','--uninstall-service']) {
+    for (const f of ['--server=URL','--api-key=TOKEN','--password=PW','--silent','--portable','--get-id','--reset-password','--install-service','--uninstall-service']) {
       expect(flags).toContain(f);
     }
     expect(AGENT_ARGS.every(a => a.meaning.length > 0)).toBe(true);

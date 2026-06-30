@@ -48,7 +48,7 @@ export interface AgentArg { flag: string; meaning: string }
 
 export const AGENT_ARGS: AgentArg[] = [
   { flag: '--server=URL', meaning: 'URL-ul de bază al serverului PeerDesk (din el derivă API-ul și signaling-ul).' },
-  { flag: '--token=TOKEN', meaning: 'Token de înregistrare generat din dashboard (folosit o singură dată).' },
+  { flag: '--api-key=TOKEN', meaning: 'Token de înregistrare generat din dashboard (folosit o singură dată). Flag-ul binarului este --api-key.' },
   { flag: '--password=PW', meaning: 'Setează manual parola de conectare (altfel se generează una).' },
   { flag: '--silent', meaning: 'Scrie în fișier de log, fără stdout (folosit de serviciu).' },
   { flag: '--portable', meaning: 'Stochează configul lângă binar (mod portabil).' },

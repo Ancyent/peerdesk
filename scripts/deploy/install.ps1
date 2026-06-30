@@ -1,10 +1,10 @@
 # PeerDesk Agent — Windows installer (run as Administrator)
 # Usage:
 #   irm https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.ps1 | iex
-#   .\install.ps1 -Server "https://api.example.com" -Token "YOUR_TOKEN"
+#   .\install.ps1 -Server "https://api.example.com" -ApiKey "YOUR_TOKEN"
 
 param(
-    [string]$Token  = "",
+    [string]$ApiKey = "",
     [string]$Server = ""
 )
 
@@ -34,7 +34,7 @@ Write-Host "==> Installed to $BinaryPath"
 
 $ExtraArgs = @()
 if ($Server) { $ExtraArgs += "--server=$Server" }
-if ($Token)  { $ExtraArgs += "--token=$Token"  }
+if ($ApiKey) { $ExtraArgs += "--api-key=$ApiKey" }
 
 Write-Host "==> Installing Windows service..."
 & $BinaryPath --install-service @ExtraArgs
