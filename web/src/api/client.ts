@@ -1,6 +1,6 @@
 import { getConfig } from '../config';
 import { singleFlight } from '../lib/singleFlight';
-import { getTokens, setTokens as storeSetTokens, clear as clearStore } from '../auth/tokenStore';
+import { getTokens, setTokens as storeSetTokens, clear as clearStore, getStorageKind } from '../auth/tokenStore';
 
 export { storeSetTokens as setTokens };
 
@@ -24,7 +24,7 @@ export const refreshAccessToken = singleFlight(async (): Promise<void> => {
   });
   if (!res.ok) throw new ApiError(res.status, 'Refresh failed');
   const data = await res.json();
-  const persist = window.localStorage.getItem('auth_persist') === 'local';
+  const persist = getStorageKind() === 'local';
   storeSetTokens({ access: data.access_token, refresh: data.refresh_token }, persist);
 });
 
@@ -143,11 +143,6 @@ export const api = {
       request<TokenResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password, remember_me }),
-      }),
-    refresh: (refresh_token: string) =>
-      request<TokenResponse>('/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({ refresh_token }),
       }),
     logout: (refresh_token: string) =>
       request<void>('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token }) }),

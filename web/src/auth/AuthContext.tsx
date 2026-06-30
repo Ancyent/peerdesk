@@ -4,6 +4,7 @@ import { api, setOnAuthFailure, refreshAccessToken } from '../api/client';
 import type { UserOut } from '../api/client';
 import { getTokens, setTokens as storeSetTokens, clear as clearStore } from './tokenStore';
 import { isIdleExpired, IDLE_THRESHOLD_MS } from './idle';
+import { tokenExpiringSoon } from './jwt';
 import { useActivityTracker } from '../hooks/useActivityTracker';
 
 interface AuthState {
@@ -75,9 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       const idle = isIdleExpired(lastActivity.current, now, IDLE_THRESHOLD_MS);
       if (idle && !sessionActive.current) { doLogout(); return; }
-      // proactively refresh if there was recent activity (keeps active sessions seamless)
+      // proactively refresh only when recently active AND the access token is near expiry
       const recentlyActive = now - lastActivity.current < IDLE_THRESHOLD_MS;
-      if (recentlyActive) {
+      if (recentlyActive && tokenExpiringSoon(getTokens()?.access, now, 2 * 60 * 1000)) {
         refreshAccessToken()
           .then(() => setState(s => ({ ...s, accessToken: getTokens()?.access ?? s.accessToken })))
           .catch(() => {}); // a real failure surfaces via the next API call's interceptor

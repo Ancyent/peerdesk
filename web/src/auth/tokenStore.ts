@@ -39,3 +39,9 @@ function browserStores(): Stores {
 export function getTokens(): Tokens | null { return readTokens(browserStores()); }
 export function setTokens(t: Tokens, remember: boolean): void { writeTokens(t, remember, browserStores()); }
 export function clear(): void { clearTokens(browserStores()); }
+
+export function getStorageKind(): 'local' | 'session' | null {
+  if (window.localStorage.getItem(PERSIST) === 'local') return 'local';
+  if (window.sessionStorage.getItem(PERSIST) === 'session') return 'session';
+  return null;
+}
