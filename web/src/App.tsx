@@ -25,12 +25,17 @@ import { useClipboard } from './hooks/useClipboard';
 import { useFileTransfer } from './hooks/useFileTransfer';
 import { getConfig } from './config';
 import type { SignalingMessage } from './types/messages';
+import { parsePath, type RoutablePage } from './routing/paths';
+import { useRoute } from './routing/useRoute';
+import { coerceOs, type OsId } from './pages/downloads/osData';
 
 type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer';
 
 export default function App() {
   const { user, loading, setSessionActive } = useAuth();
-  const [page, setPage] = useState<FullPage>('machines');
+  const initialRoute = parsePath(window.location.pathname);
+  const [page, setPage] = useState<FullPage>(initialRoute.page);
+  const [downloadsOs, setDownloadsOs] = useState<OsId>(coerceOs(initialRoute.sub));
   const [connectPeerId, setConnectPeerId] = useState('');
   const [viewerState, setViewerState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
@@ -49,6 +54,21 @@ export default function App() {
   const [showCursor, setShowCursor] = useState(true);
   const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
   const [sessionMode, setSessionMode] = useState<'gui' | 'terminal'>('gui');
+
+  const navigate = useRoute((p, sub) => {
+    setPage(p);
+    if (p === 'downloads') setDownloadsOs(coerceOs(sub));
+  });
+  const go = useCallback((p: RoutablePage, sub?: string) => {
+    navigate(p, sub ?? null);
+    setPage(p);
+    if (p === 'downloads') setDownloadsOs(coerceOs(sub ?? null));
+  }, [navigate]);
+
+  // After login, don't linger on /login or /register.
+  useEffect(() => {
+    if (user && (page === 'login' || page === 'register')) go('machines');
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const SIGNALING_URL = getConfig().signalingUrl;
 
@@ -96,7 +116,7 @@ export default function App() {
     else if (msg.type === 'answer')        { await webrtc.handleAnswer(msg.sdp); setViewerState('connected'); }
     else if (msg.type === 'ice_candidate') { await webrtc.handleIceCandidate(msg.candidate); }
     else if (msg.type === 'error')         { setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found'); setViewerState('error'); setPage('connect'); }
-    else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg('Remote machine disconnected'); setViewerState('error'); setPage('machines'); }
+    else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg('Remote machine disconnected'); setViewerState('error'); go('machines'); }
     else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? 'Connection denied'); setViewerState('error'); setPage('connect'); }
     else if (msg.type === 'session_mode')  { setSessionMode(msg.mode); }
     else if (msg.type === 'display_list')  {
@@ -127,8 +147,8 @@ export default function App() {
   );
 
   if (!user) {
-    if (page === 'register') return <RegisterPage onGoLogin={() => setPage('login')} />;
-    return <LoginPage onGoRegister={() => setPage('register')} />;
+    if (page === 'register') return <RegisterPage onGoLogin={() => go('login')} />;
+    return <LoginPage onGoRegister={() => go('register')} />;
   }
 
   if (page === 'viewer') {
@@ -178,7 +198,7 @@ export default function App() {
           isViewOnly={isViewOnly}
           videoRef={{ current: viewerRef.current?.videoElement ?? null } as React.RefObject<HTMLVideoElement | null>}
           fullscreenTargetRef={fsRef}
-          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); setPage('machines'); setIsViewOnly(false); setShowFileTransfer(false); setSessionMode('gui'); }}
+          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); go('machines'); setIsViewOnly(false); setShowFileTransfer(false); setSessionMode('gui'); }}
           onCtrlAltDel={() => {
             webrtc.sendInput({ type: 'key_down', key: 'Control', code: 'ControlLeft' });
             webrtc.sendInput({ type: 'key_down', key: 'Alt', code: 'AltLeft' });
@@ -230,12 +250,12 @@ export default function App() {
     : undefined;
 
   return (
-    <AppShell page={shellPage} onNavigate={p => setPage(p)} contextPanel={orgPanel}>
+    <AppShell page={shellPage} onNavigate={p => go(p)} contextPanel={orgPanel}>
       {page === 'machines'      && <MachinesPage onConnect={handleDashboardConnect} />}
       {page === 'organization'  && <OrganizationPage onConnect={handleDashboardConnect} orgNode={orgNode} />}
       {page === 'api-keys'      && <ApiKeysPage />}
-      {page === 'downloads'     && <DownloadsPage />}
-      {page === 'branding'      && <BrandingPage onBack={() => setPage('machines')} />}
+      {page === 'downloads'     && <DownloadsPage os={downloadsOs} onOsChange={(o) => go('downloads', o)} />}
+      {page === 'branding'      && <BrandingPage onBack={() => go('machines')} />}
       {page === 'settings'      && <SettingsPage />}
     </AppShell>
   );

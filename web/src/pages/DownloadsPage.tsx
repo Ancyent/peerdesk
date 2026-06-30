@@ -17,7 +17,7 @@ function repoSlug(releasesUrl: string): string | null {
 const card: React.CSSProperties = { border: '1px solid var(--border-dim)', borderRadius: 10, padding: 18, background: 'var(--bg-surface)' };
 const h: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 };
 
-export function DownloadsPage() {
+export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: OsId) => void }) {
   const { accessToken } = useAuth();
   const releasesUrl = getConfig().releasesUrl;
   const slug = repoSlug(releasesUrl);
@@ -29,7 +29,6 @@ export function DownloadsPage() {
   const [token, setToken] = useState<RegistrationTokenOut | null>(null);
   const [generating, setGenerating] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [os, setOs] = useState<OsId>('linux');
 
   useEffect(() => {
     if (!slug) { setState('error'); return; }
@@ -127,7 +126,7 @@ export function DownloadsPage() {
         <>
           <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
             {OS_TABS.map(t => (
-              <button key={t.id} disabled={!t.enabled} onClick={() => t.enabled && setOs(t.id)}
+              <button key={t.id} disabled={!t.enabled} onClick={() => t.enabled && onOsChange(t.id)}
                 style={{
                   padding: '6px 16px', fontSize: 13, borderRadius: 6, cursor: t.enabled ? 'pointer' : 'not-allowed',
                   background: os === t.id ? 'var(--bg-base)' : 'var(--bg-hover)',
