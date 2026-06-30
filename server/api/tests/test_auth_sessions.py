@@ -33,7 +33,9 @@ async def _login(client, remember=True):
 
 async def _session_for(db, refresh_token):
     """Return the AuthSession row that belongs to the given refresh token."""
-    _, sid = decode_refresh_token(refresh_token)
+    decoded = decode_refresh_token(refresh_token)
+    assert decoded is not None
+    _, sid = decoded
     return (await db.execute(select(AuthSession).where(AuthSession.id == sid))).scalars().first()
 
 
@@ -46,7 +48,7 @@ async def test_refresh_slides_and_returns_same_refresh(client, db):
     assert r.json()["refresh_token"] == tokens["refresh_token"]
     assert r.json()["access_token"] != tokens["access_token"]
     after = (await _session_for(db, tokens["refresh_token"])).last_used_at
-    assert after >= before
+    assert after > before
 
 
 async def test_refresh_rejects_idle_expired(client, db):
