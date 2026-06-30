@@ -1,8 +1,9 @@
-import sys, os
+import sys, os, asyncio
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from models import AuthSession
 from sqlalchemy import select
+from auth import decode_refresh_token
 
 
 def test_auth_session_defaults():
@@ -22,3 +23,45 @@ async def test_login_creates_auth_session(client, db):
     rows = (await db.execute(select(AuthSession))).scalars().all()
     assert len(rows) >= 1
     assert any(row.remember_me for row in rows)
+
+
+async def _login(client, remember=True):
+    await client.post("/auth/register", json={"email": "r@b.com", "name": "R", "password": "Pw1234!!"})
+    r = await client.post("/auth/login", json={"email": "r@b.com", "password": "Pw1234!!", "remember_me": remember})
+    return r.json()
+
+
+async def _session_for(db, refresh_token):
+    """Return the AuthSession row that belongs to the given refresh token."""
+    _, sid = decode_refresh_token(refresh_token)
+    return (await db.execute(select(AuthSession).where(AuthSession.id == sid))).scalars().first()
+
+
+async def test_refresh_slides_and_returns_same_refresh(client, db):
+    tokens = await _login(client)
+    before = (await _session_for(db, tokens["refresh_token"])).last_used_at
+    await asyncio.sleep(1)  # ensure new access token has a different exp (JWT is second-precision)
+    r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert r.status_code == 200
+    assert r.json()["refresh_token"] == tokens["refresh_token"]
+    assert r.json()["access_token"] != tokens["access_token"]
+    after = (await _session_for(db, tokens["refresh_token"])).last_used_at
+    assert after >= before
+
+
+async def test_refresh_rejects_idle_expired(client, db):
+    tokens = await _login(client)
+    row = await _session_for(db, tokens["refresh_token"])
+    row.last_used_at = datetime.now(timezone.utc) - timedelta(hours=25)
+    await db.commit()
+    r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert r.status_code == 401
+
+
+async def test_refresh_rejects_absolute_cap(client, db):
+    tokens = await _login(client)
+    row = await _session_for(db, tokens["refresh_token"])
+    row.created_at = datetime.now(timezone.utc) - timedelta(days=8)
+    await db.commit()
+    r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert r.status_code == 401

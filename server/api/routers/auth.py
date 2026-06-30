@@ -77,15 +77,29 @@ async def login_2fa(body: LoginStep2Request, db: AsyncSession = Depends(get_db))
     return TokenResponse(access_token=access, refresh_token=refresh)
 
 
+def _aware(dt: datetime) -> datetime:
+    """Coerce a naive datetime to UTC-aware (SQLite returns naive datetimes)."""
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(body: RefreshRequest):
-    user_id = decode_token(body.refresh_token, "refresh")
-    if not user_id:
+async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    decoded = decode_refresh_token(body.refresh_token)
+    if not decoded:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
-    # NOTE: Task 4 will rewrite this route with full session validation.
-    # Using a throwaway sid so the module imports cleanly until then.
-    throwaway_sid = str(uuid.uuid4())
-    return TokenResponse(
-        access_token=create_access_token(user_id),
-        refresh_token=create_refresh_token(user_id, throwaway_sid),
-    )
+    user_id, sid = decoded
+    result = await db.execute(select(AuthSession).where(AuthSession.id == sid))
+    session = result.scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    if (
+        session is None
+        or session.revoked
+        or session.user_id != user_id
+        or session.token_hash != hash_refresh_token(body.refresh_token)
+        or (now - _aware(session.created_at)) > ABSOLUTE_CAP
+        or (now - _aware(session.last_used_at)) > IDLE_TIMEOUT
+    ):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    session.last_used_at = now
+    await db.commit()
+    return TokenResponse(access_token=create_access_token(user_id), refresh_token=body.refresh_token)
