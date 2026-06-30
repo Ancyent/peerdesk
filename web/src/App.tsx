@@ -4,7 +4,6 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { MachinesPage } from './pages/MachinesPage';
 import { OrganizationPage } from './pages/OrganizationPage';
-import { AgentInstallPage } from './pages/AgentInstallPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { BrandingPage } from './pages/BrandingPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -234,8 +233,7 @@ export default function App() {
     <AppShell page={shellPage} onNavigate={p => setPage(p)} contextPanel={orgPanel}>
       {page === 'machines'      && <MachinesPage onConnect={handleDashboardConnect} />}
       {page === 'organization'  && <OrganizationPage onConnect={handleDashboardConnect} orgNode={orgNode} />}
-      {page === 'agent-install' && <AgentInstallPage />}
-      {page === 'api-keys'      && <ApiKeysPage />}
+{page === 'api-keys'      && <ApiKeysPage />}
       {page === 'downloads'     && <DownloadsPage />}
       {page === 'branding'      && <BrandingPage onBack={() => setPage('machines')} />}
       {page === 'settings'      && <SettingsPage />}

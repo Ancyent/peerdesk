@@ -92,7 +92,7 @@ export function MachinesPage({ onConnect }: Props) {
         <>
           {filtered.length === 0 && (
             <div style={{ padding: 32, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)' }}>
-              {search ? 'Nicio mașinărie găsită.' : 'Nicio mașinărie înregistrată. Folosește secțiunea Instalare Agent.'}
+              {search ? 'Nicio mașinărie găsită.' : 'Nicio mașinărie înregistrată. Folosește secțiunea Download.'}
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(265px, 1fr))', gap: 14 }}>

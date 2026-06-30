@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
 
-export type AppPage = 'machines' | 'organization' | 'agent-install' | 'api-keys' | 'downloads' | 'branding' | 'settings';
+export type AppPage = 'machines' | 'organization' | 'api-keys' | 'downloads' | 'branding' | 'settings';
 
 interface Props {
   page: AppPage;
@@ -14,9 +14,8 @@ interface Props {
 const NAV: { page: AppPage; icon: string; label: string }[] = [
   { page: 'machines',      icon: '💻', label: 'Mașini' },
   { page: 'organization',  icon: '🏢', label: 'Organizare' },
-  { page: 'agent-install', icon: '⬇️', label: 'Instalare Agent' },
   { page: 'api-keys',      icon: '🔑', label: 'API Keys' },
-  { page: 'downloads',     icon: '📦', label: 'Download' },
+  { page: 'downloads',     icon: '📦', label: 'Download & Deploy' },
 ];
 
 const ADMIN: { page: AppPage; icon: string; label: string }[] = [
