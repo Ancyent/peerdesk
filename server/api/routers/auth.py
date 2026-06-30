@@ -103,3 +103,16 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     session.last_used_at = now
     await db.commit()
     return TokenResponse(access_token=create_access_token(user_id), refresh_token=body.refresh_token)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(body: LogoutRequest, db: AsyncSession = Depends(get_db)):
+    decoded = decode_refresh_token(body.refresh_token)
+    if decoded:
+        _, sid = decoded
+        result = await db.execute(select(AuthSession).where(AuthSession.id == sid))
+        session = result.scalar_one_or_none()
+        if session is not None:
+            session.revoked = True
+            await db.commit()
+    return None

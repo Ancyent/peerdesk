@@ -67,3 +67,20 @@ async def test_refresh_rejects_absolute_cap(client, db):
     await db.commit()
     r = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
     assert r.status_code == 401
+
+
+async def test_logout_revokes_then_refresh_fails(client):
+    tokens = await _login(client)
+    r = await client.post("/auth/logout", json={"refresh_token": tokens["refresh_token"]})
+    assert r.status_code == 204
+    r2 = await client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert r2.status_code == 401
+
+
+async def test_logout_idempotent(client):
+    tokens = await _login(client)
+    await client.post("/auth/logout", json={"refresh_token": tokens["refresh_token"]})
+    r = await client.post("/auth/logout", json={"refresh_token": tokens["refresh_token"]})
+    assert r.status_code == 204
+    r2 = await client.post("/auth/logout", json={"refresh_token": "garbage"})
+    assert r2.status_code == 204
