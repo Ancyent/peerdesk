@@ -14,14 +14,13 @@ def test_access_token_round_trip():
     assert user_id == "user-123"
 
 def test_refresh_token_round_trip():
-    from auth import create_refresh_token, decode_token
-    token = create_refresh_token("user-456")
-    user_id = decode_token(token, "refresh")
-    assert user_id == "user-456"
+    from auth import create_refresh_token, decode_refresh_token
+    token = create_refresh_token("user-456", "sid-1")
+    assert decode_refresh_token(token) == ("user-456", "sid-1")
 
 def test_token_wrong_type_rejected():
     from auth import create_refresh_token, decode_token
-    refresh = create_refresh_token("user-123")
+    refresh = create_refresh_token("user-123", "sid-x")
     assert decode_token(refresh, "access") is None
 
 def test_expired_token_rejected():
@@ -34,6 +33,27 @@ def test_expired_token_rejected():
         algorithm="HS256"
     )
     assert decode_token(expired, "access") is None
+
+
+def test_refresh_token_carries_sid():
+    from auth import create_refresh_token, decode_refresh_token
+    token = create_refresh_token("user-1", "sess-9")
+    assert decode_refresh_token(token) == ("user-1", "sess-9")
+
+def test_decode_refresh_rejects_access_token():
+    from auth import create_access_token, decode_refresh_token
+    assert decode_refresh_token(create_access_token("user-1")) is None
+
+def test_hash_refresh_token_stable_and_hex():
+    from auth import hash_refresh_token
+    a = hash_refresh_token("abc")
+    assert a == hash_refresh_token("abc")
+    assert len(a) == 64 and all(c in "0123456789abcdef" for c in a)
+
+def test_idle_and_cap_constants():
+    from auth import IDLE_TIMEOUT, ABSOLUTE_CAP
+    assert IDLE_TIMEOUT.total_seconds() == 24 * 3600
+    assert ABSOLUTE_CAP.days == 7
 
 
 def test_turn_credential_hmac():
