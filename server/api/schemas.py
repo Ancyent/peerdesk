@@ -7,11 +7,13 @@ class UserRegister(BaseModel):
     email: EmailStr
     name: str
     password: str
+    remember_me: bool = False
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    remember_me: bool = False
 
 
 class TokenResponse(BaseModel):
@@ -85,6 +87,7 @@ class TOTPVerifyRequest(BaseModel):
 class LoginStep2Request(BaseModel):
     temp_token: str
     code: str
+    remember_me: bool = False
 
 
 class BrandingOut(BaseModel):
@@ -214,3 +217,7 @@ class MachineRegisterViaKey(BaseModel):
 class MachineApprovalStatus(BaseModel):
     peer_id: str
     approval_status: str  # pending | approved | denied
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str

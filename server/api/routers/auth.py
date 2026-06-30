@@ -1,13 +1,31 @@
+import uuid
 import pyotp
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db
-from models import User
-from schemas import UserRegister, UserLogin, TokenResponse, RefreshRequest, LoginStep2Request
-from auth import hash_password, verify_password, create_access_token, create_refresh_token, create_pending_2fa_token, decode_token
+from models import User, AuthSession
+from schemas import (
+    UserRegister, UserLogin, TokenResponse, RefreshRequest, LoginStep2Request, LogoutRequest,
+)
+from auth import (
+    hash_password, verify_password, create_access_token, create_refresh_token,
+    create_pending_2fa_token, decode_token, decode_refresh_token, hash_refresh_token,
+    IDLE_TIMEOUT, ABSOLUTE_CAP,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+async def create_session(db: AsyncSession, user_id: str, remember_me: bool) -> tuple[str, str]:
+    sid = str(uuid.uuid4())
+    refresh = create_refresh_token(user_id, sid)
+    db.add(AuthSession(
+        id=sid, user_id=user_id, token_hash=hash_refresh_token(refresh), remember_me=remember_me,
+    ))
+    await db.commit()
+    return create_access_token(user_id), refresh
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -19,10 +37,8 @@ async def register(body: UserRegister, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-    )
+    access, refresh = await create_session(db, user.id, body.remember_me)
+    return TokenResponse(access_token=access, refresh_token=refresh)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -41,10 +57,8 @@ async def login(body: UserLogin, db: AsyncSession = Depends(get_db)):
             temp_token=temp_token,
         )
 
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-    )
+    access, refresh = await create_session(db, user.id, body.remember_me)
+    return TokenResponse(access_token=access, refresh_token=refresh)
 
 
 @router.post("/login/2fa", response_model=TokenResponse)
@@ -59,10 +73,8 @@ async def login_2fa(body: LoginStep2Request, db: AsyncSession = Depends(get_db))
     totp = pyotp.TOTP(user.totp_secret)
     if not totp.verify(body.code, valid_window=1):
         raise HTTPException(status_code=401, detail="Invalid TOTP code")
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-    )
+    access, refresh = await create_session(db, user.id, body.remember_me)
+    return TokenResponse(access_token=access, refresh_token=refresh)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -70,7 +82,10 @@ async def refresh(body: RefreshRequest):
     user_id = decode_token(body.refresh_token, "refresh")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+    # NOTE: Task 4 will rewrite this route with full session validation.
+    # Using a throwaway sid so the module imports cleanly until then.
+    throwaway_sid = str(uuid.uuid4())
     return TokenResponse(
         access_token=create_access_token(user_id),
-        refresh_token=create_refresh_token(user_id),
+        refresh_token=create_refresh_token(user_id, throwaway_sid),
     )
