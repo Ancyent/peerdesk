@@ -233,7 +233,7 @@ export default function App() {
     <AppShell page={shellPage} onNavigate={p => setPage(p)} contextPanel={orgPanel}>
       {page === 'machines'      && <MachinesPage onConnect={handleDashboardConnect} />}
       {page === 'organization'  && <OrganizationPage onConnect={handleDashboardConnect} orgNode={orgNode} />}
-{page === 'api-keys'      && <ApiKeysPage />}
+      {page === 'api-keys'      && <ApiKeysPage />}
       {page === 'downloads'     && <DownloadsPage />}
       {page === 'branding'      && <BrandingPage onBack={() => setPage('machines')} />}
       {page === 'settings'      && <SettingsPage />}
