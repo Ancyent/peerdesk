@@ -57,3 +57,8 @@ export const AGENT_ARGS: AgentArg[] = [
   { flag: '--install-service', meaning: 'Instalează ca serviciu systemd / Windows.' },
   { flag: '--uninstall-service', meaning: 'Dezinstalează serviciul.' },
 ];
+
+export function coerceOs(sub: string | null): OsId {
+  const tab = OS_TABS.find((t) => t.id === sub && t.enabled);
+  return (tab?.id as OsId) ?? 'linux';
+}
