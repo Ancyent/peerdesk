@@ -3,6 +3,67 @@ use serde::{Deserialize, Serialize};
 
 pub const REGISTER_PATH: &str = "/machines/register";
 pub const STATUS_PATH: &str = "/machines/status";
+pub const REDEEM_PATH: &str = "/tokens/redeem";
+
+/// Which kind of credential the agent was given.
+#[derive(Debug, PartialEq)]
+pub enum CredentialKind {
+    ApiKey,
+    Token,
+}
+
+/// Classify a credential: `pd_`-prefixed strings are long-lived api keys; anything
+/// else (e.g. an `XXXX-XXXX` registration token) is treated as a registration token.
+pub fn credential_kind(cred: &str) -> CredentialKind {
+    if cred.starts_with("pd_") {
+        CredentialKind::ApiKey
+    } else {
+        CredentialKind::Token
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct TokenRedeemRequest {
+    token: String,
+    peer_id: String,
+    name: String,
+    os: Option<String>,
+}
+
+/// Response from `/tokens/redeem`: the created machine plus a durable api-key the
+/// agent must persist and use for all later authenticated calls.
+#[derive(Debug, Deserialize)]
+pub struct RedeemResponse {
+    pub id: String,
+    pub peer_id: String,
+    pub name: String,
+    pub approval_status: String,
+    pub api_key: String,
+}
+
+/// Redeem a single-use registration token: the server creates the machine and
+/// returns a durable api-key. Sends NO auth header (the token authenticates itself).
+pub async fn redeem_token(api_url: &str, token: &str, peer_id: &str) -> Result<RedeemResponse> {
+    let client = reqwest::Client::new();
+    let os = std::env::consts::OS.to_string();
+    let body = TokenRedeemRequest {
+        token: token.to_string(),
+        peer_id: peer_id.to_string(),
+        name: format!("{} ({})", get_hostname(), os),
+        os: Some(os),
+    };
+    let res = client
+        .post(format!("{}{}", api_url, REDEEM_PATH))
+        .json(&body)
+        .send()
+        .await?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(anyhow::anyhow!("Token redeem failed {}: {}", status, text));
+    }
+    Ok(res.json::<RedeemResponse>().await?)
+}
 
 #[derive(Debug, Serialize)]
 struct MachineRegisterRequest {
@@ -150,5 +211,30 @@ mod tests {
     #[test]
     fn status_path_constant() {
         assert_eq!(STATUS_PATH, "/machines/status");
+    }
+
+    #[test]
+    fn credential_kind_classifies() {
+        assert_eq!(credential_kind("pd_abc123"), CredentialKind::ApiKey);
+        assert_eq!(credential_kind("AB12-CD34"), CredentialKind::Token);
+        assert_eq!(credential_kind(""), CredentialKind::Token);
+    }
+
+    #[test]
+    fn redeem_response_deserializes_and_ignores_extra() {
+        let json = r#"{"id":"m1","peer_id":"123","name":"n","os":"linux","approval_status":"approved","api_key":"pd_xyz","company_id":null}"#;
+        let r: RedeemResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(r.api_key, "pd_xyz");
+        assert_eq!(r.approval_status, "approved");
+        assert_eq!(r.peer_id, "123");
+    }
+
+    #[test]
+    fn redeem_request_serializes_expected_shape() {
+        let body = TokenRedeemRequest { token: "T".into(), peer_id: "P".into(), name: "N".into(), os: Some("linux".into()) };
+        let v = serde_json::to_value(&body).unwrap();
+        assert_eq!(v["token"], "T");
+        assert_eq!(v["peer_id"], "P");
+        assert_eq!(v["os"], "linux");
     }
 }
