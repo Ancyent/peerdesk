@@ -54,6 +54,10 @@ class MachineOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TokenRedeemResponse(MachineOut):
+    api_key: str
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 

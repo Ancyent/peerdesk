@@ -84,7 +84,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     let approval_tx = agent_cfg.approval_tx.clone();
     let mut task_handles: Vec<tokio::task::AbortHandle> = Vec::new();
     let config_path = Config::config_path(agent_cfg.portable);
-    let cfg = Config::load_or_create(
+    let mut cfg = Config::load_or_create(
         &config_path,
         &agent_cfg.password,
         agent_cfg.server_url.as_deref(),
@@ -94,7 +94,26 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     let signaling_url = cfg.signaling_url();
     let api_url = cfg.api_url();
-    let effective_key = cfg.api_key.clone().or(agent_cfg.api_key);
+    let mut effective_key = cfg.api_key.clone().or(agent_cfg.api_key);
+
+    // A registration token (non-`pd_` credential) is single-use: redeem it once
+    // for a durable api-key, persist that, and use it from here on — the agent
+    // needs a lasting credential for TURN/status/reconnect, which a token isn't.
+    if let (Some(url), Some(key)) = (&api_url, &effective_key.clone()) {
+        if matches!(api_client::credential_kind(key), api_client::CredentialKind::Token) {
+            match api_client::redeem_token(url, key, &cfg.peer_id).await {
+                Ok(resp) => {
+                    info!("Redeemed registration token — machine_id={}", resp.id);
+                    cfg.api_key = Some(resp.api_key.clone());
+                    if let Err(e) = cfg.save(&config_path) {
+                        tracing::warn!("Failed to persist api key to config: {}", e);
+                    }
+                    effective_key = Some(resp.api_key);
+                }
+                Err(e) => tracing::warn!("Token redeem failed (non-fatal): {}", e),
+            }
+        }
+    }
 
     if let (Some(url), Some(key)) = (&api_url, &effective_key) {
         match api_client::register_machine(url, key, &cfg.peer_id).await {
