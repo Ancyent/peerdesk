@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user
-from models import RegistrationToken, Machine, User
-from schemas import RegistrationTokenCreate, RegistrationTokenOut, TokenRedeemRequest, MachineOut
+from models import RegistrationToken, Machine, User, ApiKey
+from schemas import RegistrationTokenCreate, RegistrationTokenOut, TokenRedeemRequest, MachineOut, TokenRedeemResponse
 
 router = APIRouter(prefix="/tokens", tags=["tokens"])
 
@@ -28,7 +28,7 @@ async def create_token(
     return reg
 
 
-@router.post("/redeem", response_model=MachineOut, status_code=201)
+@router.post("/redeem", response_model=TokenRedeemResponse, status_code=201)
 async def redeem_token(body: TokenRedeemRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(RegistrationToken).where(
@@ -45,13 +45,16 @@ async def redeem_token(body: TokenRedeemRequest, db: AsyncSession = Depends(get_
     if existing.scalar_one_or_none():
         raise HTTPException(409, "peer_id already registered")
 
+    key = ApiKey(name=f"Agent: {body.name}", auto_approve=True, created_by=reg.created_by)
+    db.add(key)
     machine = Machine(
         peer_id=body.peer_id, name=body.name, os=body.os,
         owner_id=reg.created_by,
         company_id=reg.company_id, location_id=reg.location_id, group_id=reg.group_id,
+        api_key_id=key.id,
     )
     db.add(machine)
     reg.used_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(machine)
-    return machine
+    return TokenRedeemResponse(**MachineOut.model_validate(machine).model_dump(), api_key=key.key)
