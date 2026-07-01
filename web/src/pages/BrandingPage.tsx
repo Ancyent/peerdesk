@@ -81,7 +81,7 @@ export function BrandingPage({ onBack }: Props) {
     <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 600, margin: '0 auto', padding: '24px 16px', background: 'var(--bg-base)', minHeight: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28, paddingBottom: 16, borderBottom: '1px solid var(--border-dim)' }}>
-        <button onClick={onBack}
+        <button onClick={onBack} title="Înapoi" aria-label="Înapoi"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 20, lineHeight: 1, padding: '0 4px' }}>
           ←
         </button>
