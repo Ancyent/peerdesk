@@ -25,7 +25,7 @@ export function CodeBlock({ code, empty }: { code: string; empty?: string }) {
   return (
     <div>
       <div style={box}>{code}</div>
-      <button onClick={copy} style={btn(copied)}>{copied ? '✓ Copiat' : '📋 Copiază comanda'}</button>
+      <button onClick={copy} aria-label="Copiază comanda" style={btn(copied)}>{copied ? '✓ Copiat' : '📋 Copiază comanda'}</button>
     </div>
   );
 }

@@ -76,7 +76,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
       {/* Sidebar wrapper — overflow:visible so toggle isn't clipped */}
       <div style={{ width: collapsed ? 64 : 220, flexShrink: 0, position: 'relative', transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)' }}>
         {/* Toggle button outside overflow:hidden */}
-        <button onClick={() => setCollapsed(c => !c)} style={{
+        <button onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Extinde bara laterală' : 'Restrânge bara laterală'} aria-label={collapsed ? 'Extinde bara laterală' : 'Restrânge bara laterală'} style={{
           position: 'absolute', top: 19, right: -13, zIndex: 30,
           width: 26, height: 26, borderRadius: '50%',
           background: 'var(--bg-surface)', border: '1px solid var(--border)',

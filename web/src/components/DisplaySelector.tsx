@@ -39,6 +39,7 @@ export function DisplaySelector({ displays, current, onChange, inline = false }:
             key={d.index}
             onClick={() => onChange(d.index)}
             title={`Monitor ${pos + 1} (${d.width}×${d.height})${d.is_primary ? ' — Default' : ''}`}
+            aria-label={`Monitor ${pos + 1} (${d.width}×${d.height})${d.is_primary ? ' — Default' : ''}`}
             style={{
               position: 'relative',
               width: 46,

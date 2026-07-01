@@ -65,7 +65,7 @@ export function MachineCard({ machine: m, onConnect, onDelete }: Props) {
             {online ? '⚡ Conectează' : 'Offline'}
           </button>
           {onDelete && (
-            <button onClick={() => onDelete(m.id)} style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>···</button>
+            <button onClick={() => onDelete(m.id)} title="Șterge mașina" aria-label="Șterge mașina" style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>···</button>
           )}
         </div>
       </div>
