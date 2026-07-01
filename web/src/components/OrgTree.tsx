@@ -76,7 +76,19 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
     cancelEdit();
   };
 
-  const startAddChild = (type: 'company' | 'location', id: string) => { setAddingChild({ type, id }); setChildName(''); expand(id); };
+  const startAddChild = async (type: 'company' | 'location', id: string) => {
+    if (accessToken) {
+      if (type === 'company' && !locations[id]) {
+        const locs = await api.locations.list(accessToken, id).catch(() => [] as LocationOut[]);
+        setLocations(p => (p[id] ? p : { ...p, [id]: locs }));
+      }
+      if (type === 'location' && !groups[id]) {
+        const grps = await api.groups.list(accessToken, id).catch(() => [] as GroupOut[]);
+        setGroups(p => (p[id] ? p : { ...p, [id]: grps }));
+      }
+    }
+    setAddingChild({ type, id }); setChildName(''); expand(id);
+  };
   const cancelAddChild = () => { setAddingChild(null); setChildName(''); };
   const commitAddChild = async () => {
     if (!accessToken || !addingChild || !childName.trim()) { cancelAddChild(); return; }
@@ -89,16 +101,22 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
   const doDelete = async (type: NodeType, id: string) => {
     if (!accessToken) { setConfirmDelete(null); return; }
     if (type === 'company') {
-      await api.companies.delete(accessToken, id).catch(() => {});
-      setCompanies(p => removeFromList(p, id));
-      setLocations(p => { const n = { ...p }; delete n[id]; return n; });
+      try {
+        await api.companies.delete(accessToken, id);
+        setCompanies(p => removeFromList(p, id));
+        setLocations(p => { const n = { ...p }; delete n[id]; return n; });
+      } catch { /* leave state intact */ }
     } else if (type === 'location') {
-      await api.locations.delete(accessToken, id).catch(() => {});
-      setLocations(p => removeFromRecord(p, id));
-      setGroups(p => { const n = { ...p }; delete n[id]; return n; });
+      try {
+        await api.locations.delete(accessToken, id);
+        setLocations(p => removeFromRecord(p, id));
+        setGroups(p => { const n = { ...p }; delete n[id]; return n; });
+      } catch { /* leave state intact */ }
     } else {
-      await api.groups.delete(accessToken, id).catch(() => {});
-      setGroups(p => removeFromRecord(p, id));
+      try {
+        await api.groups.delete(accessToken, id);
+        setGroups(p => removeFromRecord(p, id));
+      } catch { /* leave state intact */ }
     }
     setConfirmDelete(null);
   };
