@@ -35,6 +35,7 @@ export function assetLabel(name: string): string {
   if (/\.appimage$/i.test(name)) return '.AppImage';
   if (/\.deb$/i.test(name)) return '.deb';
   if (/\.msi$/i.test(name)) return '.msi';
+  if (/portable\.exe$/i.test(name)) return 'portabil (.exe)';
   if (/setup\.exe$/i.test(name)) return 'installer (.exe)';
   if (/\.exe$/i.test(name)) return 'agent .exe';
   if (/\.dmg$/i.test(name)) return '.dmg';
