@@ -2,6 +2,35 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.28] — 2026-07-02
+
+### Added
+- **Portable Windows viewer.** The Windows viewer now also ships as a standalone
+  portable `.exe` that runs without installation, alongside the `.msi` and setup
+  `.exe`. Needs the WebView2 runtime (present on Windows 10 2020+ / 11).
+- **Download & Deploy dashboard.** The download page shows, per OS, a copy-paste
+  deploy command pre-filled with your server URL and a freshly generated
+  registration token, plus a shared reference of the agent's CLI arguments.
+- **Organization tree editing.** Add locations and groups, rename, and delete any
+  node directly from the sidebar via hover actions; icon buttons across the app
+  gained tooltips and accessibility labels.
+- **Deep-linkable dashboard URLs.** Each sidebar section (and the download OS tab)
+  has its own clean URL, so a page refresh keeps your place and browser
+  back/forward work.
+- **"Remember me" + sliding web sessions.** Optional 24h-idle session with a
+  7-day cap; the dashboard auto-refreshes the session and redirects to login on
+  expiry instead of leaving a dead page.
+
+### Fixed
+- **Token-based agent onboarding now works end to end.** The agent redeems a
+  registration token via `/tokens/redeem`; the server issues a durable API key
+  that the agent stores and reuses for registration, TURN credentials, and
+  reconnects. Previously the token was sent as an API key and rejected, so a
+  token-installed machine never came online.
+- **Agent registration flag corrected.** The install command and served scripts
+  use `--api-key` — the flag the agent actually accepts — instead of the
+  non-existent `--token`.
+
 ## [0.4.27] — 2026-06-24
 
 ### Fixed
