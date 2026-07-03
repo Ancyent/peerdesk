@@ -2,6 +2,17 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.30] — 2026-07-03
+
+### Added
+- **Linux distribution picker on the Downloads page.** Pick your distro
+  (Ubuntu / Debian, Fedora / RHEL, openSUSE, Arch / other) and get the exact
+  viewer package plus a one-line install command; the agent deploy command and
+  binaries stay available regardless of distro.
+- **x86_64 `.rpm` package** for the Linux viewer (Fedora / RHEL / openSUSE),
+  built alongside the existing `.deb` and `.AppImage`.
+- **File sizes** shown next to every download on the Downloads page.
+
 ## [0.4.29] — 2026-07-03
 
 ### Added
