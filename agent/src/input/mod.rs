@@ -2,6 +2,7 @@ pub mod keymap;
 pub mod mouse;
 
 use anyhow::Result;
+#[cfg(feature = "gui-capture")]
 use enigo::{
     Coordinate,
     Direction::{Press, Release},
@@ -29,6 +30,7 @@ pub enum InputEvent {
     Scroll { delta_x: i32, delta_y: i32 },
 }
 
+#[cfg(feature = "gui-capture")]
 pub async fn run(
     mut rx: Receiver<InputEvent>,
     bounds_rx: tokio::sync::watch::Receiver<crate::display::DisplayBounds>,
@@ -108,6 +110,18 @@ pub async fn run(
             }
         };
     }
+    Ok(())
+}
+
+/// Headless build: no input injection (no enigo/X11). Drains the channel so the
+/// sender never errors; the symbol exists only so the GUI-mode call site in
+/// `lib.rs` compiles. Never spawned when the agent is in Terminal mode.
+#[cfg(not(feature = "gui-capture"))]
+pub async fn run(
+    mut rx: Receiver<InputEvent>,
+    _bounds_rx: tokio::sync::watch::Receiver<crate::display::DisplayBounds>,
+) -> Result<()> {
+    while rx.recv().await.is_some() {}
     Ok(())
 }
 

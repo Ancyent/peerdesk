@@ -17,25 +17,35 @@ pub fn decide(display_present: bool, monitor_count: usize) -> SessionMode {
     }
 }
 
-/// Live detection. On Windows/macOS always `Gui`. On Linux: `Gui` only when a
-/// display env var is set AND xcap enumerates at least one monitor.
+/// Live detection. Without the `gui-capture` feature (headless build) always
+/// `Terminal` — there is no capture stack to drive. Otherwise: on Windows/macOS
+/// always `Gui`; on Linux `Gui` only when a display env var is set AND xcap
+/// enumerates at least one monitor.
 pub fn detect() -> SessionMode {
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(feature = "gui-capture"))]
     {
-        SessionMode::Gui
+        tracing::info!("session mode: Terminal (headless build — no capture feature)");
+        SessionMode::Terminal
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(feature = "gui-capture")]
     {
-        let display_present = std::env::var_os("DISPLAY").is_some()
-            || std::env::var_os("WAYLAND_DISPLAY").is_some();
-        let monitor_count = if display_present {
-            xcap::Monitor::all().map(|m| m.len()).unwrap_or(0)
-        } else {
-            0
-        };
-        let mode = decide(display_present, monitor_count);
-        tracing::info!("session mode: {:?} (display_present={}, monitors={})", mode, display_present, monitor_count);
-        mode
+        #[cfg(not(target_os = "linux"))]
+        {
+            SessionMode::Gui
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let display_present = std::env::var_os("DISPLAY").is_some()
+                || std::env::var_os("WAYLAND_DISPLAY").is_some();
+            let monitor_count = if display_present {
+                xcap::Monitor::all().map(|m| m.len()).unwrap_or(0)
+            } else {
+                0
+            };
+            let mode = decide(display_present, monitor_count);
+            tracing::info!("session mode: {:?} (display_present={}, monitors={})", mode, display_present, monitor_count);
+            mode
+        }
     }
 }
 

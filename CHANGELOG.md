@@ -2,6 +2,24 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.29] — 2026-07-03
+
+### Added
+- **Headless Linux agent binary.** A dedicated `peerdesk-agent-linux-x86_64-headless`
+  build (compiled `--no-default-features`) links no pipewire/X11/ALSA libraries, so
+  the terminal-mode agent runs on minimal or headless servers (CentOS/RHEL, older
+  Debian/Ubuntu) where the full binary — which links the screen-capture stack — won't
+  even start. Screen capture, input injection, cursor readout, clipboard sync, and
+  audio are now behind a default-on `gui-capture` Cargo feature; the standard agent
+  binary and the desktop app are unchanged.
+- **OS compatibility test suite.** A `TESTS/` folder with per-distro and per-OS
+  checklists (Linux + Windows) for manual release verification.
+
+### Fixed
+- **Headless agent no longer stalls on a stray display switch.** A `switch_display`
+  request in terminal mode would eventually block the signaling loop; display
+  switching is now ignored when there is no screen capture.
+
 ## [0.4.28] — 2026-07-02
 
 ### Added

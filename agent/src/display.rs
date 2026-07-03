@@ -36,6 +36,7 @@ pub fn bounds_at_index(index: usize, monitors: &[Monitor]) -> DisplayBounds {
 
 /// Resolve bounds for the captured display at `index` from the live monitor list.
 /// Never panics; returns the default box on failure.
+#[cfg(feature = "gui-capture")]
 pub fn resolve(index: usize) -> DisplayBounds {
     let monitors = match xcap::Monitor::all() {
         Ok(list) => list,
@@ -57,6 +58,14 @@ pub fn resolve(index: usize) -> DisplayBounds {
         })
         .collect();
     bounds_at_index(index, &geom)
+}
+
+/// Headless build: no monitor enumeration, so input bounds are irrelevant (there
+/// is no input injection). Returns the default box; the symbol exists only so the
+/// unconditional call site in `lib.rs` compiles.
+#[cfg(not(feature = "gui-capture"))]
+pub fn resolve(_index: usize) -> DisplayBounds {
+    DisplayBounds::default()
 }
 
 #[cfg(test)]

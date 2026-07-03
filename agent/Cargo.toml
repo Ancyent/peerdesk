@@ -11,6 +11,14 @@ path = "src/lib.rs"
 name = "peerdesk-agent"
 path = "src/main.rs"
 
+[features]
+# On by default: full GUI host — screen capture (xcap+openh264), input injection
+# (enigo), cursor readout, clipboard sync (arboard), audio (cpal). Build a headless
+# terminal-only agent with `cargo build --no-default-features` — it drops these
+# crates and their pipewire/X11/ALSA linkage so it runs on minimal/headless boxes.
+default = ["gui-capture"]
+gui-capture = ["dep:xcap", "dep:openh264", "dep:enigo", "dep:arboard", "dep:cpal"]
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
@@ -21,11 +29,15 @@ serde_json = "1"
 # Desktop Duplication, which can't capture a monitor driven by a secondary GPU
 # (hybrid graphics) — it fails with E_INVALIDARG. WGC captures any monitor.
 # Windows-only feature; no effect on the Linux/macOS build.
-xcap = { version = "0.9", features = ["wgc"] }
-openh264 = "0.6"
+#
+# xcap/openh264/enigo/arboard/cpal are gated behind the default `gui-capture`
+# feature so a headless agent (`--no-default-features`) links no pipewire/X11/
+# audio libs and runs on minimal/headless servers (terminal mode only).
+xcap = { version = "0.9", features = ["wgc"], optional = true }
+openh264 = { version = "0.6", optional = true }
 webrtc = "0.11"
-enigo = "0.2"
-arboard = "3"
+enigo = { version = "0.2", optional = true }
+arboard = { version = "3", optional = true }
 tokio-tungstenite = { version = "0.23", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 bcrypt = "0.15"
@@ -39,7 +51,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4", features = ["derive", "env"] }
 tracing-appender = "0.2"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
-cpal = "0.15"
+cpal = { version = "0.15", optional = true }
 portable-pty = "0.8"
 
 [target.'cfg(windows)'.dependencies]

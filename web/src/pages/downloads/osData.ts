@@ -40,6 +40,7 @@ export function assetLabel(name: string): string {
   if (/\.exe$/i.test(name)) return 'agent .exe';
   if (/\.dmg$/i.test(name)) return '.dmg';
   if (/\.apk$/i.test(name)) return '.apk';
+  if (/headless/i.test(name) && /linux/i.test(name)) return 'agent headless (Linux, fără GUI)';
   if (/agent/i.test(name) && /linux/i.test(name)) return 'agent (Linux)';
   if (/linux/i.test(name)) return 'Linux x86_64';
   return name;

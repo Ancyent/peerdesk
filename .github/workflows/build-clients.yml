@@ -27,10 +27,19 @@ jobs:
         run: cargo build -p peerdesk-agent --release
       - name: Rename binary
         run: cp target/release/peerdesk-agent peerdesk-agent-linux-x86_64-${{ github.ref_name }}
+      # Headless variant: --no-default-features drops xcap/openh264/enigo/arboard/
+      # cpal, so this binary links no pipewire/X11/ALSA libs and starts on minimal
+      # or headless servers (CentOS/RHEL, old Debian/Ubuntu). Terminal mode only.
+      - name: Build headless agent
+        run: cargo build -p peerdesk-agent --release --no-default-features
+      - name: Rename headless binary
+        run: cp target/release/peerdesk-agent peerdesk-agent-linux-x86_64-headless-${{ github.ref_name }}
       - uses: actions/upload-artifact@v4
         with:
           name: agent-linux
-          path: peerdesk-agent-linux-x86_64-${{ github.ref_name }}
+          path: |
+            peerdesk-agent-linux-x86_64-${{ github.ref_name }}
+            peerdesk-agent-linux-x86_64-headless-${{ github.ref_name }}
 
   # ── Agent: Windows ────────────────────────────────────────
   build-agent-windows:

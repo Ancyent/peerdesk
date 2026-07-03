@@ -1,6 +1,11 @@
 pub mod api_client;
+// Audio (cpal/ALSA) and clipboard (arboard/X11) are GUI-host capabilities; gate
+// them out of the headless build so it links no ALSA/X11 libs. Neither is called
+// by the CLI agent's run loop — the desktop host (default features) keeps them.
+#[cfg(feature = "gui-capture")]
 pub mod audio;
 pub mod capture;
+#[cfg(feature = "gui-capture")]
 pub mod clipboard;
 pub mod config;
 pub mod cursor;
@@ -518,9 +523,15 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 tracing::warn!("Signaling error from server: {}", code);
             }
             Some(signaling::SignalingMessage::SwitchDisplay { index }) => {
-                info!("Switching to display {}", index);
-                let _ = display_switch_tx.send(index).await;
-                let _ = bounds_tx.send(crate::display::resolve(index));
+                // Display switching only applies to GUI capture. In the headless
+                // build (Terminal mode) nothing consumes `display_switch_rx`, so an
+                // unguarded bounded send would block this signaling loop forever
+                // once the channel (capacity 4) fills — stalling ICE/offers/etc.
+                if session_mode == crate::mode::SessionMode::Gui {
+                    info!("Switching to display {}", index);
+                    let _ = display_switch_tx.send(index).await;
+                    let _ = bounds_tx.send(crate::display::resolve(index));
+                }
             }
             Some(_) => {} // Registered, Answer, etc. — ignore in main loop
             None => {

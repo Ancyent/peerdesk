@@ -1,10 +1,13 @@
+#[cfg(feature = "gui-capture")]
 use anyhow::Result;
+#[cfg(feature = "gui-capture")]
 use openh264::{
     encoder::{Encoder, EncoderConfig},
     formats::{RgbaSliceU8, YUVBuffer},
     OpenH264API,
 };
 
+#[cfg(feature = "gui-capture")]
 pub struct H264Encoder {
     encoder: Encoder,
     width: u32,
@@ -12,6 +15,7 @@ pub struct H264Encoder {
     frame_count: u32,
 }
 
+#[cfg(feature = "gui-capture")]
 impl H264Encoder {
     pub fn new(width: u32, height: u32, fps: u32, bitrate_bps: u32) -> Result<Self> {
         anyhow::ensure!(
@@ -53,7 +57,24 @@ impl H264Encoder {
     }
 }
 
-#[cfg(test)]
+/// Headless build: no openh264. The type exists so the GUI-only video path in
+/// `webrtc_peer` compiles, but any attempt to actually encode errors out — it is
+/// never reached because the headless agent adds no video track.
+#[cfg(not(feature = "gui-capture"))]
+pub struct H264Encoder;
+
+#[cfg(not(feature = "gui-capture"))]
+impl H264Encoder {
+    pub fn new(_width: u32, _height: u32, _fps: u32, _bitrate_bps: u32) -> anyhow::Result<Self> {
+        anyhow::bail!("H.264 encoder unavailable in headless build")
+    }
+
+    pub fn encode_rgba(&mut self, _rgba: &[u8]) -> anyhow::Result<Vec<u8>> {
+        anyhow::bail!("H.264 encoder unavailable in headless build")
+    }
+}
+
+#[cfg(all(test, feature = "gui-capture"))]
 mod tests {
     use super::*;
 

@@ -2,6 +2,7 @@
 //! enigo key. Modifier-held shortcuts use the physical key so they combine;
 //! plain text uses Unicode for layout correctness.
 
+#[cfg(feature = "gui-capture")]
 use enigo::Key;
 
 /// True for Control/Alt/Meta (the modifiers that turn a keypress into a shortcut).
@@ -54,16 +55,17 @@ pub fn code_to_vk(code: &str) -> Option<u32> {
 /// Physical key for letters/digits when a modifier is held (so the shortcut
 /// combines). Windows uses the virtual-key; other platforms return None and the
 /// caller falls back to Unicode (which combines with modifiers on Linux).
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "gui-capture", target_os = "windows"))]
 pub fn physical_letter_key(code: &str) -> Option<Key> {
     code_to_vk(code).map(Key::Other)
 }
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(feature = "gui-capture", not(target_os = "windows")))]
 pub fn physical_letter_key(_code: &str) -> Option<Key> {
     None
 }
 
 /// Named enigo key for a non-character `e.code` (special keys + modifiers).
+#[cfg(feature = "gui-capture")]
 pub fn named_key(code: &str) -> Option<Key> {
     Some(match code {
         "Enter" | "NumpadEnter" => Key::Return,
@@ -105,6 +107,7 @@ pub fn named_key(code: &str) -> Option<Key> {
 /// Resolve a key event to the enigo key to press/release. `modifier_held` is true
 /// when any Control/Alt/Meta is currently down. `translate_cmd` swaps Ctrl<->Cmd
 /// (macOS hosts). Returns None for unmapped keys.
+#[cfg(feature = "gui-capture")]
 pub fn resolve(code: &str, key: &str, modifier_held: bool, translate_cmd: bool) -> Option<Key> {
     let code = translated_code(code, translate_cmd);
     if let Some(k) = named_key(code) {
@@ -152,6 +155,7 @@ mod tests {
         assert_eq!(translated_code("KeyC", true), "KeyC");
     }
 
+    #[cfg(feature = "gui-capture")]
     #[test]
     fn named_keys_resolve() {
         assert_eq!(named_key("F5"), Some(Key::F5));
@@ -160,12 +164,14 @@ mod tests {
         assert_eq!(named_key("KeyA"), None);
     }
 
+    #[cfg(feature = "gui-capture")]
     #[test]
     fn resolve_named_before_anything() {
         assert_eq!(resolve("F5", "F5", false, false), Some(Key::F5));
         assert_eq!(resolve("ControlLeft", "Control", true, false), Some(Key::Control));
     }
 
+    #[cfg(feature = "gui-capture")]
     #[test]
     fn resolve_plain_char_is_unicode() {
         assert_eq!(resolve("KeyA", "a", false, false), Some(Key::Unicode('a')));
@@ -173,6 +179,7 @@ mod tests {
         assert_eq!(resolve("Foo", "Dead", false, false), None);
     }
 
+    #[cfg(feature = "gui-capture")]
     #[test]
     fn resolve_translation_applies() {
         assert_eq!(resolve("ControlLeft", "Control", true, true), Some(Key::Meta));

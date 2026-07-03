@@ -5,6 +5,7 @@
 //! hosts and when viewing a secondary display.
 
 use crate::display::DisplayBounds;
+#[cfg(feature = "gui-capture")]
 use enigo::{Enigo, Mouse, Settings};
 
 /// Normalize an absolute (virtual-desktop) cursor position to 0..1 within the
@@ -22,6 +23,7 @@ pub fn normalize_in_bounds(cx: i32, cy: i32, b: DisplayBounds) -> Option<(f32, f
 /// (only when changed), using the current captured-display `bounds_rx` so the
 /// overlay maps to whichever monitor is being viewed. Runs on its own thread
 /// (enigo is !Send). Returns when the receiver is dropped.
+#[cfg(feature = "gui-capture")]
 pub fn run(
     tx: tokio::sync::watch::Sender<(f32, f32)>,
     bounds_rx: tokio::sync::watch::Receiver<DisplayBounds>,
@@ -49,6 +51,15 @@ pub fn run(
         }
         std::thread::sleep(std::time::Duration::from_millis(33));
     }
+}
+
+/// Headless build: no host cursor to read (no display). The symbol exists only so
+/// the GUI-mode call site in `lib.rs` compiles; it is never spawned.
+#[cfg(not(feature = "gui-capture"))]
+pub fn run(
+    _tx: tokio::sync::watch::Sender<(f32, f32)>,
+    _bounds_rx: tokio::sync::watch::Receiver<DisplayBounds>,
+) {
 }
 
 #[cfg(test)]

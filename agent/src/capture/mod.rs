@@ -1,7 +1,10 @@
 pub mod scale;
 
+#[cfg(feature = "gui-capture")]
 use anyhow::Result;
+#[cfg(feature = "gui-capture")]
 use std::time::Duration;
+#[cfg(feature = "gui-capture")]
 use xcap::Monitor;
 
 pub struct FrameData {
@@ -23,6 +26,7 @@ pub struct DisplayInfo {
 /// that vector and is reused verbatim by `run()` (capture) and
 /// `display::resolve()` (input bounds), so a viewer's selected index always maps
 /// to the same physical monitor everywhere. Never panics.
+#[cfg(feature = "gui-capture")]
 pub fn list_displays() -> Vec<DisplayInfo> {
     match Monitor::all() {
         Ok(monitors) => {
@@ -58,7 +62,16 @@ pub fn list_displays() -> Vec<DisplayInfo> {
     }
 }
 
+/// Headless build: no capture stack, so no monitors are ever reported. This is
+/// only reached in GUI-mode code paths that never run when the `gui-capture`
+/// feature is off (the agent is forced to Terminal mode).
+#[cfg(not(feature = "gui-capture"))]
+pub fn list_displays() -> Vec<DisplayInfo> {
+    Vec::new()
+}
+
 /// Pick the monitor at `index`, falling back to primary then the first.
+#[cfg(feature = "gui-capture")]
 fn pick_monitor(monitors: &[Monitor], index: usize) -> Result<Monitor> {
     if let Some(m) = monitors.get(index) {
         return Ok(m.clone());
@@ -71,6 +84,7 @@ fn pick_monitor(monitors: &[Monitor], index: usize) -> Result<Monitor> {
         .ok_or_else(|| anyhow::anyhow!("no monitors available to capture"))
 }
 
+#[cfg(feature = "gui-capture")]
 pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
     let monitors = Monitor::all()?;
     // `monitors.len()` is always out of range -> pick_monitor falls back to primary.
@@ -80,6 +94,7 @@ pub fn capture_one_frame() -> Result<(u32, u32, Vec<u8>)> {
     Ok((w, h, img.into_raw()))
 }
 
+#[cfg(feature = "gui-capture")]
 pub async fn run(
     tx: tokio::sync::broadcast::Sender<std::sync::Arc<FrameData>>,
     initial_display_index: usize,
@@ -191,9 +206,22 @@ pub async fn run(
     }
 }
 
+/// Headless build: capture is never started (the agent runs in Terminal mode),
+/// but the symbol must exist for the GUI-mode call site in `lib.rs` to compile.
+#[cfg(not(feature = "gui-capture"))]
+pub async fn run(
+    _tx: tokio::sync::broadcast::Sender<std::sync::Arc<FrameData>>,
+    _initial_display_index: usize,
+    _switch_rx: tokio::sync::mpsc::Receiver<usize>,
+    _quality_rx: tokio::sync::watch::Receiver<crate::quality::QualitySettings>,
+) -> anyhow::Result<()> {
+    Ok(())
+}
+
 /// Paced screenshot fallback for platforms where `video_recorder()` fails.
 /// Returns `Some(new_index)` to switch displays, or `None` if the switch channel
 /// closed (shut down).
+#[cfg(feature = "gui-capture")]
 async fn screenshot_capture(
     monitor: &Monitor,
     tx: &tokio::sync::broadcast::Sender<std::sync::Arc<FrameData>>,
@@ -236,6 +264,7 @@ async fn screenshot_capture(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "gui-capture")]
     #[test]
     fn frame_has_correct_dimensions() {
         // Capture needs a real display; skip headless CI.
@@ -256,7 +285,7 @@ mod tests {
 
     #[test]
     fn list_displays_does_not_panic() {
-        // May be empty in headless CI; must never panic.
+        // May be empty in headless CI or the headless build; must never panic.
         let _ = super::list_displays();
     }
 }
