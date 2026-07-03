@@ -3,10 +3,10 @@ import { useAuth } from '../auth/useAuth';
 import { api, type RegistrationTokenOut, type CompanyOut } from '../api/client';
 import { getConfig } from '../config';
 import { CodeBlock } from '../components/CodeBlock';
-import { OS_TABS, assetLabel, AGENT_ARGS, type OsId } from './downloads/osData';
+import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, formatSize, type OsId } from './downloads/osData';
 import { buildCommand } from './downloads/commands';
 
-interface Asset { name: string; browser_download_url: string }
+interface Asset { name: string; browser_download_url: string; size: number }
 interface Release { tag_name: string; html_url: string; assets: Asset[] }
 
 function repoSlug(releasesUrl: string): string | null {
@@ -29,6 +29,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   const [token, setToken] = useState<RegistrationTokenOut | null>(null);
   const [generating, setGenerating] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [distro, setDistro] = useState('ubuntu');
 
   useEffect(() => {
     if (!slug) { setState('error'); return; }
@@ -65,6 +66,13 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   const origin = window.location.origin;
   const fmt = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
   const assetsFor = (m: (n: string) => boolean) => (release?.assets ?? []).filter((a) => m(a.name));
+
+  const dl = (a: Asset) => (
+    <a key={a.name} href={a.browser_download_url}
+      style={{ padding: '5px 14px', fontSize: 12, border: '1px solid var(--border-dim)', borderRadius: 5, textDecoration: 'none', color: 'var(--text-1)', background: 'var(--bg-hover)' }}>
+      ⬇ {assetLabel(a.name)}{a.size ? ` · ${formatSize(a.size)}` : ''}
+    </a>
+  );
 
   return (
     <div style={{ padding: '24px', maxWidth: 760, background: 'var(--bg-base)', minHeight: '100%' }}>
@@ -141,23 +149,52 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
 
           {OS_TABS.filter(t => t.id === os).map(t => {
             const assets = assetsFor(t.match);
+            const isLinux = t.id === 'linux';
+            const d = LINUX_DISTROS.find(x => x.id === distro) ?? LINUX_DISTROS[0];
+            const viewerAsset = isLinux ? assets.find(a => d.match(a.name)) : undefined;
+            const agentAssets = assets.filter(a => /peerdesk-agent-linux/i.test(a.name));
             return (
               <div key={t.id} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {isLinux && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {LINUX_DISTROS.map(x => (
+                      <button key={x.id} onClick={() => setDistro(x.id)}
+                        style={{
+                          padding: '5px 14px', fontSize: 12, borderRadius: 5, cursor: 'pointer',
+                          background: distro === x.id ? 'var(--accent)' : 'var(--bg-hover)',
+                          color: distro === x.id ? '#fff' : 'var(--text-2)',
+                          border: distro === x.id ? 'none' : '1px solid var(--border-dim)',
+                        }}>
+                        {x.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div>
                   <div style={h}>Descarcă</div>
-                  {assets.length === 0 ? (
+                  {isLinux ? (
+                    viewerAsset ? (
+                      <>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>{dl(viewerAsset)}</div>
+                        <CodeBlock code={d.installHint.replace(/<file>/g, viewerAsset.name)} />
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Pachet indisponibil pentru {d.label} în {release.tag_name}.</div>
+                    )
+                  ) : assets.length === 0 ? (
                     <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Niciun fișier pentru {t.label} în {release.tag_name}.</div>
                   ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {assets.map(a => (
-                        <a key={a.name} href={a.browser_download_url}
-                          style={{ padding: '5px 14px', fontSize: 12, border: '1px solid var(--border-dim)', borderRadius: 5, textDecoration: 'none', color: 'var(--text-1)', background: 'var(--bg-hover)' }}>
-                          ⬇ {assetLabel(a.name)}
-                        </a>
-                      ))}
-                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{assets.map(dl)}</div>
                   )}
                 </div>
+
+                {isLinux && agentAssets.length > 0 && (
+                  <div>
+                    <div style={h}>Agent (binar)</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{agentAssets.map(dl)}</div>
+                  </div>
+                )}
 
                 {t.hasDeploy && (
                   <div>
