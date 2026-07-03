@@ -80,13 +80,19 @@ For each, run: **G** = agent GUI/video, **T** = agent terminal (headless, no `DI
 ### Fedora 40+
 - [ ] **G** — expected PASS, different packaging, current pipewire
 - [ ] **T**
-- [ ] **V** — AppImage (most portable across RPM distros)
+- [ ] **V (.rpm)** — native package via the Downloads page → Fedora chip → `sudo dnf install ./peerdesk-viewer-linux-v0.4.30-x86_64.rpm`; launches, connects, approves, renders
+- [ ] **V (.AppImage)** — fallback, most portable across RPM distros
+- Notes:
+
+### openSUSE (Leap 15.6 / Tumbleweed)
+- [ ] **V (.rpm)** — same package, install via `sudo zypper install ./peerdesk-viewer-linux-v0.4.30-x86_64.rpm` (Downloads page → openSUSE chip shows the zypper hint); launches + connects
+- [ ] **G** — expected PASS on Tumbleweed (pipewire 1.x); Leap 15.6 ships older pipewire → may FAIL, record
 - Notes:
 
 ### CentOS Stream 9 / RHEL 9
 - [!] **G** — expected FAIL (pipewire 0.3.x). Record error
 - [ ] **T** (headless binary) — `./peerdesk-agent-headless --server … --api-key …`; expect mode=Terminal, shell over xterm.js. Confirm it STARTS (the full binary won't on this distro) (this is the main reason to build it — RHEL servers are headless)
-- [!] **V** — expected FAIL (webkit). Record error
+- [ ] **V (.rpm)** — `sudo dnf install ./peerdesk-viewer-linux-v0.4.30-x86_64.rpm` installs, but the app needs **WebKitGTK 4.1** which RHEL 9 may lack → expect launch FAIL; record whether the rpm at least installs cleanly vs a missing-dependency error
 - Notes:
 
 ### Headless server (no monitor, no DISPLAY)
