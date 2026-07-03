@@ -10,7 +10,10 @@ All notable changes to PeerDesk are documented here.
   viewer package plus a one-line install command; the agent deploy command and
   binaries stay available regardless of distro.
 - **x86_64 `.rpm` package** for the Linux viewer (Fedora / RHEL / openSUSE),
-  built alongside the existing `.deb` and `.AppImage`.
+  built alongside the existing `.deb` and `.AppImage`. Install with
+  `sudo dnf install ./peerdesk-viewer-linux-<ver>-x86_64.rpm` (Fedora / RHEL) or
+  `sudo zypper install ./…rpm` (openSUSE); the OS compatibility checklist in
+  `TESTS/` covers these install paths.
 - **File sizes** shown next to every download on the Downloads page.
 
 ## [0.4.29] — 2026-07-03
