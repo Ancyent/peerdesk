@@ -66,3 +66,51 @@ describe('coerceOs', () => {
     expect(coerceOs('macos')).toBe('linux'); // macos tab is disabled
   });
 });
+
+import { LINUX_DISTROS, formatSize } from './osData';
+
+describe('linux tab matches rpm', () => {
+  it('classifies an rpm as a linux asset', () => {
+    expect(find('linux').match('peerdesk-viewer-linux-v0.4.30-x86_64.rpm')).toBe(true);
+  });
+});
+
+describe('assetLabel rpm', () => {
+  it('labels rpm', () => {
+    expect(assetLabel('peerdesk-viewer-linux-v0.4.30-x86_64.rpm')).toBe('.rpm');
+  });
+});
+
+describe('LINUX_DISTROS', () => {
+  const byId = (id: string) => LINUX_DISTROS.find(d => d.id === id)!;
+  it('has ubuntu/fedora/opensuse/arch with non-empty hints', () => {
+    for (const id of ['ubuntu', 'fedora', 'opensuse', 'arch']) {
+      expect(byId(id).installHint.length).toBeGreaterThan(0);
+    }
+  });
+  it('ubuntu picks the .deb, fedora + opensuse pick the .rpm, arch picks the AppImage', () => {
+    const deb = 'peerdesk-viewer-linux-v0.4.30-amd64.deb';
+    const rpm = 'peerdesk-viewer-linux-v0.4.30-x86_64.rpm';
+    const app = 'peerdesk-viewer-linux-v0.4.30.AppImage';
+    expect(byId('ubuntu').match(deb)).toBe(true);
+    expect(byId('ubuntu').match(rpm)).toBe(false);
+    expect(byId('fedora').match(rpm)).toBe(true);
+    expect(byId('opensuse').match(rpm)).toBe(true);
+    expect(byId('arch').match(app)).toBe(true);
+    expect(byId('arch').match(deb)).toBe(false);
+  });
+  it('fedora and opensuse resolve to the same rpm but different hints', () => {
+    expect(byId('fedora').pkg).toBe('rpm');
+    expect(byId('opensuse').pkg).toBe('rpm');
+    expect(byId('fedora').installHint).not.toBe(byId('opensuse').installHint);
+  });
+});
+
+describe('formatSize', () => {
+  it('formats MB and KB and guards non-positive', () => {
+    expect(formatSize(23_700_000)).toBe('22.6 MB');
+    expect(formatSize(500_000)).toBe('488 KB');
+    expect(formatSize(0)).toBe('');
+    expect(formatSize(NaN)).toBe('');
+  });
+});
