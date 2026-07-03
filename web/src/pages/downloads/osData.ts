@@ -12,8 +12,8 @@ export interface OsTab {
 export const OS_TABS: OsTab[] = [
   {
     id: 'linux', label: 'Linux', enabled: true, hasDeploy: true,
-    note: 'Comanda de mai jos instalează agentul ca serviciu systemd. Pachetele desktop (.deb/.AppImage) le instalezi normal — sunt viewer + host.',
-    match: (n) => /linux|\.deb$|\.appimage$/i.test(n),
+    note: 'Comanda de mai jos instalează agentul ca serviciu systemd. Pachetele desktop (.deb/.rpm/.AppImage) le instalezi normal — sunt viewer + host.',
+    match: (n) => /linux|\.deb$|\.rpm$|\.appimage$/i.test(n),
   },
   {
     id: 'windows', label: 'Windows', enabled: true, hasDeploy: true,
@@ -34,6 +34,7 @@ export const OS_TABS: OsTab[] = [
 export function assetLabel(name: string): string {
   if (/\.appimage$/i.test(name)) return '.AppImage';
   if (/\.deb$/i.test(name)) return '.deb';
+  if (/\.rpm$/i.test(name)) return '.rpm';
   if (/\.msi$/i.test(name)) return '.msi';
   if (/portable\.exe$/i.test(name)) return 'portabil (.exe)';
   if (/setup\.exe$/i.test(name)) return 'installer (.exe)';
@@ -44,6 +45,33 @@ export function assetLabel(name: string): string {
   if (/agent/i.test(name) && /linux/i.test(name)) return 'agent (Linux)';
   if (/linux/i.test(name)) return 'Linux x86_64';
   return name;
+}
+
+export type LinuxPkg = 'deb' | 'rpm' | 'appimage';
+
+export interface LinuxDistro {
+  id: string;
+  label: string;
+  pkg: LinuxPkg;
+  /** Install command; `<file>` is replaced with the asset filename at render time. */
+  installHint: string;
+  /** Selects the viewer asset for this distro by extension. */
+  match: (assetName: string) => boolean;
+}
+
+export const LINUX_DISTROS: LinuxDistro[] = [
+  { id: 'ubuntu',   label: 'Ubuntu / Debian', pkg: 'deb',      installHint: 'sudo apt install ./<file>',    match: (n) => /\.deb$/i.test(n) },
+  { id: 'fedora',   label: 'Fedora / RHEL',   pkg: 'rpm',      installHint: 'sudo dnf install ./<file>',    match: (n) => /\.rpm$/i.test(n) },
+  { id: 'opensuse', label: 'openSUSE',        pkg: 'rpm',      installHint: 'sudo zypper install ./<file>', match: (n) => /\.rpm$/i.test(n) },
+  { id: 'arch',     label: 'Arch / altele',   pkg: 'appimage', installHint: 'chmod +x <file> && ./<file>',  match: (n) => /\.appimage$/i.test(n) },
+];
+
+/** Human-readable file size. Empty string for non-positive/NaN input. */
+export function formatSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1) return `${mb.toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 export interface AgentArg { flag: string; meaning: string }
