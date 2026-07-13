@@ -12,11 +12,13 @@ BINARY_NAME="peerdesk-agent"
 
 API_KEY=""
 SERVER=""
+HEADLESS=0
 
 for arg in "$@"; do
   case $arg in
     --api-key=*) API_KEY="${arg#*=}" ;;
     --server=*)  SERVER="${arg#*=}" ;;
+    --headless)  HEADLESS=1 ;;
     *) echo "Unknown argument: $arg"; exit 1 ;;
   esac
 done
@@ -27,13 +29,19 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo "==> Fetching latest PeerDesk release..."
-DOWNLOAD_URL=$(curl -sSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" \
+ASSET_URLS=$(curl -sSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" \
   | grep '"browser_download_url"' \
-  | grep 'linux-x86_64' \
-  | cut -d '"' -f 4)
+  | cut -d '"' -f 4 \
+  | grep 'peerdesk-agent-linux-x86_64')
+
+if [[ "$HEADLESS" -eq 1 ]]; then
+  DOWNLOAD_URL=$(echo "$ASSET_URLS" | grep 'headless' | head -1)
+else
+  DOWNLOAD_URL=$(echo "$ASSET_URLS" | grep -v 'headless' | head -1)
+fi
 
 if [[ -z "$DOWNLOAD_URL" ]]; then
-  echo "ERROR: Could not find Linux binary in latest release."
+  echo "ERROR: Could not find Linux agent binary in latest release."
   exit 1
 fi
 
