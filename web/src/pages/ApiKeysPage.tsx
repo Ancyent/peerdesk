@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { api, type ApiKeyListOut } from '../api/client';
+import { copyText } from '../lib/clipboard';
 
 export function ApiKeysPage() {
   const { accessToken } = useAuth();
@@ -38,8 +39,8 @@ export function ApiKeysPage() {
     setKeys(prev => prev.filter(k => k.id !== id));
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string) => {
+    if (!(await copyText(text))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

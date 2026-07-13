@@ -1,5 +1,6 @@
 // web/src/components/CodeBlock.tsx
 import { useState } from 'react';
+import { copyText } from '../lib/clipboard';
 
 const box: React.CSSProperties = {
   background: 'var(--bg-base)', borderRadius: 8, padding: '12px 14px',
@@ -17,8 +18,9 @@ export function CodeBlock({ code, empty }: { code: string; empty?: string }) {
   if (!code) {
     return <div style={{ ...box, color: 'var(--text-3)' }}>{empty ?? '—'}</div>;
   }
-  const copy = () => {
-    try { navigator.clipboard?.writeText(code); } catch { /* best-effort */ }
+  const copy = async () => {
+    const ok = await copyText(code);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
