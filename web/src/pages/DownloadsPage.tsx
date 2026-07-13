@@ -240,14 +240,17 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
                   <div style={h}>Dezinstalare (terminal)</div>
                   {isLinux ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-2)', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.5 }}>
+                        ℹ️ Sunt două lucruri diferite: <b>Agentul</b> (instalat cu <code>curl … | bash</code>) este un binar + serviciu systemd, <b>NU un pachet apt/dnf</b> — se dezinstalează cu comanda de la „Agent" de mai jos. Comanda „Client / viewer" (<code>apt/dnf/zypper remove peer-desk</code>) e doar pentru aplicația desktop instalată din <code>.deb/.rpm</code>.
+                      </div>
                       {viewerAsset && (
                         <div>
-                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Client / viewer ({d.label})</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Client / viewer ({d.label}) — doar dacă ai instalat app-ul desktop</div>
                           <CodeBlock code={d.uninstallHint.replace(/<file>/g, viewerAsset.name)} />
                         </div>
                       )}
                       <div>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Agent (serviciu + binar)</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Agent (serviciu + binar) — instalat cu curl … | bash</div>
                         <CodeBlock code={AGENT_UNINSTALL_LINUX} />
                       </div>
                     </div>
