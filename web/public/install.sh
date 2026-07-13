@@ -13,15 +13,29 @@ BINARY_NAME="peerdesk-agent"
 API_KEY=""
 SERVER=""
 HEADLESS=0
+GUI=0
 
 for arg in "$@"; do
   case $arg in
     --api-key=*) API_KEY="${arg#*=}" ;;
     --server=*)  SERVER="${arg#*=}" ;;
     --headless)  HEADLESS=1 ;;
+    --gui)       GUI=1 ;;
     *) echo "Unknown argument: $arg"; exit 1 ;;
   esac
 done
+
+# Auto-detect GUI vs headless when neither flag is given.
+# The full agent links libxdo/pipewire/X11 and won't even load on a headless box.
+if [[ "$HEADLESS" -eq 0 && "$GUI" -eq 0 ]]; then
+  if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]] || compgen -G "/tmp/.X11-unix/X*" >/dev/null 2>&1; then
+    : # graphical session present -> keep the full GUI-capture agent
+  else
+    HEADLESS=1
+    echo "==> No graphical session detected -> installing the headless agent (terminal mode)."
+    echo "    Pass --gui to force the full GUI-capture agent instead."
+  fi
+fi
 
 if [[ $EUID -ne 0 ]]; then
   echo "Run as root: sudo bash $0 $*"
