@@ -21,6 +21,7 @@ async def create_token(
         company_id=body.company_id,
         location_id=body.location_id,
         group_id=body.group_id,
+        name=(body.name.strip() or None) if body.name else None,
     )
     db.add(reg)
     await db.commit()
@@ -45,10 +46,12 @@ async def redeem_token(body: TokenRedeemRequest, db: AsyncSession = Depends(get_
     if existing.scalar_one_or_none():
         raise HTTPException(409, "peer_id already registered")
 
-    key = ApiKey(name=f"Agent: {body.name}", auto_approve=True, created_by=reg.created_by)
+    # A name chosen at token-generation time wins over the agent's hostname default.
+    machine_name = reg.name or body.name
+    key = ApiKey(name=f"Agent: {machine_name}", auto_approve=True, created_by=reg.created_by)
     db.add(key)
     machine = Machine(
-        peer_id=body.peer_id, name=body.name, os=body.os,
+        peer_id=body.peer_id, name=machine_name, os=body.os,
         owner_id=reg.created_by,
         company_id=reg.company_id, location_id=reg.location_id, group_id=reg.group_id,
         api_key_id=key.id,

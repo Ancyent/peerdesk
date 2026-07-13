@@ -13,6 +13,26 @@ async def test_create_token(auth_client):
 
 
 @pytest.mark.asyncio
+async def test_token_name_overrides_agent_name(auth_client, client):
+    # A name set at token creation wins over the agent's hostname-derived name.
+    token_val = (await auth_client.post("/tokens", json={"name": "Reception PC"})).json()["token"]
+    r = await client.post("/tokens/redeem", json={
+        "token": token_val, "peer_id": "123456780", "name": "host-xyz (linux)", "os": "linux",
+    })
+    assert r.status_code == 201
+    assert r.json()["name"] == "Reception PC"
+
+
+@pytest.mark.asyncio
+async def test_no_token_name_keeps_agent_name(auth_client, client):
+    token_val = (await auth_client.post("/tokens", json={})).json()["token"]
+    r = await client.post("/tokens/redeem", json={
+        "token": token_val, "peer_id": "123456781", "name": "host-abc (linux)", "os": "linux",
+    })
+    assert r.json()["name"] == "host-abc (linux)"
+
+
+@pytest.mark.asyncio
 async def test_redeem_token(auth_client, client):
     token_val = (await auth_client.post("/tokens", json={})).json()["token"]
     r = await client.post("/tokens/redeem", json={

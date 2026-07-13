@@ -162,6 +162,7 @@ class RegistrationTokenCreate(BaseModel):
     company_id: Optional[str] = None
     location_id: Optional[str] = None
     group_id: Optional[str] = None
+    name: Optional[str] = None
 
 
 class RegistrationTokenOut(BaseModel):
@@ -172,6 +173,7 @@ class RegistrationTokenOut(BaseModel):
     company_id: Optional[str]
     location_id: Optional[str]
     group_id: Optional[str]
+    name: Optional[str] = None
     model_config = {"from_attributes": True}
 
 

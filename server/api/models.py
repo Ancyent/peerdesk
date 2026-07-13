@@ -230,6 +230,7 @@ class RegistrationToken(Base):
     token: Mapped[str] = mapped_column(String(9), unique=True, nullable=False, default=_gen_token)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
     created_by: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     company_id: Mapped[str | None] = mapped_column(String, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True)
     location_id: Mapped[str | None] = mapped_column(String, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)

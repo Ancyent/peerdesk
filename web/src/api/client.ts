@@ -259,7 +259,7 @@ export const api = {
       request<MachineOut>(`/machines/${machineId}/placement`, { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify(data) }),
   },
   tokens: {
-    create: (token: string, placement?: { company_id?: string; location_id?: string; group_id?: string }) =>
+    create: (token: string, placement?: { company_id?: string; location_id?: string; group_id?: string; name?: string }) =>
       request<RegistrationTokenOut>('/tokens', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(placement ?? {}) }),
   },
   turn: {

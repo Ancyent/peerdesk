@@ -32,6 +32,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   const [distro, setDistro] = useState('ubuntu');
   const [pw, setPw] = useState('');
   const [mode, setMode] = useState<InstallMode>('auto');
+  const [machineName, setMachineName] = useState('');
 
   useEffect(() => {
     if (!slug) { setState('error'); return; }
@@ -59,7 +60,10 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
     if (!accessToken) return;
     setGenerating(true);
     try {
-      const t = await api.tokens.create(accessToken, placementCompany ? { company_id: placementCompany } : undefined);
+      const t = await api.tokens.create(accessToken, {
+        ...(placementCompany ? { company_id: placementCompany } : {}),
+        ...(machineName.trim() ? { name: machineName.trim() } : {}),
+      });
       setToken(t);
     } catch (e) { console.error(e); }
     finally { setGenerating(false); }
@@ -96,6 +100,9 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
         {!token ? (
           <>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-2)' }}>Token de înregistrare</label>
+            <input value={machineName} onChange={e => setMachineName(e.target.value)}
+              placeholder="Nume mașină (opțional — altfel hostname-ul)"
+              style={{ width: '100%', boxSizing: 'border-box', marginBottom: 8, padding: '8px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-surface)', color: 'var(--text-1)', outline: 'none' }} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <select value={placementCompany} onChange={e => setPlacementCompany(e.target.value)}
                 style={{ flex: 1, minWidth: 180, padding: '8px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-surface)', color: 'var(--text-1)' }}>
