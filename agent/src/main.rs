@@ -83,15 +83,24 @@ async fn main() -> anyhow::Result<()> {
 
     // Service management
     if cli.install_service {
-        // Persist server/key to config before installing so the service picks them up on start
-        if effective_server.is_some() || effective_api_key.is_some() {
-            let config_path = Config::config_path(cli.portable);
+        let config_path = Config::config_path(cli.portable);
+        // A password is "explicit" when the user (or the installer script) passed
+        // --password / PEERDESK_PASSWORD / --config; a bare --install-service uses
+        // a freshly generated one, which we must NOT force onto an existing config.
+        let has_explicit_pw = cli.password.is_some() || deploy.password.is_some();
+        // Persist server/key (and create the config) so the service picks them up on start.
+        if effective_server.is_some() || effective_api_key.is_some() || has_explicit_pw {
             Config::load_or_create(
                 &config_path,
                 effective_password,
                 effective_server,
                 effective_api_key,
             )?;
+        }
+        // An explicitly-provided password is authoritative even for an existing
+        // config, so a redeploy can actually change the machine's access password.
+        if has_explicit_pw {
+            Config::set_password(&config_path, effective_password)?;
         }
         service::install_service()?;
         return Ok(());

@@ -12,15 +12,17 @@ BINARY_NAME="peerdesk-agent"
 
 API_KEY=""
 SERVER=""
+PASSWORD=""
 HEADLESS=0
 GUI=0
 
 for arg in "$@"; do
   case $arg in
-    --api-key=*) API_KEY="${arg#*=}" ;;
-    --server=*)  SERVER="${arg#*=}" ;;
-    --headless)  HEADLESS=1 ;;
-    --gui)       GUI=1 ;;
+    --api-key=*)  API_KEY="${arg#*=}" ;;
+    --server=*)   SERVER="${arg#*=}" ;;
+    --password=*) PASSWORD="${arg#*=}" ;;
+    --headless)   HEADLESS=1 ;;
+    --gui)        GUI=1 ;;
     *) echo "Unknown argument: $arg"; exit 1 ;;
   esac
 done
@@ -64,9 +66,19 @@ curl -sSL "$DOWNLOAD_URL" -o "${INSTALL_DIR}/${BINARY_NAME}"
 chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
 echo "==> Installed to ${INSTALL_DIR}/${BINARY_NAME}"
 
+# The agent auto-approves connections for headless installs, so the access
+# password is the only gate. Generate one if the caller didn't pass --password,
+# and print it below so the machine is actually reachable.
+GENERATED_PW=0
+if [[ -z "$PASSWORD" ]]; then
+  PASSWORD="$( { LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 14; } 2>/dev/null || true )"
+  GENERATED_PW=1
+fi
+
 ARGS=""
-[[ -n "$SERVER"  ]] && ARGS="$ARGS --server=$SERVER"
-[[ -n "$API_KEY" ]] && ARGS="$ARGS --api-key=$API_KEY"
+[[ -n "$SERVER"   ]] && ARGS="$ARGS --server=$SERVER"
+[[ -n "$API_KEY"  ]] && ARGS="$ARGS --api-key=$API_KEY"
+[[ -n "$PASSWORD" ]] && ARGS="$ARGS --password=$PASSWORD"
 
 echo "==> Installing systemd service..."
 # shellcheck disable=SC2086
@@ -78,6 +90,12 @@ echo ""
 echo "==============================================="
 echo " PeerDesk Agent installed successfully!"
 echo " Peer ID : ${PEER_ID}"
+echo " Password: ${PASSWORD}"
 echo " Service : systemctl status peerdesk-agent"
 echo " Logs    : journalctl -u peerdesk-agent -f"
 echo "==============================================="
+if [[ "$GENERATED_PW" -eq 1 ]]; then
+  echo " NOTE: password auto-generated — save it. Connect with Peer ID + Password."
+  echo "       Pass --password=YOUR_PW to choose your own, or run:"
+  echo "       sudo ${BINARY_NAME} --reset-password  (to rotate it later)"
+fi

@@ -5,7 +5,8 @@
 
 param(
     [string]$ApiKey = "",
-    [string]$Server = ""
+    [string]$Server = "",
+    [string]$Password = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,9 +33,18 @@ Write-Host "==> Downloading $($Asset.name)..."
 Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $BinaryPath
 Write-Host "==> Installed to $BinaryPath"
 
+# The access password is the gate for connecting. Generate one if not supplied,
+# and print it below so the machine is actually reachable.
+$GeneratedPw = $false
+if (-not $Password) {
+    $Password = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 14 | ForEach-Object { [char]$_ })
+    $GeneratedPw = $true
+}
+
 $ExtraArgs = @()
-if ($Server) { $ExtraArgs += "--server=$Server" }
-if ($ApiKey) { $ExtraArgs += "--api-key=$ApiKey" }
+if ($Server)   { $ExtraArgs += "--server=$Server" }
+if ($ApiKey)   { $ExtraArgs += "--api-key=$ApiKey" }
+if ($Password) { $ExtraArgs += "--password=$Password" }
 
 Write-Host "==> Installing Windows service..."
 & $BinaryPath --install-service @ExtraArgs
@@ -45,6 +55,11 @@ Write-Host ""
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host " PeerDesk Agent installed successfully!"       -ForegroundColor Green
 Write-Host " Peer ID : $PeerID"
+Write-Host " Password: $Password"
 Write-Host " Service : Get-Service peerdesk-agent"
 Write-Host " Logs    : $env:APPDATA\peerdesk\agent.log"
 Write-Host "===============================================" -ForegroundColor Green
+if ($GeneratedPw) {
+    Write-Host " NOTE: password auto-generated - save it. Connect with Peer ID + Password." -ForegroundColor Yellow
+    Write-Host "       Pass -Password YOUR_PW to choose your own." -ForegroundColor Yellow
+}

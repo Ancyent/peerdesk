@@ -170,6 +170,19 @@ impl Config {
         cfg.save(path)?;
         Ok(cfg)
     }
+
+    /// Authoritatively set the access password on an existing (or new) config,
+    /// overwriting `password_hash` + `hmac_key`. Unlike `load_or_create`, which
+    /// never rewrites the password of an existing config, this is used when a
+    /// password is explicitly provided at deploy time (`--install-service
+    /// --password=...`) so a redeploy can actually change the machine's password.
+    pub fn set_password(path: &Path, password: &str) -> Result<()> {
+        let mut cfg = Self::load(path)?;
+        cfg.password_hash = bcrypt::hash(password, bcrypt::DEFAULT_COST)?;
+        cfg.hmac_key = Some(derive_hmac_key(password));
+        cfg.save(path)?;
+        Ok(())
+    }
 }
 
 /// Generate a short, simple access password: 8 characters, lowercase letters
@@ -328,6 +341,31 @@ mod tests {
             Some("https://api.example.com")
         );
         assert_eq!(loaded.api_key.as_deref(), Some("tok123"));
+    }
+
+    #[test]
+    fn set_password_overwrites_existing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        Config::load_or_create(
+            &path,
+            "first-pw",
+            Some("https://api.example.com"),
+            Some("tok"),
+        )
+        .unwrap();
+        let before = Config::load(&path).unwrap();
+        assert!(bcrypt::verify("first-pw", &before.password_hash).unwrap());
+
+        Config::set_password(&path, "second-pw").unwrap();
+        let after = Config::load(&path).unwrap();
+        // New password verifies, old one no longer does; server/key/peer_id preserved.
+        assert!(bcrypt::verify("second-pw", &after.password_hash).unwrap());
+        assert!(!bcrypt::verify("first-pw", &after.password_hash).unwrap());
+        assert_eq!(after.hmac_key, Some(derive_hmac_key("second-pw")));
+        assert_eq!(after.server_url.as_deref(), Some("https://api.example.com"));
+        assert_eq!(after.api_key.as_deref(), Some("tok"));
+        assert_eq!(after.peer_id, before.peer_id);
     }
 
     #[test]
