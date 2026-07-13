@@ -3,7 +3,7 @@ import { useAuth } from '../auth/useAuth';
 import { api, type RegistrationTokenOut, type CompanyOut } from '../api/client';
 import { getConfig } from '../config';
 import { CodeBlock } from '../components/CodeBlock';
-import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, formatSize, type OsId } from './downloads/osData';
+import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, AGENT_UNINSTALL_LINUX, AGENT_UNINSTALL_WINDOWS, formatSize, type OsId } from './downloads/osData';
 import { buildCommand } from './downloads/commands';
 
 interface Asset { name: string; browser_download_url: string; size: number }
@@ -202,6 +202,34 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
                     <CodeBlock code={buildCommand(t.id, { origin, token: token?.token ?? null })} empty="Generează un token mai întâi ↑" />
                   </div>
                 )}
+
+                <div>
+                  <div style={h}>Dezinstalare (terminal)</div>
+                  {isLinux ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {viewerAsset && (
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Client / viewer ({d.label})</div>
+                          <CodeBlock code={d.uninstallHint.replace(/<file>/g, viewerAsset.name)} />
+                        </div>
+                      )}
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Agent (serviciu + binar)</div>
+                        <CodeBlock code={AGENT_UNINSTALL_LINUX} />
+                      </div>
+                    </div>
+                  ) : t.id === 'windows' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Agent (PowerShell ca Administrator)</div>
+                        <CodeBlock code={AGENT_UNINSTALL_WINDOWS} />
+                      </div>
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>Viewer-ul desktop se dezinstalează din Setări → Aplicații.</p>
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>Dezinstalează aplicația din launcher-ul Android.</p>
+                  )}
+                </div>
 
                 {t.note && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>{t.note}</p>}
               </div>

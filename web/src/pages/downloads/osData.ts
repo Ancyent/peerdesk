@@ -55,16 +55,29 @@ export interface LinuxDistro {
   pkg: LinuxPkg;
   /** Install command; `<file>` is replaced with the asset filename at render time. */
   installHint: string;
+  /** Uninstall command for the viewer package (`<file>` replaced at render time). */
+  uninstallHint: string;
   /** Selects the viewer asset for this distro by extension. */
   match: (assetName: string) => boolean;
 }
 
+// The .deb and .rpm both install the viewer under package name "peer-desk"
+// (Tauri sanitizes productName "PeerDesk"). The AppImage isn't installed — you
+// just delete the file.
 export const LINUX_DISTROS: LinuxDistro[] = [
-  { id: 'ubuntu',   label: 'Ubuntu / Debian', pkg: 'deb',      installHint: 'sudo apt install ./<file>',    match: (n) => /\.deb$/i.test(n) },
-  { id: 'fedora',   label: 'Fedora / RHEL',   pkg: 'rpm',      installHint: 'sudo dnf install ./<file>',    match: (n) => /\.rpm$/i.test(n) },
-  { id: 'opensuse', label: 'openSUSE',        pkg: 'rpm',      installHint: 'sudo zypper install ./<file>', match: (n) => /\.rpm$/i.test(n) },
-  { id: 'arch',     label: 'Arch / altele',   pkg: 'appimage', installHint: 'chmod +x <file> && ./<file>',  match: (n) => /\.appimage$/i.test(n) },
+  { id: 'ubuntu',   label: 'Ubuntu / Debian', pkg: 'deb',      installHint: 'sudo apt install ./<file>',    uninstallHint: 'sudo apt remove peer-desk',    match: (n) => /\.deb$/i.test(n) },
+  { id: 'fedora',   label: 'Fedora / RHEL',   pkg: 'rpm',      installHint: 'sudo dnf install ./<file>',    uninstallHint: 'sudo dnf remove peer-desk',    match: (n) => /\.rpm$/i.test(n) },
+  { id: 'opensuse', label: 'openSUSE',        pkg: 'rpm',      installHint: 'sudo zypper install ./<file>', uninstallHint: 'sudo zypper remove peer-desk', match: (n) => /\.rpm$/i.test(n) },
+  { id: 'arch',     label: 'Arch / altele',   pkg: 'appimage', installHint: 'chmod +x <file> && ./<file>',  uninstallHint: 'rm <file>',                    match: (n) => /\.appimage$/i.test(n) },
 ];
+
+/** Uninstall the headless/CLI agent (systemd service + binary). Distro-independent. */
+export const AGENT_UNINSTALL_LINUX =
+  'sudo peerdesk-agent --uninstall-service && sudo rm -f /usr/local/bin/peerdesk-agent';
+
+/** Uninstall the agent on Windows (run PowerShell as Administrator). */
+export const AGENT_UNINSTALL_WINDOWS =
+  '& "$env:ProgramFiles\\PeerDesk\\peerdesk-agent.exe" --uninstall-service; Remove-Item -Recurse -Force "$env:ProgramFiles\\PeerDesk"';
 
 /** Human-readable file size. Empty string for non-positive/NaN input. */
 export function formatSize(bytes: number): string {

@@ -43,6 +43,29 @@ describe('assetLabel', () => {
   });
 });
 
+import { AGENT_UNINSTALL_LINUX } from './osData';
+
+describe('uninstall hints', () => {
+  it('every distro has install + uninstall hints', () => {
+    for (const d of LINUX_DISTROS) {
+      expect(d.installHint.length).toBeGreaterThan(0);
+      expect(d.uninstallHint.length).toBeGreaterThan(0);
+    }
+  });
+  it('deb/rpm uninstall targets the real package name peer-desk', () => {
+    for (const id of ['ubuntu', 'fedora', 'opensuse']) {
+      const d = LINUX_DISTROS.find(x => x.id === id)!;
+      expect(d.uninstallHint).toContain('peer-desk');
+    }
+    // AppImage isn't a package — uninstall is just deleting the file.
+    expect(LINUX_DISTROS.find(x => x.id === 'arch')!.uninstallHint).toContain('rm ');
+  });
+  it('agent uninstall removes the service and the binary', () => {
+    expect(AGENT_UNINSTALL_LINUX).toContain('--uninstall-service');
+    expect(AGENT_UNINSTALL_LINUX).toContain('/usr/local/bin/peerdesk-agent');
+  });
+});
+
 describe('AGENT_ARGS', () => {
   it('documents all nine binary flags', () => {
     const flags = AGENT_ARGS.map(a => a.flag);
