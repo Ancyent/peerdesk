@@ -4,7 +4,7 @@ import { api, type RegistrationTokenOut, type CompanyOut } from '../api/client';
 import { getConfig } from '../config';
 import { CodeBlock } from '../components/CodeBlock';
 import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, AGENT_UNINSTALL_LINUX, AGENT_UNINSTALL_WINDOWS, formatSize, type OsId } from './downloads/osData';
-import { buildCommand } from './downloads/commands';
+import { buildCommand, type InstallMode } from './downloads/commands';
 
 interface Asset { name: string; browser_download_url: string; size: number }
 interface Release { tag_name: string; html_url: string; assets: Asset[] }
@@ -30,6 +30,8 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   const [generating, setGenerating] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [distro, setDistro] = useState('ubuntu');
+  const [pw, setPw] = useState('');
+  const [mode, setMode] = useState<InstallMode>('auto');
 
   useEffect(() => {
     if (!slug) { setState('error'); return; }
@@ -199,7 +201,31 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
                 {t.hasDeploy && (
                   <div>
                     <div style={h}>Deploy</div>
-                    <CodeBlock code={buildCommand(t.id, { origin, token: token?.token ?? null })} empty="Generează un token mai întâi ↑" />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                      <input
+                        value={pw}
+                        onChange={(e) => setPw(e.target.value)}
+                        placeholder="Parolă (gol = auto-generată)"
+                        style={{ flex: '1 1 200px', minWidth: 160, padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border-dim)', background: 'var(--bg-hover)', color: 'var(--text-1)', outline: 'none' }}
+                      />
+                      {isLinux && (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {(['auto', 'headless', 'gui'] as const).map((mo) => (
+                            <button key={mo} type="button" onClick={() => setMode(mo)}
+                              title={mo === 'auto' ? 'Detectează automat (recomandat)' : mo === 'headless' ? 'Fără GUI — server/terminal' : 'Forțează captură GUI'}
+                              style={{
+                                padding: '6px 12px', fontSize: 12, borderRadius: 5, cursor: 'pointer',
+                                background: mode === mo ? 'var(--accent)' : 'var(--bg-hover)',
+                                color: mode === mo ? '#fff' : 'var(--text-2)',
+                                border: mode === mo ? 'none' : '1px solid var(--border-dim)',
+                              }}>
+                              {mo === 'auto' ? 'Auto' : mo === 'headless' ? 'Headless' : 'GUI'}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <CodeBlock code={buildCommand(t.id, { origin, token: token?.token ?? null, password: pw.trim() || undefined, mode: isLinux ? mode : undefined })} empty="Generează un token mai întâi ↑" />
                   </div>
                 )}
 

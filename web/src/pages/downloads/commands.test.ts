@@ -18,4 +18,23 @@ describe('buildCommand', () => {
   it('android → empty (no CLI deploy)', () => {
     expect(buildCommand('android', ctx)).toBe('');
   });
+
+  it('linux appends --password (shell-quoted) and --headless', () => {
+    const cmd = buildCommand('linux', { ...ctx, password: 'Secret 1', mode: 'headless' });
+    expect(cmd).toContain("--password='Secret 1'");
+    expect(cmd.endsWith('--headless')).toBe(true);
+  });
+  it('linux --gui when mode=gui, nothing when auto', () => {
+    expect(buildCommand('linux', { ...ctx, mode: 'gui' }).endsWith('--gui')).toBe(true);
+    expect(buildCommand('linux', { ...ctx, mode: 'auto' })).not.toContain('--headless');
+    expect(buildCommand('linux', { ...ctx, mode: 'auto' })).not.toContain('--gui');
+  });
+  it('escapes a single quote in the linux password', () => {
+    expect(buildCommand('linux', { ...ctx, password: "a'b" })).toContain(`--password='a'\\''b'`);
+  });
+  it('windows appends -Password (double-quoted), ignores mode', () => {
+    const cmd = buildCommand('windows', { ...ctx, password: 'Secret1', mode: 'headless' });
+    expect(cmd).toContain('-Password "Secret1"');
+    expect(cmd).not.toContain('headless');
+  });
 });
