@@ -51,7 +51,16 @@ class MachineOut(BaseModel):
     group_id: Optional[str] = None
     approval_status: str = "approved"
     api_key_id: Optional[str] = None
+    has_saved_password: bool = False
     model_config = {"from_attributes": True}
+
+
+class SavedPasswordIn(BaseModel):
+    password: str
+
+
+class SavedPasswordOut(BaseModel):
+    password: str
 
 
 class TokenRedeemResponse(MachineOut):

@@ -4,7 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user, get_api_key
 from models import User, Machine, ApiKey, Company, Location, Group
-from schemas import MachineRegister, MachineOut, MachinePlacement, MachineRegisterViaKey, MachineApprovalStatus
+from schemas import (
+    MachineRegister, MachineOut, MachinePlacement, MachineRegisterViaKey,
+    MachineApprovalStatus, SavedPasswordIn, SavedPasswordOut,
+)
+from crypto_box import encrypt_secret, decrypt_secret
 
 router = APIRouter(prefix="/machines", tags=["machines"])
 
@@ -169,6 +173,67 @@ async def delete_machine(
         raise HTTPException(status_code=404, detail="Machine not found")
     await db.delete(machine)
     await db.commit()
+
+
+async def _owned_machine(machine_id: str, db: AsyncSession, user: User) -> Machine:
+    result = await db.execute(
+        select(Machine).where(
+            Machine.id == machine_id,
+            Machine.owner_id == user.id,
+        )
+    )
+    machine = result.scalar_one_or_none()
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+    return machine
+
+
+@router.put("/{machine_id}/saved-password", status_code=204)
+async def set_saved_password(
+    machine_id: str,
+    body: SavedPasswordIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Save (encrypted) the connect password for a machine the user owns, so the
+    web viewer can connect without re-typing it. Opt-in; overwrites any prior one."""
+    if not body.password:
+        raise HTTPException(status_code=400, detail="Password required")
+    machine = await _owned_machine(machine_id, db, current_user)
+    machine.saved_password_enc = encrypt_secret(body.password)
+    await db.commit()
+
+
+@router.delete("/{machine_id}/saved-password", status_code=204)
+async def clear_saved_password(
+    machine_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Forget a machine's saved connect password."""
+    machine = await _owned_machine(machine_id, db, current_user)
+    machine.saved_password_enc = None
+    await db.commit()
+
+
+@router.get("/{machine_id}/saved-password", response_model=SavedPasswordOut)
+async def get_saved_password(
+    machine_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the decrypted connect password so the web viewer can auto-connect.
+    Owner-only. 404 if none saved (or the key rotated and it can't be decrypted)."""
+    machine = await _owned_machine(machine_id, db, current_user)
+    if not machine.saved_password_enc:
+        raise HTTPException(status_code=404, detail="No saved password")
+    password = decrypt_secret(machine.saved_password_enc)
+    if password is None:
+        # Key rotated or ciphertext corrupt — drop the stale value and report absent.
+        machine.saved_password_enc = None
+        await db.commit()
+        raise HTTPException(status_code=404, detail="No saved password")
+    return SavedPasswordOut(password=password)
 
 
 @router.patch("/{peer_id}/heartbeat", status_code=204)

@@ -2,8 +2,9 @@ import type { MachineOut } from '../api/client';
 
 interface Props {
   machine: MachineOut;
-  onConnect: (peerId: string) => void;
+  onConnect: (machine: MachineOut) => void;
   onDelete?: (id: string) => void;
+  onForget?: (machine: MachineOut) => void;
 }
 
 function getOsConfig(os: string | null): { icon: string; bg: string } {
@@ -23,9 +24,10 @@ function formatLastSeen(ts: string | null): string {
   return `${Math.floor(h / 24)}z`;
 }
 
-export function MachineCard({ machine: m, onConnect, onDelete }: Props) {
+export function MachineCard({ machine: m, onConnect, onDelete, onForget }: Props) {
   const { icon, bg } = getOsConfig(m.os);
   const online = m.is_online;
+  const saved = m.has_saved_password;
 
   return (
     <div
@@ -61,9 +63,12 @@ export function MachineCard({ machine: m, onConnect, onDelete }: Props) {
           {m.os ?? 'Linux'}{!online && m.last_seen_at ? ` · offline ${formatLastSeen(m.last_seen_at)}` : online ? ' · ultima activitate: acum' : ''}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button disabled={!online} onClick={() => online && onConnect(m.peer_id)} style={{ flex: 1, padding: '8px 0', background: online ? 'linear-gradient(135deg, var(--accent), var(--accent-2))' : 'var(--bg-hover)', border: 'none', borderRadius: 8, color: online ? 'var(--text-1)' : 'var(--text-3)', fontSize: 12, fontWeight: 700, cursor: online ? 'pointer' : 'default', boxShadow: online ? '0 2px 12px rgba(0,200,150,0.38)' : 'none', transition: 'all 0.2s' }}>
-            {online ? '⚡ Conectează' : 'Offline'}
+          <button disabled={!online} onClick={() => online && onConnect(m)} style={{ flex: 1, padding: '8px 0', background: online ? 'linear-gradient(135deg, var(--accent), var(--accent-2))' : 'var(--bg-hover)', border: 'none', borderRadius: 8, color: online ? 'var(--text-1)' : 'var(--text-3)', fontSize: 12, fontWeight: 700, cursor: online ? 'pointer' : 'default', boxShadow: online ? '0 2px 12px rgba(0,200,150,0.38)' : 'none', transition: 'all 0.2s' }}>
+            {online ? (saved ? '⚡ Conectează 🔑' : '⚡ Conectează') : 'Offline'}
           </button>
+          {saved && onForget && (
+            <button onClick={() => onForget(m)} title="Uită parola salvată" aria-label="Uită parola salvată" style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>🔑✕</button>
+          )}
           {onDelete && (
             <button onClick={() => onDelete(m.id)} title="Șterge mașina" aria-label="Șterge mașina" style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>···</button>
           )}

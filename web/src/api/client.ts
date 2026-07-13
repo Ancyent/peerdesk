@@ -83,6 +83,7 @@ export interface MachineOut {
   company_id: string | null; location_id: string | null; group_id: string | null;
   approval_status: string;   // "pending" | "approved" | "denied"
   api_key_id: string | null;
+  has_saved_password: boolean;
 }
 
 export interface ApiKeyOut {
@@ -180,6 +181,21 @@ export const api = {
       }),
     remove: (token: string, machineId: string) =>
       request<void>(`/machines/${machineId}`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+      }),
+    getSavedPassword: (token: string, machineId: string) =>
+      request<{ password: string }>(`/machines/${machineId}/saved-password`, {
+        headers: authHeaders(token),
+      }),
+    saveSavedPassword: (token: string, machineId: string, password: string) =>
+      request<void>(`/machines/${machineId}/saved-password`, {
+        method: 'PUT',
+        headers: authHeaders(token),
+        body: JSON.stringify({ password }),
+      }),
+    clearSavedPassword: (token: string, machineId: string) =>
+      request<void>(`/machines/${machineId}/saved-password`, {
         method: 'DELETE',
         headers: authHeaders(token),
       }),

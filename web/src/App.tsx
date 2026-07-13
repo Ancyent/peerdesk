@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from './auth/useAuth';
+import { api, type MachineOut } from './api/client';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { MachinesPage } from './pages/MachinesPage';
@@ -32,11 +33,17 @@ import { coerceOs, type OsId } from './pages/downloads/osData';
 type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer';
 
 export default function App() {
-  const { user, loading, setSessionActive } = useAuth();
+  const { user, loading, setSessionActive, accessToken } = useAuth();
   const initialRoute = parsePath(window.location.pathname);
   const [page, setPage] = useState<FullPage>(initialRoute.page);
   const [downloadsOs, setDownloadsOs] = useState<OsId>(coerceOs(initialRoute.sub));
   const [connectPeerId, setConnectPeerId] = useState('');
+  const [connectMachineId, setConnectMachineId] = useState<string | null>(null);
+  // Set when a "remember password" connect is in flight; saved once the host accepts.
+  const pendingSaveRef = useRef<{ machineId: string; password: string } | null>(null);
+  // machineId whose saved password we're auto-connecting with, so a wrong-password
+  // failure can drop the now-stale saved value.
+  const autoSavedMachineRef = useRef<string | null>(null);
   const [viewerState, setViewerState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
   const [displays, setDisplays] = useState<Array<{index: number; width: number; height: number; is_primary: boolean}>>([]);
@@ -126,10 +133,27 @@ export default function App() {
   }, [viewerState]);
 
   const { send } = useSignaling(SIGNALING_URL, async (msg) => {
-    if (msg.type === 'joined')             { await webrtc.startOffer(); webrtc.setQuality(PRESETS.balanced); }
+    if (msg.type === 'joined')             {
+      await webrtc.startOffer(); webrtc.setQuality(PRESETS.balanced);
+      autoSavedMachineRef.current = null;
+      const pending = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      if (pending && accessToken) {
+        api.machines.saveSavedPassword(accessToken, pending.machineId, pending.password).catch(() => {});
+      }
+    }
     else if (msg.type === 'answer')        { await webrtc.handleAnswer(msg.sdp); setViewerState('connected'); }
     else if (msg.type === 'ice_candidate') { await webrtc.handleIceCandidate(msg.candidate); }
-    else if (msg.type === 'error')         { setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found'); setViewerState('error'); setPage('connect'); }
+    else if (msg.type === 'error')         {
+      // A saved password that no longer works (host rotated it) is stale — drop it
+      // so we stop auto-connecting with it and fall back to manual entry.
+      if (msg.code === 'unauthorized' && autoSavedMachineRef.current && accessToken) {
+        api.machines.clearSavedPassword(accessToken, autoSavedMachineRef.current).catch(() => {});
+      }
+      autoSavedMachineRef.current = null;
+      pendingSaveRef.current = null;
+      setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found'); setViewerState('error'); setPage('connect');
+    }
     else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg('Remote machine disconnected'); setViewerState('error'); go('machines'); }
     else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? 'Connection denied'); setViewerState('error'); setPage('connect'); }
     else if (msg.type === 'session_mode')  { setSessionMode(msg.mode); }
@@ -143,13 +167,30 @@ export default function App() {
   });
   sendRef.current = send;
 
-  const handleConnect = (peerId: string, password: string) => {
+  const handleConnect = (peerId: string, password: string, remember = false) => {
     setErrMsg(''); setViewerState('connecting'); setPage('viewer');
+    // Guard on peerId === connectPeerId so editing the ID away from the picked
+    // machine doesn't save the password under the wrong machine.
+    pendingSaveRef.current = (remember && connectMachineId && peerId === connectPeerId)
+      ? { machineId: connectMachineId, password } : null;
+    autoSavedMachineRef.current = null;
     send({ type: 'join', peer_id: peerId, password });
   };
 
-  const handleDashboardConnect = (peerId: string) => {
-    setConnectPeerId(peerId); setErrMsg(''); setViewerState('idle'); setPage('connect');
+  const handleDashboardConnect = async (machine: MachineOut) => {
+    setConnectPeerId(machine.peer_id); setConnectMachineId(machine.id); setErrMsg('');
+    // If a password is saved for this machine, connect straight away.
+    if (machine.has_saved_password && accessToken) {
+      try {
+        const { password } = await api.machines.getSavedPassword(accessToken, machine.id);
+        pendingSaveRef.current = null;
+        autoSavedMachineRef.current = machine.id;
+        setViewerState('connecting'); setPage('viewer');
+        send({ type: 'join', peer_id: machine.peer_id, password });
+        return;
+      } catch { /* fall through to the manual form */ }
+    }
+    setViewerState('idle'); setPage('connect');
   };
 
   const handleDisplaySwitch = useCallback((index: number) => {
@@ -257,7 +298,7 @@ export default function App() {
   }
 
   if (effectivePage === 'connect') return (
-    <ConnectForm onConnect={handleConnect} initialPeerId={connectPeerId} error={errMsg || undefined} />
+    <ConnectForm onConnect={handleConnect} initialPeerId={connectPeerId} error={errMsg || undefined} canSave={!!connectMachineId} />
   );
 
   const shellPage: AppPage = ['login', 'register', 'connect', 'viewer'].includes(effectivePage) ? 'machines' : effectivePage as AppPage;

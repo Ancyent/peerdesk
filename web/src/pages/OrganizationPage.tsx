@@ -5,7 +5,7 @@ import { type OrgNode } from '../components/OrgTree';
 import { MachineCard } from '../components/MachineCard';
 
 interface Props {
-  onConnect: (peerId: string) => void;
+  onConnect: (machine: MachineOut) => void;
   orgNode: OrgNode;
 }
 

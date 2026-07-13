@@ -4,7 +4,7 @@ import { api, type MachineOut } from '../api/client';
 import { MachineCard } from '../components/MachineCard';
 
 interface Props {
-  onConnect: (peerId: string) => void;
+  onConnect: (machine: MachineOut) => void;
 }
 
 export function MachinesPage({ onConnect }: Props) {
@@ -55,6 +55,16 @@ export function MachinesPage({ onConnect }: Props) {
     load();
   };
 
+  const handleForget = async (m: MachineOut) => {
+    if (!accessToken) return;
+    try {
+      await api.machines.clearSavedPassword(accessToken, m.id);
+    } catch (e) {
+      console.error(e);
+    }
+    load();
+  };
+
   const filtered = machines
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()) || m.peer_id.includes(search))
     .sort((a, b) => Number(b.is_online) - Number(a.is_online));
@@ -96,7 +106,7 @@ export function MachinesPage({ onConnect }: Props) {
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(265px, 1fr))', gap: 14 }}>
-            {filtered.map(m => <MachineCard key={m.id} machine={m} onConnect={onConnect} onDelete={handleDelete} />)}
+            {filtered.map(m => <MachineCard key={m.id} machine={m} onConnect={onConnect} onDelete={handleDelete} onForget={handleForget} />)}
           </div>
         </>
       )}

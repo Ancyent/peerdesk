@@ -57,9 +57,16 @@ class Machine(Base):
     api_key_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True
     )
+    # Fernet-encrypted connect password, saved so the web viewer can connect
+    # without re-typing it. Only set when the owner opts in; never serialized raw.
+    saved_password_enc: Mapped[str | None] = mapped_column(String, nullable=True)
 
     owner: Mapped["User"] = relationship("User", back_populates="machines")
     api_key_rel: Mapped["ApiKey | None"] = relationship("ApiKey", back_populates="machines")
+
+    @property
+    def has_saved_password(self) -> bool:
+        return self.saved_password_enc is not None
 
     def __init__(self, **kwargs):
         if "id" not in kwargs:

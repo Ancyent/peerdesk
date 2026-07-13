@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { useBrandingContext } from '../branding/BrandingContext';
 
 interface Props {
-  onConnect: (peerId: string, password: string) => void;
+  onConnect: (peerId: string, password: string, remember: boolean) => void;
   error?: string;
   initialPeerId?: string;
+  canSave?: boolean;
 }
 
-export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
+export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props) {
   const [peerId, setPeerId] = useState(initialPeerId ?? '');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
 
   useEffect(() => { setPeerId(initialPeerId ?? ''); }, [initialPeerId]);
   const { brand_name, logo_data_url } = useBrandingContext();
@@ -57,7 +59,7 @@ export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
           }}>{error}</div>
         )}
 
-        <form onSubmit={e => { e.preventDefault(); onConnect(peerId, password); }}
+        <form onSubmit={e => { e.preventDefault(); onConnect(peerId, password, remember); }}
           style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
@@ -87,6 +89,12 @@ export function ConnectForm({ onConnect, error, initialPeerId }: Props) {
               required
             />
           </div>
+          {canSave && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
+              Salvează parola pentru această mașină (conectare directă data viitoare)
+            </label>
+          )}
           <button
             type="submit"
             disabled={peerId.length !== 9}
