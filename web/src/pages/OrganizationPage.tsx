@@ -13,10 +13,22 @@ export function OrganizationPage({ onConnect, orgNode }: Props) {
   const { accessToken } = useAuth();
   const [machines, setMachines] = useState<MachineOut[]>([]);
 
-  useEffect(() => {
+  const load = () => {
     if (!accessToken) return;
     api.machines.list(accessToken).then(setMachines).catch(console.error);
-  }, [accessToken]);
+  };
+
+  useEffect(() => { load(); }, [accessToken]);
+
+  const handleForget = async (m: MachineOut) => {
+    if (!accessToken) return;
+    try {
+      await api.machines.clearSavedPassword(accessToken, m.id);
+    } catch (e) {
+      console.error(e);
+    }
+    load();
+  };
 
   const filtered = machines
     .filter(m => {
@@ -39,7 +51,7 @@ export function OrganizationPage({ onConnect, orgNode }: Props) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {filtered.map(m => <MachineCard key={m.id} machine={m} onConnect={onConnect} />)}
+          {filtered.map(m => <MachineCard key={m.id} machine={m} onConnect={onConnect} onForget={handleForget} />)}
         </div>
       )}
     </div>
