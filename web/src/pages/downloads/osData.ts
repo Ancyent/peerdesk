@@ -71,13 +71,17 @@ export const LINUX_DISTROS: LinuxDistro[] = [
   { id: 'arch',     label: 'Arch / altele',   pkg: 'appimage', installHint: 'chmod +x <file> && ./<file>',  uninstallHint: 'rm <file>',                    match: (n) => /\.appimage$/i.test(n) },
 ];
 
-/** Uninstall the headless/CLI agent (systemd service + binary). Distro-independent. */
+/**
+ * Uninstall the headless/CLI agent: systemd service + binary + config (the
+ * config holds the peer ID and password, so removing it forces a clean fresh
+ * install next time). Distro-independent.
+ */
 export const AGENT_UNINSTALL_LINUX =
-  'sudo peerdesk-agent --uninstall-service && sudo rm -f /usr/local/bin/peerdesk-agent';
+  'sudo peerdesk-agent --uninstall-service && sudo rm -f /usr/local/bin/peerdesk-agent && sudo rm -rf /root/.config/peerdesk';
 
-/** Uninstall the agent on Windows (run PowerShell as Administrator). */
+/** Uninstall the agent on Windows (service + binary + config). Run PowerShell as Administrator. */
 export const AGENT_UNINSTALL_WINDOWS =
-  '& "$env:ProgramFiles\\PeerDesk\\peerdesk-agent.exe" --uninstall-service; Remove-Item -Recurse -Force "$env:ProgramFiles\\PeerDesk"';
+  '& "$env:ProgramFiles\\PeerDesk\\peerdesk-agent.exe" --uninstall-service; Remove-Item -Recurse -Force "$env:ProgramFiles\\PeerDesk", "$env:APPDATA\\peerdesk" -ErrorAction SilentlyContinue';
 
 /** Human-readable file size. Empty string for non-positive/NaN input. */
 export function formatSize(bytes: number): string {

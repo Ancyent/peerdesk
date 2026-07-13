@@ -250,7 +250,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
                         </div>
                       )}
                       <div>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Agent (serviciu + binar) — instalat cu curl … | bash</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Agent (serviciu + binar + config) — instalat cu curl … | bash</div>
                         <CodeBlock code={AGENT_UNINSTALL_LINUX} />
                       </div>
                     </div>

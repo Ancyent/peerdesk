@@ -60,9 +60,10 @@ describe('uninstall hints', () => {
     // AppImage isn't a package — uninstall is just deleting the file.
     expect(LINUX_DISTROS.find(x => x.id === 'arch')!.uninstallHint).toContain('rm ');
   });
-  it('agent uninstall removes the service and the binary', () => {
+  it('agent uninstall removes the service, the binary, and the config', () => {
     expect(AGENT_UNINSTALL_LINUX).toContain('--uninstall-service');
     expect(AGENT_UNINSTALL_LINUX).toContain('/usr/local/bin/peerdesk-agent');
+    expect(AGENT_UNINSTALL_LINUX).toContain('/root/.config/peerdesk');
   });
 });
 

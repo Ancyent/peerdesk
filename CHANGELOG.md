@@ -2,6 +2,33 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.31] — 2026-07-13
+
+### Fixed
+- **Linux agent: the systemd service read a different config file than the
+  interactive commands.** The generated unit set no `HOME`, so the service's
+  `dirs::config_dir()` resolved elsewhere than `/root/.config/peerdesk` where
+  `install` and `--reset-password` write — a password set or reset never reached
+  the running service (connections failed with "unauthorized"). The unit now pins
+  `Environment=HOME=/root`. Reinstall the agent to regenerate the unit.
+- **`--password` is now applied even to an existing config.** Previously a
+  redeploy with `--password` was ignored if the machine already had a config, so
+  the old password stayed in effect. `--install-service --password=…` now writes
+  the new password authoritatively.
+
+### Added
+- **`install.sh` auto-detects headless vs GUI** (no `$DISPLAY`/Wayland → installs
+  the headless agent) and accepts `--headless` / `--gui` overrides and
+  `--password` (generated and printed if omitted).
+- **Uninstall also removes the config.** The Downloads-page agent uninstall
+  command now deletes the service, the binary, *and* `~/.config/peerdesk`, so a
+  later reinstall starts clean (new peer ID / password) instead of silently
+  reusing the old identity.
+- **Deploy command builder + machine name on the Downloads page** (web): password
+  field, Auto/Headless/GUI selector, optional machine name, per-distro uninstall
+  commands, saved per-machine connect passwords for one-click connect, and copy
+  buttons that work over plain HTTP.
+
 ## [0.4.30] — 2026-07-03
 
 ### Added

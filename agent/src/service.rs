@@ -45,6 +45,11 @@ pub fn build_systemd_unit(exe_path: &str) -> String {
          \n\
          [Service]\n\
          Type=simple\n\
+         # Pin HOME so the service reads the SAME config the interactive root\n\
+         # commands (install, --reset-password) write. Without this the service\n\
+         # inherits systemd's HOME (often unset) and dirs::config_dir() resolves\n\
+         # to a different path, so a password reset never reaches the service.\n\
+         Environment=HOME=/root\n\
          ExecStart={exe} --silent\n\
          Restart=on-failure\n\
          RestartSec=5\n\
@@ -144,5 +149,7 @@ mod tests {
         assert!(unit.contains("ExecStart=/usr/local/bin/peerdesk-agent --silent"));
         assert!(unit.contains("Restart=on-failure"));
         assert!(unit.contains("WantedBy=multi-user.target"));
+        // HOME must be pinned so the service and interactive root share one config.
+        assert!(unit.contains("Environment=HOME=/root"));
     }
 }
