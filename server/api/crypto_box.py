@@ -8,16 +8,23 @@ None), which the callers treat as "no saved password".
 """
 import base64
 import hashlib
+import hmac
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
+
+# Domain-separation label: the key is derived via HMAC(secret, INFO) rather than a
+# bare hash of the secret, so that even when the fallback shares JWT_SECRET the
+# encryption key is cryptographically distinct from anything else derived from it.
+_INFO = b"peerdesk-saved-pw-v1"
 
 
 def _fernet() -> Fernet:
     secret = os.getenv("SAVED_PW_KEY") or os.getenv(
         "JWT_SECRET", "dev-secret-change-in-production"
     )
-    key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
+    digest = hmac.new(secret.encode(), _INFO, hashlib.sha256).digest()
+    key = base64.urlsafe_b64encode(digest)
     return Fernet(key)
 
 
