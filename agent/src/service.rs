@@ -69,7 +69,9 @@ fn install_systemd(exe_path: &str) -> Result<()> {
     println!("Written: {unit_path}");
     run_cmd("systemctl", &["daemon-reload"])?;
     run_cmd("systemctl", &["enable", SERVICE_NAME])?;
-    run_cmd("systemctl", &["start", SERVICE_NAME])?;
+    // `restart` (not `start`) so a reinstall over an already-running service
+    // actually picks up the new unit file (e.g. HOME) and the rewritten config.
+    run_cmd("systemctl", &["restart", SERVICE_NAME])?;
     println!("Service '{SERVICE_NAME}' installed and started.");
     println!("Logs: journalctl -u {SERVICE_NAME} -f");
     Ok(())
