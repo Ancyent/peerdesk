@@ -31,16 +31,36 @@ services:
     image: coturn/coturn:latest
     restart: unless-stopped
     network_mode: host
-    command: >
-      -n
-      --log-file=stdout
-      --use-auth-secret
-      --static-auth-secret=${TURN_SECRET}
-      --realm=peerdesk
-      --min-port=49160
-      --max-port=49200
-      --fingerprint
-      --no-multicast-peers
+    environment:
+      TURN_SECRET: ${TURN_SECRET}
+      TURN_HOST: ${TURN_HOST:-localhost}
+      TURN_PRIVATE_IP: ${TURN_PRIVATE_IP:-}
+    # Behind NAT, coturn advertises the address it sees itself on — a private LAN
+    # IP — so an external viewer is handed a relay candidate it cannot reach and
+    # the session dies with a black screen and no error message anywhere.
+    # --external-ip fixes that but accepts only a literal IP, while this
+    # deployment's public address is dynamic (hence the DDNS name in TURN_HOST),
+    # so resolve it at start.
+    # A relay is UDP and can never travel through an HTTP reverse proxy: 3478 and
+    # 49160-49200 must be port-forwarded straight to TURN_PRIVATE_IP.
+    # NOTE: the mapping is fixed at container start. Restart this service when
+    # the public IP changes, or the relay silently points at the old address.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        EXT=$$(getent hosts "$$TURN_HOST" | awk '{print $$1}' | head -1)
+        if [ -n "$$EXT" ] && [ -n "$$TURN_PRIVATE_IP" ]; then
+          MAP="--external-ip=$$EXT/$$TURN_PRIVATE_IP"
+          echo "coturn: relay advertised as $$EXT (mapped from $$TURN_PRIVATE_IP)"
+        else
+          MAP=""
+          echo "coturn: WARNING — no external-ip mapping (TURN_HOST='$$TURN_HOST' resolved='$$EXT' TURN_PRIVATE_IP='$$TURN_PRIVATE_IP'); viewers outside this LAN will get an unreachable relay"
+        fi
+        exec turnserver -n --log-file=stdout --use-auth-secret \
+          --static-auth-secret="$$TURN_SECRET" --realm=peerdesk \
+          --min-port=49160 --max-port=49200 --fingerprint \
+          --no-multicast-peers \
+          --listening-ip="$$TURN_PRIVATE_IP" --relay-ip="$$TURN_PRIVATE_IP" $$MAP
 
   api:
     build:
