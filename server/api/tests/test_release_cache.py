@@ -160,6 +160,23 @@ async def test_refresh_prunes_assets_from_older_releases(cache, fake_github):
     assert not (cache / "old-asset").exists()
 
 
+async def test_refresh_reports_success_when_prune_fails(cache, fake_github, monkeypatch):
+    # A prune failure is cleanup gone wrong, not a failed refresh: the new
+    # manifest and assets are already durably committed via os.replace() by
+    # the time _prune() runs. refresh() must still report True, and the new
+    # release must actually be in place -- not silently swallowed by the
+    # outer except Exception the way a raised _prune() used to be.
+    fake_github(_github_release(), {"agent-linux": b"BINARY"})
+
+    def boom(keep):
+        raise PermissionError("cannot unlink stragglers")
+
+    monkeypatch.setattr(release_cache, "_prune", boom)
+    assert await release_cache.refresh() is True
+    assert release_cache.read_manifest()["tag_name"] == "v0.4.32"
+    assert (cache / "agent-linux").read_bytes() == b"BINARY"
+
+
 async def test_refresh_loop_disabled_makes_no_network_call(cache, monkeypatch):
     called = False
 

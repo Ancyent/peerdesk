@@ -75,6 +75,16 @@ def _prune(keep: set) -> None:
             p.unlink(missing_ok=True)
 
 
+def _prune_safely(keep: set) -> None:
+    """Best-effort cleanup of stale assets. Never lets a refresh be reported
+    as failed just because a straggler file could not be removed — by the
+    time this runs, the new manifest is already durably committed."""
+    try:
+        _prune(keep)
+    except Exception as e:
+        log.warning("release cache prune failed (stale assets may remain): %s", e)
+
+
 async def refresh() -> bool:
     """Pull the latest release into the cache. True when the cache changed.
 
@@ -101,6 +111,13 @@ async def refresh() -> bool:
             assets = []
             for a in rel.get("assets", []):
                 dest = CACHE_DIR / a["name"]
+                # Skip re-downloading a file that is already on disk, so a retry of
+                # the same tag after a partial failure resumes instead of redoing
+                # completed work. This is only safe because every asset filename
+                # embeds the release tag (CI names them e.g.
+                # peerdesk-agent-linux-x86_64-${{ github.ref_name }}), so no two
+                # releases can ever collide on a filename. An unversioned asset
+                # name would let this skip serve stale bytes under a new tag.
                 if not dest.is_file():
                     await _download(client, a["browser_download_url"], dest)
                 assets.append({"name": a["name"], "size": a["size"]})
@@ -113,9 +130,17 @@ async def refresh() -> bool:
             "assets": assets,
         }
         tmp = manifest_path().with_name(MANIFEST_NAME + ".tmp")
-        tmp.write_text(json.dumps(manifest, indent=2))
-        os.replace(tmp, manifest_path())
-        _prune(keep={a["name"] for a in assets})
+        try:
+            tmp.write_text(json.dumps(manifest, indent=2))
+            os.replace(tmp, manifest_path())
+        finally:
+            tmp.unlink(missing_ok=True)
+
+        # The manifest is now durably committed -- the refresh has succeeded
+        # regardless of what happens next. Pruning stale assets is cleanup,
+        # not part of the commit, so its failure must not be reported as a
+        # failed refresh (see _prune_safely).
+        _prune_safely(keep={a["name"] for a in assets})
         log.info("release cache updated to %s (%d assets)", rel["tag_name"], len(assets))
         return True
     except Exception as e:
