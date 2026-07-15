@@ -480,6 +480,9 @@ async fn reset_password(state: State<'_, SharedAgentState>) -> Result<String, St
             password_hash: hash,
             server_url: cfg.server_url,
             api_key: cfg.api_key,
+            // Carry any unredeemed token across a password reset — dropping it
+            // would silently cancel this machine's pending enrollment.
+            pending_token: cfg.pending_token,
             hmac_key: Some(peerdesk_agent::config::derive_hmac_key(&new_pw)),
         }
         .save(&config_path)

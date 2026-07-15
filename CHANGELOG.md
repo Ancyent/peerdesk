@@ -2,6 +2,32 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [0.4.32] — 2026-07-15
+
+### Fixed
+- **Signaling: a disconnecting agent was never cleaned up, which broke auth after
+  every password change.** Cleanup lived in `except WebSocketDisconnect`, but
+  starlette's `iter_text()` catches that exception itself, so the block was
+  unreachable dead code and `unregister_agent()` never ran. Each disconnect left
+  a zombie socket holding the `peer_id` and a stale Redis record with the *old*
+  password hash. The agent's reconnect was then rejected (`peer_id_in_use`) while
+  viewers were authenticated against the stale hash — surfacing as
+  **"Wrong ID or password" on a machine that showed online**. Cleanup now runs in
+  a `finally` block, covering normal closes and abrupt resets alike.
+- **Agent: `peer_id_in_use` was ignored.** The agent logged a warning and kept
+  running as if registered — permanently unreachable while looking healthy. It
+  now drops the socket and retries with backoff until the slot frees.
+- **Agent: "Registered with signaling server" was logged before the server
+  replied**, reporting success for registrations the server had rejected. It is
+  now logged only on the server's `registered` ack.
+- **Agent: re-running the installer with a spent token bricked the API key.** A
+  registration token is single-use; re-running `install.sh` with the same token
+  overwrote the durable `pd_` key the first redeem had earned, so the agent 401'd
+  out of register, heartbeat and TURN (falling back to STUN-only, leaving viewers
+  on other networks with no relay). Tokens are now parked in a separate
+  `pending_token` field and can never overwrite a durable key; a fresh token
+  still re-enrolls.
+
 ## [0.4.31] — 2026-07-13
 
 ### Fixed

@@ -36,9 +36,15 @@ pub struct Config {
     /// Signaling WebSocket and REST API URLs are derived from this.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server_url: Option<String>,
-    /// Registration token for associating this machine with an account.
+    /// Durable `pd_`-prefixed credential used for every authenticated API call.
+    /// Earned by redeeming a registration token; never overwritten by one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+    /// A single-use registration token still awaiting redemption. Parked here
+    /// rather than in `api_key` so that re-running the installer with an already
+    /// spent token cannot destroy the durable key an earlier redeem earned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_token: Option<String>,
     /// HMAC key derived from the password; sent to signaling server at registration.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hmac_key: Option<String>,
@@ -78,6 +84,17 @@ impl Config {
     /// prefix the agent's POST /machines/register hits the web SPA and 405s.
     pub fn api_url(&self) -> Option<String> {
         self.server_base().map(|base| format!("{}/api", base))
+    }
+
+    /// True when `api_key` holds a durable `pd_` credential rather than an
+    /// unredeemed registration token.
+    pub fn has_durable_api_key(&self) -> bool {
+        self.api_key.as_deref().is_some_and(|k| {
+            matches!(
+                crate::api_client::credential_kind(k),
+                crate::api_client::CredentialKind::ApiKey
+            )
+        })
     }
 
     pub fn load(path: &Path) -> Result<Self> {
@@ -149,6 +166,7 @@ impl Config {
                     password_hash: bcrypt::hash(password, bcrypt::DEFAULT_COST)?,
                     server_url: None,
                     api_key: None,
+                    pending_token: None,
                     hmac_key: Some(derive_hmac_key(password)),
                 }
             }
@@ -157,8 +175,27 @@ impl Config {
         if let Some(url) = server_url {
             cfg.server_url = Some(url.to_string());
         }
-        if let Some(tok) = api_key {
-            cfg.api_key = Some(tok.to_string());
+        // Route the credential by kind. A durable `pd_` key is authoritative and
+        // retires any parked token. A single-use registration token is parked in
+        // `pending_token` instead of overwriting `api_key`: re-running the
+        // installer with the same (already spent) token used to destroy the
+        // durable key an earlier redeem had earned, leaving the agent 401-locked
+        // out of register, heartbeat and TURN. The token still lands in
+        // `api_key` while no durable key exists, because the register/heartbeat
+        // paths gate on `api_key` being set and the first redeem replaces it.
+        if let Some(cred) = api_key {
+            match crate::api_client::credential_kind(cred) {
+                crate::api_client::CredentialKind::ApiKey => {
+                    cfg.api_key = Some(cred.to_string());
+                    cfg.pending_token = None;
+                }
+                crate::api_client::CredentialKind::Token => {
+                    cfg.pending_token = Some(cred.to_string());
+                    if !cfg.has_durable_api_key() {
+                        cfg.api_key = Some(cred.to_string());
+                    }
+                }
+            }
         }
         // Populate hmac_key if missing (upgrade path for existing configs).
         // Skip when password is empty (e.g. the Tauri desktop passes ""), so we
@@ -331,6 +368,7 @@ mod tests {
             password_hash: "$2b$12$abc".into(),
             server_url: Some("https://api.example.com".into()),
             api_key: Some("tok123".into()),
+            pending_token: None,
             hmac_key: None,
         };
         cfg.save(&path).unwrap();
@@ -375,6 +413,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: Some("https://api.example.com".into()),
             api_key: None,
+            pending_token: None,
             hmac_key: None,
         };
         assert_eq!(cfg.signaling_url(), "wss://api.example.com/ws");
@@ -387,6 +426,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: Some("http://localhost:8001".into()),
             api_key: None,
+            pending_token: None,
             hmac_key: None,
         };
         assert_eq!(cfg.signaling_url(), "ws://localhost:8001/ws");
@@ -399,6 +439,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: None,
             api_key: None,
+            pending_token: None,
             hmac_key: None,
         };
         assert_eq!(cfg.signaling_url(), "ws://localhost:8001/ws");
@@ -411,6 +452,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: Some("https://api.example.com/".into()),
             api_key: None,
+            pending_token: None,
             hmac_key: None,
         };
         // nginx fronts the REST API under /api (same host that serves /ws)
@@ -425,6 +467,7 @@ mod tests {
             password_hash: "x".into(),
             server_url: Some("https://host.example.com/api".into()),
             api_key: None,
+            pending_token: None,
             hmac_key: None,
         };
         // entering ".../api" must not double the prefix or break signaling
@@ -483,6 +526,78 @@ mod tests {
     fn hmac_key_never_equals_password() {
         let pw = "MyPassword";
         assert_ne!(derive_hmac_key(pw), pw);
+    }
+
+    #[test]
+    fn spent_token_does_not_clobber_durable_api_key() {
+        // The field bug: install once (token redeems into a durable pd_ key),
+        // then re-run the installer with the SAME, now-spent token. Overwriting
+        // `api_key` with it 401-locked the agent out of register/heartbeat/TURN.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        Config::load_or_create(&path, "pw", Some("https://s.example"), Some("AB12-CD34")).unwrap();
+
+        // Simulate the successful first redeem persisting the durable key.
+        let mut cfg = Config::load(&path).unwrap();
+        cfg.api_key = Some("pd_durable_key".into());
+        cfg.pending_token = None;
+        cfg.save(&path).unwrap();
+
+        // Installer re-run with the spent token.
+        Config::load_or_create(&path, "pw", Some("https://s.example"), Some("AB12-CD34")).unwrap();
+
+        let after = Config::load(&path).unwrap();
+        assert_eq!(
+            after.api_key.as_deref(),
+            Some("pd_durable_key"),
+            "a spent token must not overwrite the durable api-key"
+        );
+        assert!(after.has_durable_api_key());
+        // The token is still parked so a *fresh* one can re-enroll on next start.
+        assert_eq!(after.pending_token.as_deref(), Some("AB12-CD34"));
+    }
+
+    #[test]
+    fn first_install_parks_token_and_keeps_it_usable() {
+        // With no durable key yet, the token stays in `api_key` too: the
+        // heartbeat/register gates key off `api_key` being set, and the redeem
+        // on first start replaces it with the durable credential.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        Config::load_or_create(&path, "pw", Some("https://s.example"), Some("AB12-CD34")).unwrap();
+
+        let cfg = Config::load(&path).unwrap();
+        assert_eq!(cfg.pending_token.as_deref(), Some("AB12-CD34"));
+        assert_eq!(cfg.api_key.as_deref(), Some("AB12-CD34"));
+        assert!(!cfg.has_durable_api_key());
+    }
+
+    #[test]
+    fn explicit_durable_key_wins_and_clears_pending_token() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        Config::load_or_create(&path, "pw", Some("https://s.example"), Some("AB12-CD34")).unwrap();
+
+        Config::load_or_create(&path, "pw", None, Some("pd_explicit")).unwrap();
+
+        let after = Config::load(&path).unwrap();
+        assert_eq!(after.api_key.as_deref(), Some("pd_explicit"));
+        assert_eq!(after.pending_token, None, "a durable key retires the token");
+    }
+
+    #[test]
+    fn config_without_pending_token_field_still_loads() {
+        // Configs written by agents older than this field must keep working.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(
+            &path,
+            r#"{"peer_id":"123456789","password_hash":"$2b$12$x","api_key":"pd_old"}"#,
+        )
+        .unwrap();
+        let cfg = Config::load(&path).unwrap();
+        assert_eq!(cfg.pending_token, None);
+        assert_eq!(cfg.api_key.as_deref(), Some("pd_old"));
     }
 
     #[test]

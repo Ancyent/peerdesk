@@ -99,26 +99,49 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
 
     let signaling_url = cfg.signaling_url();
     let api_url = cfg.api_url();
-    let mut effective_key = cfg.api_key.clone().or(agent_cfg.api_key);
-
-    // A registration token (non-`pd_` credential) is single-use: redeem it once
-    // for a durable api-key, persist that, and use it from here on — the agent
-    // needs a lasting credential for TURN/status/reconnect, which a token isn't.
-    if let (Some(url), Some(key)) = (&api_url, &effective_key.clone()) {
-        if matches!(api_client::credential_kind(key), api_client::CredentialKind::Token) {
-            match api_client::redeem_token(url, key, &cfg.peer_id).await {
-                Ok(resp) => {
-                    info!("Redeemed registration token — machine_id={}", resp.id);
-                    cfg.api_key = Some(resp.api_key.clone());
-                    if let Err(e) = cfg.save(&config_path) {
-                        tracing::warn!("Failed to persist api key to config: {}", e);
-                    }
-                    effective_key = Some(resp.api_key);
+    // A registration token is single-use: redeem it once for a durable api-key,
+    // persist that, and use it from here on — the agent needs a lasting
+    // credential for TURN/status/reconnect, which a token isn't. Current
+    // installs park the token in `pending_token`; configs written by older
+    // agents kept it in `api_key` itself, so accept both.
+    let pending_token = cfg.pending_token.clone().or_else(|| {
+        cfg.api_key
+            .as_deref()
+            .filter(|k| matches!(api_client::credential_kind(k), api_client::CredentialKind::Token))
+            .map(str::to_string)
+    });
+    if let (Some(url), Some(token)) = (&api_url, pending_token) {
+        match api_client::redeem_token(url, &token, &cfg.peer_id).await {
+            Ok(resp) => {
+                info!("Redeemed registration token — machine_id={}", resp.id);
+                cfg.api_key = Some(resp.api_key);
+                cfg.pending_token = None;
+                if let Err(e) = cfg.save(&config_path) {
+                    tracing::warn!("Failed to persist api key to config: {}", e);
                 }
-                Err(e) => tracing::warn!("Token redeem failed (non-fatal): {}", e),
+            }
+            Err(e) if cfg.has_durable_api_key() => {
+                // The installer was re-run with an already-spent token. The
+                // durable key that token bought is still here, so retire the
+                // token instead of retrying a redeem that can never succeed.
+                tracing::debug!(
+                    "Ignoring spent registration token — durable api-key already held ({})",
+                    e
+                );
+                cfg.pending_token = None;
+                if let Err(e) = cfg.save(&config_path) {
+                    tracing::warn!("Failed to clear spent token from config: {}", e);
+                }
+            }
+            Err(e) => {
+                // No durable key yet, so the failure may be transient (server
+                // down). Keep the token and retry on the next start.
+                tracing::warn!("Token redeem failed (non-fatal): {}", e);
             }
         }
     }
+
+    let effective_key = cfg.api_key.clone().or(agent_cfg.api_key);
 
     if let (Some(url), Some(key)) = (&api_url, &effective_key) {
         match api_client::register_machine(url, key, &cfg.peer_id).await {

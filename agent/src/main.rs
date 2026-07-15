@@ -147,6 +147,9 @@ async fn main() -> anyhow::Result<()> {
             password_hash: hash,
             server_url: cfg.server_url.clone(),
             api_key: cfg.api_key.clone(),
+            // Carry any unredeemed token across a password reset — dropping it
+            // would silently cancel this machine's pending enrollment.
+            pending_token: cfg.pending_token.clone(),
             hmac_key: Some(peerdesk_agent::config::derive_hmac_key(&new_pw)),
         };
         updated.save(&config_path)?;
