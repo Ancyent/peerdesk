@@ -188,3 +188,21 @@ async def test_refresh_loop_disabled_makes_no_network_call(cache, monkeypatch):
     monkeypatch.setattr(release_cache, "refresh", tripwire)
     await release_cache.refresh_loop(0)
     assert called is False, "RELEASE_REFRESH_SECONDS=0 must not touch the network"
+
+
+async def test_lifespan_starts_and_stops_the_refresh_loop(monkeypatch):
+    import main
+    started = asyncio.Event()
+
+    async def fake_loop(interval=0):
+        started.set()
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(main.release_cache, "refresh_loop", fake_loop)
+    async with main.lifespan(main.app):
+        await asyncio.wait_for(started.wait(), timeout=1)
+
+    # Leaving the context must cancel the task, not leak it.
+    leaked = [t for t in asyncio.all_tasks()
+              if t.get_name() == "release-refresh" and not t.done()]
+    assert leaked == []

@@ -1,12 +1,22 @@
+import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+import release_cache
 from routers import auth, machines, users, turn, sessions, totp, branding, companies, locations, groups, tokens, api_keys, releases
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Mirror GitHub releases locally so no client ever has to call the GitHub
+    # API (60 req/hour per source IP — shared by every client behind one NAT).
+    task = asyncio.create_task(release_cache.refresh_loop(), name="release-refresh")
     yield
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
 
 
 app = FastAPI(title="PeerDesk API", lifespan=lifespan)
