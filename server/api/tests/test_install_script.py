@@ -52,3 +52,25 @@ echo "$DOWNLOAD_URL"
     out = subprocess.run(["bash", "-c", prog], capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == f"http://server.test/api/releases/download/{expected}"
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda p: p.parent.name)
+def test_fails_fast_when_server_is_empty(script, tmp_path):
+    """The download URL is now built from SERVER, so a missing --server must be
+    a clear, immediate error — not a curl failure against 'http:///...'."""
+    body = script.read_text()
+    start = body.index("resolve_download_url()")
+    end = body.index("\n}\n", start) + 3
+    resolver = body[start:end]
+
+    prog = f"""
+SERVER=""
+HEADLESS=0
+{resolver}
+resolve_download_url
+echo "$DOWNLOAD_URL"
+"""
+    out = subprocess.run(["bash", "-c", prog], capture_output=True, text=True)
+    assert out.returncode != 0
+    assert "--server" in out.stderr
+    assert out.stdout.strip() == "", "must exit before ever calling curl"

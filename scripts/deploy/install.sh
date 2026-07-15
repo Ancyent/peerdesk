@@ -49,6 +49,10 @@ fi
 # release and serves it itself.
 resolve_download_url() {
   local manifest asset
+  if [[ -z "$SERVER" ]]; then
+    echo "ERROR: --server=<url> is required to resolve the agent binary (e.g. --server=https://api.example.com)" >&2
+    exit 1
+  fi
   manifest=$(curl -sSL "${SERVER}/api/releases/latest") || {
     echo "ERROR: cannot reach ${SERVER}/api/releases/latest" >&2
     exit 1

@@ -18,10 +18,18 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit 1
 }
 
+if (-not $Server) {
+    Write-Error "-Server <url> is required to resolve the agent binary (e.g. -Server https://api.example.com)."
+    exit 1
+}
+
 Write-Host "==> Resolving agent binary from $Server..."
 # Resolve from the PeerDesk server, not the GitHub API — see install.sh.
 $manifest = Invoke-RestMethod -Uri "$Server/api/releases/latest"
-$asset = $manifest.assets | Where-Object { $_.name -like "*windows*" } | Select-Object -First 1
+# Match the agent's name shape, not the substring "windows": that also matches
+# the Windows viewer installers (peerdesk-viewer-windows-*), and asset order
+# in the manifest is controlled by GitHub, not us.
+$asset = $manifest.assets | Where-Object { $_.name -like "peerdesk-agent-windows*" } | Select-Object -First 1
 if (-not $asset) {
   Write-Error "No Windows agent binary in $Server/api/releases/latest — the server may not have fetched a release yet."
   exit 1
