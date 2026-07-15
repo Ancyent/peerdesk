@@ -46,10 +46,25 @@ def test_asset_path_rejects_name_not_in_manifest(cache):
     assert release_cache.asset_path("secret") is None
 
 
-def test_asset_path_rejects_traversal(cache):
-    # Even if a traversal name somehow reached the manifest, it must not escape.
-    _write_manifest(cache, [{"name": "../../etc/passwd", "size": 1}])
-    assert release_cache.asset_path("../../etc/passwd") is None
+def test_asset_path_rejects_traversal(tmp_path, monkeypatch):
+    # pytest's tmp_path already sits several levels under /tmp, so a name like
+    # "../../etc/passwd" resolves to a path that doesn't exist -- a naive
+    # implementation would return None simply because the file is missing, not
+    # because traversal was blocked, making the test pass even without a guard.
+    #
+    # To make this test actually exercise the guard, we put the cache in its
+    # own subdirectory (so there is a real directory directly above it) and
+    # write a real file there that "../secret.txt" would genuinely reach if
+    # the containment check in asset_path() were removed. The manifest must
+    # list that traversal name too, since asset_path() checks manifest
+    # membership before the guard runs.
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    monkeypatch.setattr(release_cache, "CACHE_DIR", cache_dir)
+    (tmp_path / "secret.txt").write_bytes(b"SECRET")
+
+    _write_manifest(cache_dir, [{"name": "../secret.txt", "size": 6}])
+    assert release_cache.asset_path("../secret.txt") is None
 
 
 def test_asset_path_returns_none_when_file_missing(cache):
