@@ -16,6 +16,19 @@ MANIFEST = json.dumps({
     ],
 })
 
+# A decoy asset name that merely *contains* the substring "headless" but is
+# not the headless agent binary — e.g. a viewer/CLI package. Listed BEFORE
+# the real headless agent asset, so an unanchored `grep -o '*headless*'`
+# glob would pick it first.
+DECOY_MANIFEST = json.dumps({
+    "tag_name": "v0.4.32",
+    "assets": [
+        {"name": "peerdesk-viewer-linux-headless-cli-v0.4.32"},
+        {"name": "peerdesk-agent-linux-x86_64-headless-v0.4.32"},
+        {"name": "peerdesk-agent-linux-x86_64-v0.4.32"},
+    ],
+})
+
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda p: p.parent.name)
 def test_script_never_calls_the_github_api(script):
@@ -52,6 +65,37 @@ echo "$DOWNLOAD_URL"
     out = subprocess.run(["bash", "-c", prog], capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == f"http://server.test/api/releases/download/{expected}"
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda p: p.parent.name)
+def test_headless_glob_ignores_decoy_asset(script, tmp_path):
+    """The headless resolver must be anchored to the agent's name shape, just
+    like the GUI resolver already is. An unanchored `*headless*` substring
+    match would happily select a non-agent asset (e.g. a viewer package)
+    that happens to contain "headless" in its name and is listed first."""
+    stub = tmp_path / "curl"
+    stub.write_text(f"#!/bin/sh\ncat <<'JSON'\n{DECOY_MANIFEST}\nJSON\n")
+    stub.chmod(0o755)
+
+    body = script.read_text()
+    start = body.index("resolve_download_url()")
+    end = body.index("\n}\n", start) + 3
+    resolver = body[start:end]
+
+    prog = f"""
+PATH="{tmp_path}:$PATH"
+SERVER="http://server.test"
+HEADLESS=1
+{resolver}
+resolve_download_url
+echo "$DOWNLOAD_URL"
+"""
+    out = subprocess.run(["bash", "-c", prog], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == (
+        "http://server.test/api/releases/download/"
+        "peerdesk-agent-linux-x86_64-headless-v0.4.32"
+    ), out.stdout
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda p: p.parent.name)

@@ -53,24 +53,29 @@ resolve_download_url() {
     echo "ERROR: --server=<url> is required to resolve the agent binary (e.g. --server=https://api.example.com)" >&2
     exit 1
   fi
-  manifest=$(curl -sSL "${SERVER}/api/releases/latest") || {
-    echo "ERROR: cannot reach ${SERVER}/api/releases/latest" >&2
+  echo "==> Resolving agent binary from ${SERVER}..." >&2
+  if ! manifest=$(curl -sSL -f "${SERVER}/api/releases/latest"); then
+    echo "ERROR: ${SERVER}/api/releases/latest is unreachable or returned an HTTP error." >&2
+    echo "       If the server is up, it may not have cached a release yet (cold start) -- wait and retry." >&2
+    echo "       Otherwise, check that --server=${SERVER} is correct." >&2
     exit 1
-  }
+  fi
+  # Anchor to the agent's exact name shape in both branches. A bare
+  # substring match on "headless" would also select a non-agent asset
+  # (e.g. a viewer/CLI package) whose name merely contains that word.
   if [[ "$HEADLESS" -eq 1 ]]; then
-    asset=$(echo "$manifest" | grep -o '"name": *"[^"]*headless[^"]*"' | head -1 | cut -d '"' -f 4)
+    asset=$(echo "$manifest" | grep -o '"name": *"peerdesk-agent-linux-x86_64-headless-v[^"]*"' | head -1 | cut -d '"' -f 4)
   else
     asset=$(echo "$manifest" | grep -o '"name": *"peerdesk-agent-linux-x86_64-v[^"]*"' | head -1 | cut -d '"' -f 4)
   fi
   if [[ -z "$asset" ]]; then
     echo "ERROR: no Linux agent binary in ${SERVER}/api/releases/latest" >&2
-    echo "       The server may not have fetched a release yet." >&2
+    echo "       The manifest was fetched but contains no matching Linux asset." >&2
     exit 1
   fi
   DOWNLOAD_URL="${SERVER}/api/releases/download/${asset}"
 }
 
-echo "==> Resolving agent binary from ${SERVER}..."
 resolve_download_url
 
 echo "==> Downloading ${DOWNLOAD_URL}..."
