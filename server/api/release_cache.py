@@ -6,11 +6,15 @@ behind one NAT shares that budget, and a machine with no route to GitHub could
 never install an agent at all. The API fetches each release once and serves the
 files from this cache.
 """
+import asyncio
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+import httpx
 
 log = logging.getLogger(__name__)
 
@@ -49,3 +53,85 @@ def asset_path(name: str) -> Optional[Path]:
     if p.parent != CACHE_DIR.resolve():
         return None
     return p if p.is_file() else None
+
+
+async def _download(client: httpx.AsyncClient, url: str, dest: Path) -> None:
+    """Stream `url` to `dest` atomically: a partial transfer is never visible."""
+    tmp = dest.with_name(dest.name + ".tmp")
+    try:
+        with tmp.open("wb") as fh:
+            async with client.stream("GET", url, follow_redirects=True) as r:
+                r.raise_for_status()
+                async for chunk in r.aiter_bytes():
+                    fh.write(chunk)
+        os.replace(tmp, dest)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _prune(keep: set) -> None:
+    for p in CACHE_DIR.iterdir():
+        if p.name != MANIFEST_NAME and p.name not in keep:
+            p.unlink(missing_ok=True)
+
+
+async def refresh() -> bool:
+    """Pull the latest release into the cache. True when the cache changed.
+
+    Never raises. A failure must leave the previous cache intact and serving —
+    a stale agent binary is vastly better than a Downloads page that 503s
+    because GitHub happened to be unreachable.
+    """
+    headers = {"Accept": "application/vnd.github+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    try:
+        async with httpx.AsyncClient(timeout=60.0, headers=headers) as client:
+            r = await client.get(
+                f"https://api.github.com/repos/{RELEASE_REPO}/releases/latest"
+            )
+            r.raise_for_status()
+            rel = r.json()
+
+            current = read_manifest()
+            if current and current.get("tag_name") == rel["tag_name"]:
+                return False
+
+            CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            assets = []
+            for a in rel.get("assets", []):
+                dest = CACHE_DIR / a["name"]
+                if not dest.is_file():
+                    await _download(client, a["browser_download_url"], dest)
+                assets.append({"name": a["name"], "size": a["size"]})
+
+        # Manifest last: it must never advertise a file that is not on disk.
+        manifest = {
+            "tag_name": rel["tag_name"],
+            "html_url": rel.get("html_url", ""),
+            "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "assets": assets,
+        }
+        tmp = manifest_path().with_name(MANIFEST_NAME + ".tmp")
+        tmp.write_text(json.dumps(manifest, indent=2))
+        os.replace(tmp, manifest_path())
+        _prune(keep={a["name"] for a in assets})
+        log.info("release cache updated to %s (%d assets)", rel["tag_name"], len(assets))
+        return True
+    except Exception as e:
+        log.warning("release refresh failed, serving cached copy: %s", e)
+        return False
+
+
+async def refresh_loop(interval: int = REFRESH_SECONDS) -> None:
+    """Refresh now, then every `interval` seconds.
+
+    `interval <= 0` disables fetching entirely (air-gap mode): the cache is
+    served exactly as an operator populated it.
+    """
+    if interval <= 0:
+        log.info("release refresh disabled — serving the cache as-is")
+        return
+    while True:
+        await refresh()
+        await asyncio.sleep(interval)
