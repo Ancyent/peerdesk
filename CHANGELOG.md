@@ -2,6 +2,17 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [Unreleased]
+
+### Fixed
+- **Self-hosted installs no longer depend on the GitHub API.** The Downloads
+  page and `install.sh` resolved the agent binary by calling `api.github.com`
+  **from the client**, which allows only 60 requests/hour per source IP — so
+  every machine behind one NAT shared that budget, and a host with no route to
+  GitHub could never install an agent at all. The server now mirrors each
+  release to a local volume and serves the manifest and binaries itself. Set
+  `RELEASE_REFRESH_SECONDS=0` for an air-gapped server.
+
 ## [0.4.32] — 2026-07-15
 
 ### Fixed
