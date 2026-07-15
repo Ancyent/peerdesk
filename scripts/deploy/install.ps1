@@ -1,6 +1,6 @@
 # PeerDesk Agent — Windows installer (run as Administrator)
 # Usage:
-#   irm https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.ps1 | iex
+#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.ps1))) -Server "https://api.example.com" -ApiKey "YOUR_TOKEN"
 #   .\install.ps1 -Server "https://api.example.com" -ApiKey "YOUR_TOKEN"
 
 param(

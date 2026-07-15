@@ -472,9 +472,7 @@ curl -sSL https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy
 
 ### Quick install — Windows (as Administrator)
 ```powershell
-irm https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.ps1 | iex
-# Or with parameters:
-.\install.ps1 -Server "https://your-server.com" -ApiKey "YOUR_TOKEN"
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Ancyent/peerdesk/main/scripts/deploy/install.ps1))) -Server "https://your-server.com" -ApiKey "YOUR_TOKEN"
 ```
 
 ### Manual / portable
