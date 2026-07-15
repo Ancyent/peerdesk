@@ -6,7 +6,6 @@
 
 set -euo pipefail
 
-GITHUB_REPO="Ancyent/peerdesk"
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="peerdesk-agent"
 
@@ -44,22 +43,31 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-echo "==> Fetching latest PeerDesk release..."
-ASSET_URLS=$(curl -sSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" \
-  | grep '"browser_download_url"' \
-  | cut -d '"' -f 4 \
-  | grep 'peerdesk-agent-linux-x86_64')
+# Resolve the agent binary from the PeerDesk server, never from the GitHub API:
+# GitHub allows 60 requests/hour per source IP (shared by every machine behind
+# your NAT) and is unreachable from isolated networks. The server mirrors each
+# release and serves it itself.
+resolve_download_url() {
+  local manifest asset
+  manifest=$(curl -sSL "${SERVER}/api/releases/latest") || {
+    echo "ERROR: cannot reach ${SERVER}/api/releases/latest" >&2
+    exit 1
+  }
+  if [[ "$HEADLESS" -eq 1 ]]; then
+    asset=$(echo "$manifest" | grep -o '"name": *"[^"]*headless[^"]*"' | head -1 | cut -d '"' -f 4)
+  else
+    asset=$(echo "$manifest" | grep -o '"name": *"peerdesk-agent-linux-x86_64-v[^"]*"' | head -1 | cut -d '"' -f 4)
+  fi
+  if [[ -z "$asset" ]]; then
+    echo "ERROR: no Linux agent binary in ${SERVER}/api/releases/latest" >&2
+    echo "       The server may not have fetched a release yet." >&2
+    exit 1
+  fi
+  DOWNLOAD_URL="${SERVER}/api/releases/download/${asset}"
+}
 
-if [[ "$HEADLESS" -eq 1 ]]; then
-  DOWNLOAD_URL=$(echo "$ASSET_URLS" | grep 'headless' | head -1)
-else
-  DOWNLOAD_URL=$(echo "$ASSET_URLS" | grep -v 'headless' | head -1)
-fi
-
-if [[ -z "$DOWNLOAD_URL" ]]; then
-  echo "ERROR: Could not find Linux agent binary in latest release."
-  exit 1
-fi
+echo "==> Resolving agent binary from ${SERVER}..."
+resolve_download_url
 
 echo "==> Downloading ${DOWNLOAD_URL}..."
 curl -sSL "$DOWNLOAD_URL" -o "${INSTALL_DIR}/${BINARY_NAME}"
