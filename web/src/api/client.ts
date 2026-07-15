@@ -133,6 +133,18 @@ export interface TurnCredentials {
   ttl: number;
 }
 
+export interface ReleaseAsset {
+  name: string;
+  size: number;
+  browser_download_url: string;
+}
+
+export interface Release {
+  tag_name: string;
+  html_url: string;
+  assets: ReleaseAsset[];
+}
+
 export const api = {
   auth: {
     register: (email: string, name: string, password: string, remember_me = false) =>
@@ -265,5 +277,8 @@ export const api = {
   turn: {
     credentials: (token: string) =>
       request<TurnCredentials>('/turn/credentials', { headers: authHeaders(token) }),
+  },
+  releases: {
+    latest: () => request<Release>('/releases/latest'),
   },
 };

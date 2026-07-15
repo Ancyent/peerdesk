@@ -1,18 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { api, type RegistrationTokenOut, type CompanyOut } from '../api/client';
+import { api, type RegistrationTokenOut, type CompanyOut, type Release, type ReleaseAsset } from '../api/client';
 import { getConfig } from '../config';
 import { CodeBlock } from '../components/CodeBlock';
 import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, AGENT_UNINSTALL_LINUX, AGENT_UNINSTALL_WINDOWS, formatSize, type OsId } from './downloads/osData';
 import { buildCommand, type InstallMode } from './downloads/commands';
 
-interface Asset { name: string; browser_download_url: string; size: number }
-interface Release { tag_name: string; html_url: string; assets: Asset[] }
-
-function repoSlug(releasesUrl: string): string | null {
-  const m = releasesUrl.match(/github\.com\/([^/]+\/[^/]+)/);
-  return m ? m[1] : null;
-}
+type Asset = ReleaseAsset;
 
 const card: React.CSSProperties = { border: '1px solid var(--border-dim)', borderRadius: 10, padding: 18, background: 'var(--bg-surface)' };
 const h: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 };
@@ -20,7 +14,6 @@ const h: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--te
 export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: OsId) => void }) {
   const { accessToken } = useAuth();
   const releasesUrl = getConfig().releasesUrl;
-  const slug = repoSlug(releasesUrl);
 
   const [release, setRelease] = useState<Release | null>(null);
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
@@ -35,12 +28,14 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   const [machineName, setMachineName] = useState('');
 
   useEffect(() => {
-    if (!slug) { setState('error'); return; }
-    fetch(`https://api.github.com/repos/${slug}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((data: Release) => { setRelease(data); setState('ok'); })
+    // Our own API mirrors GitHub releases. Calling api.github.com from the
+    // browser capped everyone behind one NAT at 60 requests/hour and broke
+    // outright for clients with no route to GitHub.
+    api.releases
+      .latest()
+      .then((data) => { setRelease(data); setState('ok'); })
       .catch(() => setState('error'));
-  }, [slug]);
+  }, []);
 
   useEffect(() => {
     if (!accessToken) return;
