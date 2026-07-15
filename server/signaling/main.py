@@ -189,6 +189,16 @@ async def websocket_endpoint(ws: WebSocket):
                 await ws.send_text(json.dumps({"type": "error", "code": f"missing_field:{e}"}))
 
     except WebSocketDisconnect:
+        pass
+    finally:
+        # Cleanup MUST live in `finally`, not in `except WebSocketDisconnect`.
+        # starlette's `iter_text()` catches WebSocketDisconnect itself, so the
+        # `async for` above ends *normally* on disconnect and an `except` block
+        # never fires — the agent then leaked: a zombie socket kept its peer_id
+        # (rejecting the real agent's reconnect with peer_id_in_use) and a stale
+        # password hash stayed in Redis, so viewers were authenticated against
+        # the old password. `finally` also covers abrupt resets, which surface
+        # as other exceptions entirely.
         if peer_id:
             await unregister_agent(state, redis_client, peer_id)
         if viewer_id:

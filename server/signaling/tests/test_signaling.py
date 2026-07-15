@@ -89,3 +89,94 @@ def test_rate_limiter_different_ips_independent():
     _check_rate_limit("10.0.0.3")  # blocked
     # Different IP should still be allowed
     assert _check_rate_limit("10.0.0.4") is True
+
+
+def _fake_redis():
+    from unittest.mock import AsyncMock
+    r = AsyncMock()
+    r.hset = AsyncMock()
+    r.expire = AsyncMock()
+    r.delete = AsyncMock()
+    r.hgetall = AsyncMock(return_value={})
+    return r
+
+
+def _ws_test_client(monkeypatch):
+    """TestClient wired to a fake Redis and a fresh ConnectionState.
+
+    The endpoint reads `redis_client`/`state` as module globals at call time, so
+    patching the module attributes is enough; lifespan (which would dial a real
+    Redis) never runs because we don't enter TestClient as a context manager.
+    """
+    import main
+    from fastapi.testclient import TestClient
+    from session import ConnectionState
+
+    fake = _fake_redis()
+    monkeypatch.setattr(main, "redis_client", fake)
+    monkeypatch.setattr(main, "state", ConnectionState())
+    main._connection_attempts.clear()
+    return main, fake, TestClient(main.app)
+
+
+def test_agent_disconnect_unregisters(monkeypatch):
+    """A disconnecting agent must be evicted from state and Redis.
+
+    Regression: starlette's `iter_text()` catches WebSocketDisconnect itself, so
+    the endpoint's `except WebSocketDisconnect` block was unreachable and
+    `unregister_agent` never ran. Every disconnect leaked a zombie socket that
+    held the peer_id forever (blocking the real agent's re-register with
+    peer_id_in_use) and left a stale password hash in Redis, so viewers were
+    authenticated against the *old* password and saw "wrong password".
+    """
+    main, fake, client = _ws_test_client(monkeypatch)
+
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({
+            "type": "register",
+            "peer_id": "123456789",
+            "password_hash": "hash-v1",
+            "hmac_key": "key-v1",
+        })
+        assert ws.receive_json()["type"] == "registered"
+        assert "123456789" in main.state.agent_connections
+
+    assert "123456789" not in main.state.agent_connections, (
+        "agent socket leaked after disconnect — it will hold the peer_id forever"
+    )
+    fake.delete.assert_awaited_with("agent:123456789")
+
+
+def test_agent_can_reregister_after_password_change(monkeypatch):
+    """The end-to-end scenario from the field.
+
+    An agent registers, its password is reset (new hash), and it reconnects.
+    With the disconnect leak, the stale socket + old hash made the server reject
+    the reconnect as peer_id_in_use and keep authenticating viewers against the
+    old password. After cleanup runs, the new hash must win.
+    """
+    main, fake, client = _ws_test_client(monkeypatch)
+
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({
+            "type": "register",
+            "peer_id": "933146422",
+            "password_hash": "hash-old",
+            "hmac_key": "key-old",
+        })
+        assert ws.receive_json()["type"] == "registered"
+
+    # Agent restarts after `--reset-password` and announces fresh credentials.
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({
+            "type": "register",
+            "peer_id": "933146422",
+            "password_hash": "hash-new",
+            "hmac_key": "key-new",
+        })
+        reply = ws.receive_json()
+
+    assert reply["type"] == "registered", f"re-register rejected: {reply}"
+    stored = fake.hset.await_args.kwargs["mapping"]
+    assert stored["password_hash"] == "hash-new"
+    assert stored["hmac_key"] == "key-new"

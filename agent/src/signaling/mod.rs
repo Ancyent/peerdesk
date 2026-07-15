@@ -104,8 +104,10 @@ pub async fn run(
             backoff_secs = (backoff_secs * 2).min(15);
             continue 'reconnect;
         }
-        tracing::info!("Registered with signaling server, peer_id={}", peer_id);
-        backoff_secs = 1; // reset after a successful connection
+        // Registration only counts once the server acks it with `registered`.
+        // Logging success here (before any ack) used to report a healthy agent
+        // that the server had in fact rejected — see the Registered/Error arms.
+        tracing::debug!("Sent registration for peer_id={} — awaiting ack", peer_id);
 
         // Keepalive: ping the server every 30s so an idle connection isn't dropped
         // by a NAT/firewall idle timeout. A dropped idle socket leaves the host
@@ -124,6 +126,25 @@ pub async fn run(
                 msg = read.next() => match msg {
                     Some(Ok(Message::Text(text))) => {
                         match serde_json::from_str::<SignalingMessage>(&text) {
+                            Ok(SignalingMessage::Registered { peer_id: acked }) => {
+                                tracing::info!("Registered with signaling server, peer_id={}", acked);
+                                backoff_secs = 1; // confirmed — reset after a good registration
+                            }
+                            Ok(SignalingMessage::Error { code }) if code == "peer_id_in_use" => {
+                                // The server still holds a registration for this
+                                // peer_id, so we are NOT registered: viewers can
+                                // never reach us and are authenticated against the
+                                // stale record instead. Idling here would look
+                                // healthy while being permanently unreachable, so
+                                // drop the socket and retry until the slot frees.
+                                tracing::warn!(
+                                    "Registration rejected — peer_id {} already in use on the server; retry in {}s",
+                                    peer_id,
+                                    backoff_secs
+                                );
+                                backoff_secs = (backoff_secs * 2).min(15);
+                                continue 'reconnect;
+                            }
                             Ok(parsed) => {
                                 if to_webrtc.send(parsed).await.is_err() {
                                     return Ok(()); // WebRTC side dropped — shut down

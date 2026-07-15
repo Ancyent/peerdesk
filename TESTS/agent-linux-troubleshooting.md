@@ -1,71 +1,117 @@
 # Linux agent — connection troubleshooting
 
-Use this when a Linux (headless) agent is **online** in the dashboard but the web
-viewer rejects the connection with **"Wrong ID or password"** even though you set
-a known password.
+## Where the logs actually are
 
-## Root cause (fixed in v0.4.31, but old installs may still be affected)
+`--silent` (how the systemd service runs) sends logs to a **file**, not journald
+— see `agent/src/logging.rs`. `journalctl -u peerdesk-agent` therefore shows only
+systemd start/stop lines and **never** any agent activity. That is expected and
+is *not* a symptom. Read the file instead:
 
-The agent stores its config at `$HOME/.config/peerdesk/config.json`. Before
-v0.4.31 the generated systemd unit set no `HOME`, so the **service** and the
-**interactive commands** (`install`, `--reset-password`) resolved to *different*
-files. A password set/reset then never reached the running service. v0.4.31 pins
-`Environment=HOME=/root` in the unit and makes reinstall `restart` the service —
-but a box that was first installed with an older agent can still have a stale
-config at a second path (e.g. `/config.json` or `/.config/peerdesk/config.json`).
+- `/var/log/peerdesk-agent.log` (preferred — used when `/var/log` is writable)
+- `~/.local/share/peerdesk/agent.log` (fallback)
 
-## Step 1 — gather the current state (paste the full output)
+---
 
-```bash
-echo "=== ENV of the running process ==="
-sudo tr '\0' '\n' < /proc/$(pgrep -f 'peerdesk-agent --silent' | head -1)/environ | grep -E 'HOME|XDG|PWD'
-echo "=== systemd unit ==="
-cat /etc/systemd/system/peerdesk-agent.service
-echo "=== every peerdesk config on disk ==="
-sudo find / -name config.json -path '*peerdesk*' 2>/dev/null -exec sh -c 'echo "FILE: $1"; cat "$1"; echo' _ {} \;
+## SOLVED 2026-07-15 — "wrong password" on a Linux agent that shows online
+
+**Do not chase configs, HOME, or reinstalls for this symptom.** The old
+"two configs / wrong HOME" theory (v0.4.31) was *not* the cause. The bug was on
+the **server**, and it is now fixed.
+
+### Root cause
+
+`server/signaling/main.py` cleaned up a disconnecting agent inside
+`except WebSocketDisconnect:`. But starlette's `iter_text()` catches
+WebSocketDisconnect itself (`websockets.py:143-148`), so the `async for` loop
+ends *normally* and that `except` block was **unreachable dead code**.
+`unregister_agent()` therefore never ran for **any** disconnect.
+
+Every agent disconnect leaked:
+- a **zombie socket** in `state.agent_connections[peer_id]` — held the peer_id
+  until the process restarted (the container had been up since 2026-06-24)
+- a **stale `agent:<peer_id>` record in Redis** with the *old* password hash
+
+The failure chain that produced "wrong password":
+
+1. Agent registers → Redis stores hash **A**. Socket later dies → nothing is
+   cleaned up.
+2. Password is changed (`--reset-password` / reinstall) → agent config now has
+   hash **B**.
+3. Agent reconnects announcing **B**. `register_agent()` sees the zombie socket
+   *and* stored hash **A** → no match → rejects with `peer_id_in_use`.
+4. The agent logged a warning and **kept running as if registered** — so it sat
+   there permanently unreachable while looking healthy.
+5. The viewer's password was checked against the **stale hash A** → `auth_failed`
+   → *"Wrong ID or password"*. The real agent was never consulted.
+
+### Fixes shipped
+
+- **`server/signaling/main.py`** — cleanup moved to a `finally:` block, so it
+  runs on normal disconnects *and* abrupt resets. Regression tests:
+  `test_agent_disconnect_unregisters`, `test_agent_can_reregister_after_password_change`.
+- **`agent/src/signaling/mod.rs`** —
+  - `peer_id_in_use` now drops the socket and retries with backoff instead of
+    idling forever pretending to be registered.
+  - "Registered with signaling server" is logged only on the server's
+    `registered` ack, not immediately after `send`. The old log claimed success
+    on a registration the server had rejected — it is what sent this
+    investigation to the wrong place for two sessions.
+
+### Verified
+
+- Live: registered a throwaway peer against `ws://192.168.200.223/ws`, dropped
+  the socket, confirmed `EXISTS agent:999000111` → `0`. Before the fix the key
+  survived 24h (TTL) and the socket forever.
+- The real agent (`933146422`) re-registered on its own after the signaling
+  restart; Redis now holds the **same** hash as the agent's config.
+
+---
+
+## Still open — token reuse bricks the agent's API key
+
+Visible in the agent log and **not yet fixed**:
+
+```
+Token redeem failed (non-fatal): 409 Conflict: {"detail":"peer_id already registered"}
+API registration failed (non-fatal): 401 Unauthorized: {"detail":"Invalid or inactive API key"}
+TURN credentials unavailable, using STUN only: 401 Unauthorized
 ```
 
-What it reveals: the service's real `HOME`, whether the unit has `HOME=/root`,
-and **all** config files with their `peer_id` + `password_hash`. If more than one
-config file exists, the service is reading the one the server's stored hash
-matches — and your reset/reinstall wrote to a different one.
+Re-running `install.sh` with an **already-redeemed** registration token
+(`--api-key=UFDW-RA9Q`) makes `Config::load_or_create` overwrite the durable
+`pd_…` api-key in `config.json` with the spent token. The agent then 401s on
+register/heartbeat/TURN and runs **STUN-only** — fine on one LAN, but no relay
+for cross-network viewers.
 
-## Step 2 — clean reinstall (deterministic fix)
+Workaround: generate a **fresh** token per install. Real fix: don't let a token
+clobber a durable api-key that already redeemed successfully.
 
-Wipes every stale config so exactly one remains, then reinstalls with your
-chosen password and restarts the service so it picks up the new unit + config.
-Generate a fresh registration token in the dashboard first.
+---
 
-```bash
-# 1. stop and fully remove the old agent (service + binary + ALL configs)
-sudo systemctl stop peerdesk-agent 2>/dev/null
-sudo pkill -f peerdesk-agent 2>/dev/null
-sudo /usr/local/bin/peerdesk-agent --uninstall-service 2>/dev/null
-sudo rm -f /usr/local/bin/peerdesk-agent
-sudo find / -name config.json -path '*peerdesk*' -delete 2>/dev/null
-sudo find / -name peerdesk.json -delete 2>/dev/null
-
-# 2. reinstall with your password (replace TOKEN and the password)
-curl -sSL http://192.168.200.223/install.sh | sudo bash -s -- \
-  --server=http://192.168.200.223 --api-key=TOKEN --password='YourPassword'
-
-# 3. make sure the running service uses the new unit + config
-sudo systemctl restart peerdesk-agent
-```
-
-A **new device** (new peer ID) appears in the dashboard; the old one goes
-offline. Connect to the new one with `YourPassword` and tick "save password".
-
-## Step 3 — verify the password took (optional, run on the SERVER host)
-
-On the machine running the PeerDesk server (`192.168.200.223`):
+## If a Linux agent misbehaves again — the order that works
 
 ```bash
-cd deploy
-# stored hash the agent announced:
-docker compose exec redis redis-cli HGET agent:<PEER_ID> password_hash
+# 1. the agent's real log (NOT journalctl)
+tail -n 60 /var/log/peerdesk-agent.log 2>/dev/null || tail -n 60 ~/.local/share/peerdesk/agent.log
+
+# 2. is its websocket actually up?
+ss -tnp | grep -i peerdesk    # expect ESTAB to <server>:80
 ```
 
-The stored `$2b$...` hash should change every time you set a new password. If it
-never changes across resets, the service is still reading a stale config → repeat
-Step 2 and confirm Step 1 shows only one config file.
+Then on the **server** (`192.168.200.223`):
+
+```bash
+cd /root/peerdesk/deploy
+docker compose exec redis redis-cli --scan --pattern 'agent:*'
+docker compose exec redis redis-cli HGETALL agent:<PEER_ID>
+docker compose logs --tail=40 signaling      # look for "outcome": "auth_failed"
+```
+
+Read it like this:
+
+| Evidence | Meaning |
+|---|---|
+| Redis hash ≠ the hash in the agent's `config.json` | The server holds a stale record — the viewer is being checked against the wrong password. |
+| `peer_id_in_use` in the agent log | The server refused the registration; the agent is a ghost. Should now self-heal via retry. |
+| `"outcome": "auth_failed"` in signaling logs | The request *did* reach the server — so this is auth, not connectivity. |
+| No `agent:*` key at all | The agent never registered — check its websocket first. |
