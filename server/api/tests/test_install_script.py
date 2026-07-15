@@ -8,6 +8,15 @@ import pytest
 REPO = Path(__file__).resolve().parents[3]
 SCRIPTS = [REPO / "web/public/install.sh", REPO / "scripts/deploy/install.sh"]
 
+# The "never call the GitHub API" rule applies to every installer we ship,
+# not just the bash ones — the PowerShell installer had a bug that let it
+# fall through unmigrated to api.github.com for months (all other tests in
+# this file exercise bash-specific resolver internals and stay .sh-only).
+ALL_SCRIPTS = SCRIPTS + [
+    REPO / "web/public/install.ps1",
+    REPO / "scripts/deploy/install.ps1",
+]
+
 MANIFEST = json.dumps({
     "tag_name": "v0.4.32",
     "assets": [
@@ -30,10 +39,10 @@ DECOY_MANIFEST = json.dumps({
 })
 
 
-@pytest.mark.parametrize("script", SCRIPTS, ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("script", ALL_SCRIPTS, ids=lambda p: f"{p.parent.name}/{p.name}")
 def test_script_never_calls_the_github_api(script):
     assert "api.github.com" not in script.read_text(), (
-        "install.sh must resolve assets from the PeerDesk server: the GitHub API "
+        "install script must resolve assets from the PeerDesk server: the GitHub API "
         "allows 60 req/hour per IP and is unreachable from isolated machines"
     )
 

@@ -57,6 +57,12 @@ def asset_path(name: str) -> Optional[Path]:
 
 async def _download(client: httpx.AsyncClient, url: str, dest: Path) -> None:
     """Stream `url` to `dest` atomically: a partial transfer is never visible."""
+    # Single-writer by assumption: this fixed "<name>.tmp" path is safe only
+    # because exactly one process runs refresh_loop() against CACHE_DIR (the
+    # Dockerfile starts a single uvicorn worker, no --workers/--scale). Two
+    # writers sharing this volume would interleave into the same tmp file and
+    # os.replace() a corrupt result. Don't scale the API without giving each
+    # writer its own tmp name (e.g. include the pid) first.
     tmp = dest.with_name(dest.name + ".tmp")
     try:
         with tmp.open("wb") as fh:
@@ -105,7 +111,21 @@ async def refresh() -> bool:
 
             current = read_manifest()
             if current and current.get("tag_name") == rel["tag_name"]:
-                return False
+                # Same tag is only a no-op if every asset the manifest advertises
+                # is still actually on disk. If one was deleted out-of-band, the
+                # manifest would otherwise keep advertising a 404 forever -- no
+                # future refresh would ever notice, since a tag bump is the only
+                # thing that normally gets us past this check.
+                missing = [
+                    a["name"] for a in current.get("assets", [])
+                    if not (CACHE_DIR / a["name"]).is_file()
+                ]
+                if not missing:
+                    return False
+                log.info(
+                    "release cache: tag %s unchanged but missing asset(s) %s -- repairing",
+                    rel["tag_name"], missing,
+                )
 
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
             assets = []

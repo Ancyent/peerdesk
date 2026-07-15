@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { api, type RegistrationTokenOut, type CompanyOut, type Release, type ReleaseAsset } from '../api/client';
+import { api, ApiError, type RegistrationTokenOut, type CompanyOut, type Release, type ReleaseAsset } from '../api/client';
 import { getConfig } from '../config';
 import { CodeBlock } from '../components/CodeBlock';
 import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, AGENT_UNINSTALL_LINUX, AGENT_UNINSTALL_WINDOWS, formatSize, type OsId } from './downloads/osData';
@@ -17,6 +17,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
 
   const [release, setRelease] = useState<Release | null>(null);
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState('');
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [placementCompany, setPlacementCompany] = useState('');
   const [token, setToken] = useState<RegistrationTokenOut | null>(null);
@@ -34,7 +35,10 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
     api.releases
       .latest()
       .then((data) => { setRelease(data); setState('ok'); })
-      .catch(() => setState('error'));
+      .catch((e) => {
+        setErrorMessage(e instanceof ApiError ? e.message : '');
+        setState('error');
+      });
   }, []);
 
   useEffect(() => {
@@ -129,6 +133,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
         <div style={card}>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
             Nu am putut încărca lista de fișiere automat.{' '}
+            {errorMessage && <span>({errorMessage}){' '}</span>}
             <a href={releasesUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Deschide releases →</a>
           </p>
         </div>

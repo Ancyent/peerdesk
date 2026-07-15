@@ -177,6 +177,27 @@ async def test_refresh_reports_success_when_prune_fails(cache, fake_github, monk
     assert (cache / "agent-linux").read_bytes() == b"BINARY"
 
 
+async def test_refresh_restores_asset_deleted_out_of_band_even_when_tag_unchanged(cache, fake_github):
+    """If an asset is deleted from CACHE_DIR without a tag bump (e.g. an
+    operator fat-fingered a manual cleanup, or the disk had a hiccup), the
+    manifest must not keep advertising a file that 404s forever. The very
+    next refresh() -- even though GitHub still reports the same tag -- must
+    notice the gap and re-download it."""
+    fake_github(_github_release(), {"agent-linux": b"BINARY"})
+    await release_cache.refresh()
+    assert (cache / "agent-linux").read_bytes() == b"BINARY"
+
+    (cache / "agent-linux").unlink()
+    assert not (cache / "agent-linux").exists()
+
+    # GitHub still reports the same tag on this second call.
+    fake_github(_github_release(), {"agent-linux": b"BINARY"})
+    await release_cache.refresh()
+
+    assert (cache / "agent-linux").read_bytes() == b"BINARY"
+    assert release_cache.read_manifest()["tag_name"] == "v0.4.32"
+
+
 async def test_refresh_loop_disabled_makes_no_network_call(cache, monkeypatch):
     called = False
 

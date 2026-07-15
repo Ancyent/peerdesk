@@ -10,7 +10,6 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$GitHubRepo = "Ancyent/peerdesk"
 $InstallDir = "$env:ProgramFiles\PeerDesk"
 $BinaryPath = "$InstallDir\peerdesk-agent.exe"
 
@@ -19,18 +18,27 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit 1
 }
 
-Write-Host "==> Fetching latest PeerDesk release..."
-$Release = Invoke-RestMethod "https://api.github.com/repos/$GitHubRepo/releases/latest"
-$Asset   = $Release.assets | Where-Object { $_.name -like "*windows-x86_64.exe" } | Select-Object -First 1
-
-if (-not $Asset) {
-    Write-Error "Could not find Windows binary in latest release."
+if (-not $Server) {
+    Write-Error "-Server <url> is required to resolve the agent binary (e.g. -Server https://api.example.com)."
     exit 1
 }
 
+Write-Host "==> Resolving agent binary from $Server..."
+# Resolve from the PeerDesk server, not the GitHub API — see install.sh.
+$manifest = Invoke-RestMethod -Uri "$Server/api/releases/latest"
+# Match the agent's name shape, not the substring "windows": that also matches
+# the Windows viewer installers (peerdesk-viewer-windows-*), and asset order
+# in the manifest is controlled by GitHub, not us.
+$asset = $manifest.assets | Where-Object { $_.name -like "peerdesk-agent-windows*" } | Select-Object -First 1
+if (-not $asset) {
+  Write-Error "No Windows agent binary in $Server/api/releases/latest — the server may not have fetched a release yet."
+  exit 1
+}
+$DownloadUrl = "$Server/api/releases/download/$($asset.name)"
+
 if (-not (Test-Path $InstallDir)) { New-Item -ItemType Directory -Path $InstallDir | Out-Null }
-Write-Host "==> Downloading $($Asset.name)..."
-Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $BinaryPath
+Write-Host "==> Downloading $($asset.name)..."
+Invoke-WebRequest -Uri $DownloadUrl -OutFile $BinaryPath
 Write-Host "==> Installed to $BinaryPath"
 
 # The access password is the gate for connecting. Generate one if not supplied,

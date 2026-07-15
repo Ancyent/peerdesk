@@ -18,8 +18,9 @@ async def latest():
             status_code=503,
             detail=(
                 "No release cached yet — the server has not been able to reach "
-                "GitHub. Check RELEASE_REPO and outbound network, or copy the "
-                "release assets into RELEASE_CACHE_DIR manually."
+                "GitHub. Check RELEASE_REPO and outbound network, or populate "
+                "RELEASE_CACHE_DIR by hand with the assets AND a manifest.json "
+                "(see RELEASE_REFRESH_SECONDS in .env.example for its shape)."
             ),
         )
     return {
