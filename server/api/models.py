@@ -23,8 +23,6 @@ class User(Base):
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    machines: Mapped[list["Machine"]] = relationship("Machine", back_populates="owner", cascade="all, delete-orphan")
-
     def __init__(self, **kwargs):
         if "id" not in kwargs:
             kwargs["id"] = str(uuid.uuid4())
@@ -84,7 +82,9 @@ class Machine(Base):
     peer_id: Mapped[str] = mapped_column(String(9), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False, default="My Machine")
     os: Mapped[str | None] = mapped_column(String, nullable=True)
-    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    account_id: Mapped[str] = mapped_column(String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Audit only — who enrolled this machine. Never consulted for authorization.
+    created_by_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -99,7 +99,6 @@ class Machine(Base):
     # without re-typing it. Only set when the owner opts in; never serialized raw.
     saved_password_enc: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    owner: Mapped["User"] = relationship("User", back_populates="machines")
     api_key_rel: Mapped["ApiKey | None"] = relationship("ApiKey", back_populates="machines")
 
     @property
@@ -183,6 +182,7 @@ class Branding(Base):
     __tablename__ = "branding"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    account_id: Mapped[str] = mapped_column(String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
     brand_name: Mapped[str] = mapped_column(String(100), default="PeerDesk")
     logo_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     accent_color: Mapped[str] = mapped_column(String(7), default="#2563eb")
@@ -205,7 +205,9 @@ class Company(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    account_id: Mapped[str] = mapped_column(String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Audit only — who created this company. Never consulted for authorization.
+    created_by_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     locations: Mapped[list["Location"]] = relationship("Location", back_populates="company", cascade="all, delete-orphan")
@@ -265,6 +267,7 @@ class RegistrationToken(Base):
     __tablename__ = "registration_tokens"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_id: Mapped[str] = mapped_column(String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
     token: Mapped[str] = mapped_column(String(9), unique=True, nullable=False, default=_gen_token)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -292,6 +295,7 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_id: Mapped[str] = mapped_column(String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
     key: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, default=_gen_api_key)
     name: Mapped[str] = mapped_column(String(200), nullable=False, default="Default Key")
     created_by: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
