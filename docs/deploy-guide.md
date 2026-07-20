@@ -225,6 +225,126 @@ sudo systemctl status peerdesk-agent
 - [ ] Test conexiune din browser la `https://domain.com`
 - [ ] Renewal automat: `certbot renew --dry-run`
 
+### 3.7 Publicare printr-un proxy extern (Nginx Proxy Manager, Traefik, etc.)
+
+Varianta în care **păstrezi nginx-ul intern** și pui un proxy în fața lui — tipic
+când ai deja un reverse proxy care administrează certificatele pentru mai multe
+domenii. Diferă de secțiunea 4: acolo nginx-ul intern lipsește cu totul.
+
+Notație: `<PUBLIC_DOMAIN>` = domeniul public (ex. `app.exemplu.com`),
+`<DDNS_HOST>` = numele DDNS care urmărește IP-ul tău public,
+`<PEERDESK_HOST_IP>` = mașina cu stack-ul PeerDesk, `<PROXY_IP>` = proxy-ul.
+
+#### Traseul traficului
+
+```
+browser / agent   <PUBLIC_DOMAIN> :443 → proxy → <PEERDESK_HOST_IP>:80
+releu TURN (UDP)  <DDNS_HOST> :3478   → direct → <PEERDESK_HOST_IP>:3478
+```
+
+TURN **nu poate** trece prin proxy: releul e UDP, iar un reverse proxy HTTP nu
+transportă UDP.
+
+#### Port forwarding pe router
+
+| Port | Protocol | Către | De ce |
+|---|---|---|---|
+| 80 | TCP | `<PROXY_IP>` | validare Let's Encrypt HTTP-01 |
+| 443 | TCP | `<PROXY_IP>` | aplicația web |
+| **3478** | **TCP + UDP** | **`<PEERDESK_HOST_IP>`** | control TURN |
+| **49160-49200** | **UDP** | **`<PEERDESK_HOST_IP>`** | media releată TURN |
+
+Ultimele două ocolesc proxy-ul. Dacă lipsesc, un viewer din altă rețea se
+conectează, se autentifică — și rămâne cu **ecran negru fără niciun mesaj de
+eroare**, cea mai greu de diagnosticat defecțiune din sistem.
+
+#### Configurarea proxy-ului
+
+Ținta este portul **80**, nu 443: nginx-ul intern nu are bloc `listen 443`, deci
+443 ar refuza conexiunea. TLS se termină la proxy; saltul din LAN rămâne HTTP.
+
+- **Websockets Support: ON.** Fiecare sesiune se negociază prin `/ws`; fără el
+  agentul nu se înregistrează și nu se conectează nimic.
+- Pentru descărcări de binare (20–85 MB), dezactivează bufferarea — altfel
+  proxy-ul scrie tot răspunsul într-un fișier temporar înainte ca utilizatorul să
+  vadă primul octet:
+
+```nginx
+location /api/releases/download/ {
+    proxy_pass http://<PEERDESK_HOST_IP>:80;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+#### Ajustări pe serverul PeerDesk
+
+| Setare | Valoare | De ce |
+|---|---|---|
+| `TURN_HOST` | `<DDNS_HOST>` | o adresă privată aici înseamnă că viewerii externi primesc un releu inaccesibil |
+| `TURN_PRIVATE_IP` | `<PEERDESK_HOST_IP>` | permite coturn să mapeze privat → public în spatele NAT |
+| `set_real_ip_from` | `<PROXY_IP>` | fără el fiecare vizitator arată ca proxy-ul, iar limitatorul per-IP pune tot internetul într-o singură găleată |
+
+`deploy/nginx/default.conf` **suprascrie** `X-Forwarded-For` pe `/ws` — nu îl
+adaugă. Serverul de signaling se încrede în prima intrare, deci orice antet
+trimis de client trebuie eliminat acolo; altfel un client își poate falsifica
+IP-ul sursă, păcălind limitatorul și jurnalul de audit.
+
+#### Verificare — în ordinea asta
+
+Fiecare pas izolează un salt; primul eșec arată unde e ruptura.
+
+```bash
+# 1. aplicația răspunde prin TLS            → 200
+curl -sS -o /dev/null -w '%{http_code}\n' https://<PUBLIC_DOMAIN>/
+
+# 2. API-ul răspunde prin proxy             → JSON cu "tag_name"
+curl -sS https://<PUBLIC_DOMAIN>/api/releases/latest | head -c 120
+
+# 3. WebSocket-urile supraviețuiesc         → 101 (pasul cel mai des sărit)
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+  -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+  https://<PUBLIC_DOMAIN>/ws
+
+# 4. IP-ul real ajunge la signaling (nu cel al proxy-ului)
+cd deploy && docker compose logs --tail=20 signaling | grep connection_attempt
+
+# 5. TURN e accesibil din afara rețelei (de pe date mobile / un VPS)
+nc -zvu <DDNS_HOST> 3478
+```
+
+Un `101` la pasul 3 confirmă suportul WebSocket; un `200` sau `400` înseamnă că
+opțiunea e dezactivată în proxy. La pasul 5, testează cu <https://icetest.info>
+și așteaptă cel puțin un candidat `relay` — lipsa lui înseamnă că forward-urile
+UDP lipsesc.
+
+#### Capcane
+
+**Nu activa proxy-ul Cloudflare (norul portocaliu)** pe domeniul folosit de TURN.
+Domeniul ar rezolva către Cloudflare, care nu transportă UDP 3478, și releul
+moare silențios. De aceea `TURN_HOST` folosește DDNS-ul, nu domeniul public.
+
+**Dacă IP-ul public e dinamic**, coturn îl rezolvă **o singură dată, la pornire**.
+Când se schimbă, releul continuă să anunțe adresa veche:
+
+```bash
+cd deploy && docker compose restart coturn
+```
+
+**Editarea lui `deploy/nginx/default.conf` cere recreare, nu reload.** Fișierul e
+bind-mount și Docker leagă *inode-ul*: o editare care rescrie fișierul lasă
+containerul citind versiunea veche, iar `nginx -t` validează fericit copia
+învechită.
+
+```bash
+docker compose up -d --force-recreate --no-deps nginx
+```
+
+**Agenții existenți nu migrează singuri.** Sunt configurați cu URL-ul vechi;
+doar instalările noi folosesc domeniul. Pentru a muta unul, reinstalează-l cu
+`--server=https://<PUBLIC_DOMAIN>` și un token nou.
+
 ---
 
 ## 4. Productie fără nginx intern (în spatele unui proxy extern)
