@@ -33,10 +33,13 @@ async def test_machine_carries_account_and_creator_separately(db):
     db.add_all([user, acct])
     await db.flush()
 
-    m = Machine(peer_id="123456789", name="Server", account_id=acct.id, created_by_id=user.id)
+    # owner_id is still NOT NULL (expand/contract keeps it until Task 7), so it
+    # must be supplied here alongside the new columns.
+    m = Machine(peer_id="123456789", name="Server", owner_id=user.id, account_id=acct.id, created_by_id=user.id)
     db.add(m)
     await db.flush()
 
     assert m.account_id == acct.id
     assert m.created_by_id == user.id
-    assert not hasattr(m, "owner_id"), "owner_id must be gone; authorization uses account_id"
+    # owner_id deliberately still exists here: the routers read it until Task 7
+    # moves them onto account_id. Task 7 drops it and asserts it is gone.

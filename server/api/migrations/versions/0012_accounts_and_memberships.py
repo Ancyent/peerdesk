@@ -67,19 +67,28 @@ def upgrade() -> None:
     op.execute("UPDATE branding SET account_id = (SELECT id FROM accounts ORDER BY created_at LIMIT 1)")
     op.execute("DELETE FROM branding WHERE account_id IS NULL")
 
+    # account_id stays NULLABLE here on purpose. The routers do not set it until
+    # Tasks 6-7; making it NOT NULL now fails every insert they make. Task 7's
+    # migration tightens it once they do.
     for table in SCOPED:
-        op.alter_column(table, "account_id", nullable=False)
         op.create_foreign_key(f"fk_{table}_account", table, "accounts", ["account_id"], ["id"], ondelete="CASCADE")
         op.create_index(f"ix_{table}_account_id", table, ["account_id"])
 
-    # owner_id survives only as audit, under a name that cannot be mistaken for access.
-    op.alter_column("machines", "owner_id", new_column_name="created_by_id", nullable=True)
-    op.alter_column("companies", "owner_id", new_column_name="created_by_id", nullable=True)
+    # Expand, do not rename: copy owner_id into created_by_id and LEAVE owner_id
+    # in place. Routers still read it until Task 7 moves them onto account_id,
+    # and dropping it here would break them mid-refactor. Task 7 drops it.
+    for table in ("machines", "companies"):
+        op.add_column(table, sa.Column("created_by_id", sa.String(), nullable=True))
+        op.execute(f"UPDATE {table} SET created_by_id = owner_id")
+        op.create_foreign_key(
+            f"fk_{table}_created_by", table, "users", ["created_by_id"], ["id"], ondelete="SET NULL"
+        )
 
 
 def downgrade() -> None:
-    op.alter_column("machines", "created_by_id", new_column_name="owner_id")
-    op.alter_column("companies", "created_by_id", new_column_name="owner_id")
+    for table in ("machines", "companies"):
+        op.drop_constraint(f"fk_{table}_created_by", table, type_="foreignkey")
+        op.drop_column(table, "created_by_id")
     for table in SCOPED:
         op.drop_index(f"ix_{table}_account_id", table)
         op.drop_constraint(f"fk_{table}_account", table, type_="foreignkey")
