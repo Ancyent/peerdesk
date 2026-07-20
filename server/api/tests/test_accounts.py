@@ -43,3 +43,11 @@ async def test_machine_carries_account_and_creator_separately(db):
     assert m.created_by_id == user.id
     # owner_id deliberately still exists here: the routers read it until Task 7
     # moves them onto account_id. Task 7 drops it and asserts it is gone.
+
+
+def test_account_id_is_nullable_until_routers_set_it():
+    from models import ApiKey, Branding, Company, Machine, Membership, RegistrationToken
+
+    for model in (Machine, Company, ApiKey, RegistrationToken, Branding):
+        assert model.__table__.c.account_id.nullable is True, f"{model.__name__} must stay nullable until Task 7"
+    assert Membership.__table__.c.account_id.nullable is False, "a membership without an account is meaningless"
