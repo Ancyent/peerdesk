@@ -9,8 +9,7 @@ dist/
 builds/
 peerdesk-release.jks
 android-secrets.env
-screenshots/*
-!screenshots/README.md
+screenshots/
 
 # Manual test checklists and infra notes — local only, never published.
 # Anything meant for users goes in docs/.
