@@ -2,7 +2,7 @@ import uuid
 import secrets
 import string
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, ForeignKey, DateTime, Text
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -34,6 +34,44 @@ class User(Base):
             kwargs["totp_secret"] = None
         if "totp_enabled" not in kwargs:
             kwargs["totp_enabled"] = False
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)
+
+
+class Account(Base):
+    __tablename__ = "accounts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)
+
+
+class Membership(Base):
+    """Links a user to an account with a role. A user may hold memberships in
+    many accounts, with a different role in each."""
+
+    __tablename__ = "memberships"
+    __table_args__ = (UniqueConstraint("user_id", "account_id", name="uq_membership_user_account"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id: Mapped[str] = mapped_column(String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(10), nullable=False, default="member")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "role" not in kwargs:
+            kwargs["role"] = "member"
         if "created_at" not in kwargs:
             kwargs["created_at"] = utcnow()
         super().__init__(**kwargs)

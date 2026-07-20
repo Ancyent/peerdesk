@@ -1,0 +1,24 @@
+import pytest
+from sqlalchemy import select
+from models import Account, Membership, User
+
+
+@pytest.mark.asyncio
+async def test_a_user_can_hold_memberships_in_two_accounts(db):
+    user = User(email="tech@test.com", name="Tech", password_hash="x")
+    own = Account(name="My Company")
+    client_acct = Account(name="Client Co")
+    db.add_all([user, own, client_acct])
+    await db.flush()
+
+    db.add_all([
+        Membership(user_id=user.id, account_id=own.id, role="admin"),
+        Membership(user_id=user.id, account_id=client_acct.id, role="member"),
+    ])
+    await db.flush()
+
+    rows = (await db.execute(
+        select(Membership).where(Membership.user_id == user.id)
+    )).scalars().all()
+
+    assert {m.account_id: m.role for m in rows} == {own.id: "admin", client_acct.id: "member"}
