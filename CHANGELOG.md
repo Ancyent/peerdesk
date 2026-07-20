@@ -2,9 +2,18 @@
 
 All notable changes to PeerDesk are documented here.
 
-## [Unreleased]
+## [0.4.33] — 2026-07-20
 
 ### Fixed
+- **Terminal mode: typing `exit` killed the shell for good.** The PTY was tied to
+  the agent *process* rather than to the connection, and was spawned once at
+  startup — so `exit` ended the only shell there was. The reader thread hit EOF
+  and stopped, while `write_input` discarded the error on every later keystroke:
+  the terminal went silent, with no echo and no message. Reconnecting did not
+  help, because the new session was handed the same dead PTY; only restarting the
+  agent recovered it. Each connection now gets its own shell — matching how the
+  peer connection is already rebuilt per offer — and the viewer is told when the
+  shell ends instead of being left with a terminal that ignores every key.
 - **Self-hosted installs no longer depend on the GitHub API.** The Downloads
   page and `install.sh` resolved the agent binary by calling `api.github.com`
   **from the client**, which allows only 60 requests/hour per source IP — so

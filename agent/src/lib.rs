@@ -338,44 +338,11 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
         }
     }
 
-    // PTY plumbing: in terminal mode the agent serves a shell over a data
-    // channel instead of screen capture/input injection.
-    let (pty_output, _pty_out_keep): (tokio::sync::broadcast::Sender<Vec<u8>>, _) =
-        tokio::sync::broadcast::channel(256);
-    let (pty_input_tx, mut pty_input_rx) =
-        tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(256);
-
-    if session_mode == crate::mode::SessionMode::Terminal {
-        match crate::terminal::PtySession::spawn(80, 24) {
-            Ok(mut pty) => {
-                let pty_out = pty.output.clone();
-                std::thread::spawn(move || {
-                    while let Some(msg) = pty_input_rx.blocking_recv() {
-                        match msg {
-                            crate::terminal::ClientMsg::Bytes(b) => pty.write_input(&b),
-                            crate::terminal::ClientMsg::Resize { cols, rows } => {
-                                pty.resize(cols, rows)
-                            }
-                        }
-                    }
-                });
-                let shared = pty_output.clone();
-                let mut sub = pty_out.subscribe();
-                tokio::spawn(async move {
-                    loop {
-                        match sub.recv().await {
-                            Ok(buf) => {
-                                let _ = shared.send(buf);
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                        }
-                    }
-                });
-            }
-            Err(e) => tracing::error!("failed to start shell: {}", e),
-        }
-    }
+    // In terminal mode the agent serves a shell over a data channel instead of
+    // screen capture/input injection. The shell belongs to the *connection*, not
+    // to the agent process, so it is started in the Offer handler below — one
+    // process-wide PTY meant a single `exit` left every later viewer with a dead
+    // terminal that silently swallowed keystrokes.
 
     // Audio capture is not yet wired into the WebRTC pipeline. Previously an
     // audio thread was spawned with a receiver that was dropped immediately,
@@ -408,6 +375,9 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // outbound Answer/ICE to signaling. Both are replaced on each new Offer.
     let mut peer: Option<webrtc_peer::PeerConnection> = None;
     let mut fwd_abort: Option<tokio::task::AbortHandle> = None;
+    // This session's shell, in terminal mode. Dropping it ends that shell, so it
+    // is replaced on each Offer alongside the peer connection.
+    let mut terminal_bridge: Option<crate::terminal::TerminalBridge> = None;
 
     // When run_agent's future is dropped (host aborts the agent on restart),
     // abort these background tasks so no orphan signaling/peer connection lingers.
@@ -502,6 +472,44 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                 if let Some(h) = fwd_abort.take() {
                     h.abort();
                 }
+                // Start this connection's shell. Clearing the previous bridge
+                // first drops its input senders, which ends the pump thread and
+                // hangs up the old shell — so a viewer who typed `exit` and
+                // reconnected gets a live terminal instead of the dead one.
+                drop(terminal_bridge.take());
+                let idle_terminal = || {
+                    (
+                        tokio::sync::broadcast::channel::<Vec<u8>>(1).0,
+                        tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(1).0,
+                    )
+                };
+                let (pty_output, pty_input_tx) =
+                    if session_mode == crate::mode::SessionMode::Terminal {
+                        match crate::terminal::start_bridge(80, 24) {
+                            Ok(bridge) => {
+                                let wiring = (bridge.output.clone(), bridge.input.clone());
+                                terminal_bridge = Some(bridge);
+                                // Record the shell ending. In the signaling log a
+                                // viewer that disconnected and a user who typed
+                                // `exit` look identical; this tells them apart.
+                                if let Some(started) = terminal_bridge.as_ref() {
+                                    let mut ended = started.exited.clone();
+                                    tokio::spawn(async move {
+                                        if ended.wait_for(|done| *done).await.is_ok() {
+                                            info!("shell exited — terminal session finished");
+                                        }
+                                    });
+                                }
+                                wiring
+                            }
+                            Err(e) => {
+                                tracing::error!("failed to start shell for this session: {}", e);
+                                idle_terminal()
+                            }
+                        }
+                    } else {
+                        idle_terminal()
+                    };
                 match webrtc_peer::PeerConnection::new(
                     session_mode,
                     frame_tx.subscribe(),
@@ -509,8 +517,8 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                     ice_servers.clone(),
                     quality_tx.clone(),
                     cursor_tx.clone(),
-                    pty_output.clone(),
-                    pty_input_tx.clone(),
+                    pty_output,
+                    pty_input_tx,
                 )
                 .await
                 {
