@@ -302,7 +302,8 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://<PUBLIC_DOMAIN>/
 curl -sS https://<PUBLIC_DOMAIN>/api/releases/latest | head -c 120
 
 # 3. WebSocket-urile supraviețuiesc         → 101 (pasul cel mai des sărit)
-curl -sS -o /dev/null -w '%{http_code}\n' \
+#    --http1.1 este OBLIGATORIU, vezi nota de mai jos
+curl -sS --http1.1 -o /dev/null -w '%{http_code}\n' \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
   -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
   https://<PUBLIC_DOMAIN>/ws
@@ -315,9 +316,20 @@ nc -zvu <DDNS_HOST> 3478
 ```
 
 Un `101` la pasul 3 confirmă suportul WebSocket; un `200` sau `400` înseamnă că
-opțiunea e dezactivată în proxy. La pasul 5, testează cu <https://icetest.info>
-și așteaptă cel puțin un candidat `relay` — lipsa lui înseamnă că forward-urile
-UDP lipsesc.
+opțiunea e dezactivată în proxy.
+
+> **Fără `--http1.1`, pasul 3 dă un rezultat fals.** Dacă proxy-ul oferă HTTP/2,
+> curl îl negociază automat — iar mecanismul `Connection: Upgrade` nu există în
+> HTTP/2, deci antetele sunt ignorate. Cererea ajunge la signaling ca un GET
+> obișnuit, care răspunde `404 {"detail":"Not Found"}`. Arată exact ca un
+> WebSocket rupt, deși totul funcționează. Browserele nu au problema asta:
+> deschid handshake-ul peste HTTP/1.1.
+
+Un `101` urmat de un timeout al lui curl este **rezultatul corect** — conexiunea
+s-a promovat, iar curl așteaptă date pe care nimeni nu i le trimite.
+
+La pasul 5, testează cu <https://icetest.info> și așteaptă cel puțin un candidat
+`relay` — lipsa lui înseamnă că forward-urile UDP lipsesc.
 
 #### Capcane
 
