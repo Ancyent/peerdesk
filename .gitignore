@@ -12,6 +12,10 @@ android-secrets.env
 screenshots/*
 !screenshots/README.md
 
+# Manual test checklists and infra notes — local only, never published.
+# Anything meant for users goes in docs/.
+TESTS/
+
 # Local tooling / editor / OS junk — not part of the project
 .claude/
 .superpowers/
