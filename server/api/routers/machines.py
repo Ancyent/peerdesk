@@ -63,16 +63,20 @@ async def register_machine(
     return machine
 
 
-async def _account_id_for_creator(db: AsyncSession, user_id: str) -> str | None:
-    """Self-registration via API key carries no account claim, so resolve the
-    account from the key creator's own (oldest) membership — mirrors
-    routers/auth.py's _account_id_for, kept local to avoid a cross-router
-    private import."""
+async def _account_id_for_creator(db: AsyncSession, user_id: str) -> str:
+    """Fallback for API keys created before account_id was stamped on them
+    (pre-migration keys): resolve the account from the key creator's own
+    (oldest) membership — mirrors routers/auth.py's _account_id_for, kept
+    local to avoid a cross-router private import. Raises 401 rather than
+    returning None, so a creator with no membership never yields a machine
+    silently orphaned with account_id=NULL."""
     result = await db.execute(
         select(Membership).where(Membership.user_id == user_id).order_by(Membership.created_at)
     )
     membership = result.scalars().first()
-    return membership.account_id if membership else None
+    if membership is None:
+        raise HTTPException(status_code=401, detail="No account membership")
+    return membership.account_id
 
 
 @router.post("/register", response_model=MachineOut, status_code=201)
@@ -91,7 +95,7 @@ async def register_machine_via_key(
         name=body.name,
         os=body.os,
         owner_id=api_key.created_by,  # still NOT NULL until Task 7 drops the column
-        account_id=await _account_id_for_creator(db, api_key.created_by),
+        account_id=api_key.account_id or await _account_id_for_creator(db, api_key.created_by),
         created_by_id=api_key.created_by,
         api_key_id=api_key.id,
         approval_status=status,
@@ -277,37 +281,23 @@ async def set_placement(
 
     # Verify each non-None placement target belongs to the caller's account, so a
     # user cannot place their machine into another account's company/location/group.
-    # Company/Location/Group aren't behind access.py yet (Task 7); this mirrors the
-    # account_id join Task 7 will use for their own routers.
+    # Goes through access.py's visible_* helpers so Stage 2's grant condition
+    # applies here too, instead of hand-rolling the account_id filter.
     if body.company_id is not None:
         owned = await db.execute(
-            select(Company).where(
-                Company.id == body.company_id,
-                Company.account_id == membership.account_id,
-            )
+            access.visible_companies(membership).where(Company.id == body.company_id)
         )
         if not owned.scalar_one_or_none():
             raise HTTPException(403, "Company not owned by user")
     if body.location_id is not None:
         owned = await db.execute(
-            select(Location)
-            .join(Company, Location.company_id == Company.id)
-            .where(
-                Location.id == body.location_id,
-                Company.account_id == membership.account_id,
-            )
+            access.visible_locations(membership).where(Location.id == body.location_id)
         )
         if not owned.scalar_one_or_none():
             raise HTTPException(403, "Location not owned by user")
     if body.group_id is not None:
         owned = await db.execute(
-            select(Group)
-            .join(Location, Group.location_id == Location.id)
-            .join(Company, Location.company_id == Company.id)
-            .where(
-                Group.id == body.group_id,
-                Company.account_id == membership.account_id,
-            )
+            access.visible_groups(membership).where(Group.id == body.group_id)
         )
         if not owned.scalar_one_or_none():
             raise HTTPException(403, "Group not owned by user")

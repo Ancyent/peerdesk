@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import select
 from models import Account, Machine, Membership, User
+from crypto_box import encrypt_secret
 
 
 @pytest.mark.asyncio
@@ -73,3 +74,86 @@ async def test_machine_owned_by_a_different_user_in_my_account_is_visible(auth_c
 
     r2 = await auth_client.get(f"/machines/{m.id}")
     assert r2.status_code == 200
+
+
+async def _other_account_machine(db, **kwargs) -> Machine:
+    other = Account(name="Other Co")
+    db.add(other)
+    await db.flush()
+    m = Machine(
+        peer_id=kwargs.pop("peer_id"),
+        name=kwargs.pop("name", "not-yours"),
+        account_id=other.id,
+        owner_id="someone-else",
+        **kwargs,
+    )
+    db.add(m)
+    await db.commit()
+    return m
+
+
+@pytest.mark.asyncio
+async def test_approving_another_accounts_machine_returns_404(auth_client, db):
+    m = await _other_account_machine(db, peer_id="700000001")
+    r = await auth_client.post(f"/machines/{m.id}/approve")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_denying_another_accounts_machine_returns_404(auth_client, db):
+    m = await _other_account_machine(db, peer_id="700000002")
+    r = await auth_client.post(f"/machines/{m.id}/deny")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_deleting_another_accounts_machine_returns_404(auth_client, db):
+    m = await _other_account_machine(db, peer_id="700000003")
+    r = await auth_client.delete(f"/machines/{m.id}")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_placing_another_accounts_machine_returns_404(auth_client, db):
+    m = await _other_account_machine(db, peer_id="700000004")
+    r = await auth_client.patch(f"/machines/{m.id}/placement", json={"company_id": None})
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_setting_saved_password_on_another_accounts_machine_returns_404(auth_client, db):
+    m = await _other_account_machine(db, peer_id="700000005")
+    r = await auth_client.put(f"/machines/{m.id}/saved-password", json={"password": "Secret123"})
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_clearing_saved_password_on_another_accounts_machine_returns_404(auth_client, db):
+    m = await _other_account_machine(db, peer_id="700000006")
+    r = await auth_client.delete(f"/machines/{m.id}/saved-password")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_getting_saved_password_on_another_accounts_machine_returns_404(auth_client, db):
+    """The worst-case leak in this router: a saved connect password is
+    plaintext once decrypted, so this route above all must not let a caller
+    outside the machine's account reach it."""
+    m = await _other_account_machine(db, peer_id="700000007")
+    m.saved_password_enc = encrypt_secret("OtherAccountsSecret")
+    await db.commit()
+
+    r = await auth_client.get(f"/machines/{m.id}/saved-password")
+    assert r.status_code == 404
+    assert "OtherAccountsSecret" not in r.text
+
+
+@pytest.mark.asyncio
+async def test_register_machine_stamps_account_id(auth_client, db):
+    my_membership = (await db.execute(select(Membership))).scalars().first()
+    r = await auth_client.post("/machines", json={"peer_id": "700000008", "name": "PC"})
+    assert r.status_code == 201
+    machine_id = r.json()["id"]
+
+    row = (await db.execute(select(Machine).where(Machine.id == machine_id))).scalar_one()
+    assert row.account_id == my_membership.account_id

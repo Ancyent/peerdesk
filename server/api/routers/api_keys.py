@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from deps import get_db, get_current_user
-from models import User, ApiKey
+from deps import get_db, get_current_user, get_current_membership
+from models import User, ApiKey, Membership
 from schemas import ApiKeyCreate, ApiKeyOut, ApiKeyListOut
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
@@ -36,8 +36,14 @@ async def create_api_key(
     body: ApiKeyCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_membership),
 ):
-    key = ApiKey(name=body.name, auto_approve=body.auto_approve, created_by=user.id)
+    key = ApiKey(
+        name=body.name,
+        auto_approve=body.auto_approve,
+        created_by=user.id,
+        account_id=membership.account_id,
+    )
     db.add(key)
     await db.commit()
     await db.refresh(key)
