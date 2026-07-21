@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from deps import get_db, get_current_user
-from models import Company, User
+from deps import get_db, get_current_user, get_current_membership
+from models import Company, User, Membership
 from schemas import CompanyCreate, CompanyOut
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -15,8 +15,18 @@ async def list_companies(db: AsyncSession = Depends(get_db), user: User = Depend
 
 
 @router.post("", response_model=CompanyOut, status_code=201)
-async def create_company(body: CompanyCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    company = Company(name=body.name, owner_id=user.id)
+async def create_company(
+    body: CompanyCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_membership),
+):
+    # account_id is stamped here (ahead of this router's own Task 7 migration)
+    # because machines.py's placement handler already validates placement
+    # targets by Company.account_id — without this, every company created
+    # after Task 6 would be unplaceable. Task 7 still owns this router's own
+    # read/update/delete authorization (owner_id, below), unchanged here.
+    company = Company(name=body.name, owner_id=user.id, account_id=membership.account_id)
     db.add(company)
     await db.commit()
     await db.refresh(company)

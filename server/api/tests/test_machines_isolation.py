@@ -1,0 +1,75 @@
+import pytest
+from sqlalchemy import select
+from models import Account, Machine, Membership, User
+
+
+@pytest.mark.asyncio
+async def test_machines_from_another_account_are_invisible(auth_client, db):
+    other = Account(name="Other Co")
+    db.add(other)
+    await db.flush()
+    # owner_id is still NOT NULL during expand/contract — Task 7 drops it.
+    db.add(Machine(peer_id="999999999", name="not-yours", account_id=other.id, owner_id="someone-else"))
+    await db.commit()
+
+    r = await auth_client.get("/machines")
+    assert r.status_code == 200
+    assert "not-yours" not in [m["name"] for m in r.json()]
+
+
+@pytest.mark.asyncio
+async def test_fetching_another_accounts_machine_returns_404(auth_client, db):
+    other = Account(name="Other Co")
+    db.add(other)
+    await db.flush()
+    m = Machine(peer_id="888888888", name="not-yours", account_id=other.id, owner_id="someone-else")
+    db.add(m)
+    await db.commit()
+
+    r = await auth_client.get(f"/machines/{m.id}")
+    assert r.status_code == 404, "must be 404, not 403 — existence itself is private"
+
+
+@pytest.mark.asyncio
+async def test_machine_owned_by_caller_but_moved_to_another_account_is_invisible(auth_client, db):
+    """The load-bearing case for this task: authorization must key off account_id,
+    not owner_id. A machine the caller's user id still owns, but that now belongs
+    to a different account, must not be visible or reachable — proves the router
+    no longer falls back to owner_id under the hood."""
+    me = (await db.execute(select(User).where(User.email == "user@test.com"))).scalar_one()
+    other = Account(name="Other Co")
+    db.add(other)
+    await db.flush()
+    m = Machine(peer_id="777777777", name="moved-away", account_id=other.id, owner_id=me.id)
+    db.add(m)
+    await db.commit()
+
+    r = await auth_client.get("/machines")
+    assert r.status_code == 200
+    assert "moved-away" not in [x["name"] for x in r.json()]
+
+    r2 = await auth_client.get(f"/machines/{m.id}")
+    assert r2.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_machine_owned_by_a_different_user_in_my_account_is_visible(auth_client, db):
+    """The reciprocal case: a teammate's machine, registered under a different
+    user id, must be visible to me as long as it's in my account — proves the
+    router grants access by account_id rather than restricting to owner_id."""
+    me = (await db.execute(select(User).where(User.email == "user@test.com"))).scalar_one()
+    my_membership = (await db.execute(select(Membership).where(Membership.user_id == me.id))).scalar_one()
+
+    teammate = User(email="teammate@test.com", name="Teammate", password_hash="x")
+    db.add(teammate)
+    await db.flush()
+    m = Machine(peer_id="666666666", name="teammates-pc", account_id=my_membership.account_id, owner_id=teammate.id)
+    db.add(m)
+    await db.commit()
+
+    r = await auth_client.get("/machines")
+    assert r.status_code == 200
+    assert "teammates-pc" in [x["name"] for x in r.json()]
+
+    r2 = await auth_client.get(f"/machines/{m.id}")
+    assert r2.status_code == 200
