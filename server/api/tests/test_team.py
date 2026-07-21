@@ -466,3 +466,59 @@ async def test_removing_a_grant_syncs_saved_passwords(auth_client, member_client
         select(SavedConnectPassword).where(SavedConnectPassword.membership_id == membership_id)
     )).scalars().all()
     assert rows == []
+
+
+async def test_mixed_visible_and_invisible_targets_in_one_put_is_refused(auth_client, member_client, client):
+    """Every other grants test sends zero grants, one grant, or two IDENTICAL
+    grants, so _assert_targets_visible (team.py) is never called with more
+    than one distinct id or more than one target kind. A rewrite that turned
+    the per-target 404 into "404 only when nothing at all is visible" (e.g.
+    `if not found_ids:` in place of `if missing:`, or a check that only looks
+    at whether the *batch* returned anything rather than whether every id in
+    it was found) would pass the entire pre-existing suite: two visible
+    companies plus one invisible machine, in the same PUT, must still 404 --
+    the invisible machine must not be waved through just because the two
+    companies alongside it were found."""
+    _, membership_id = member_client
+    co_a = (await auth_client.post("/companies", json={"name": "A"})).json()
+    co_b = (await auth_client.post("/companies", json={"name": "B"})).json()
+
+    await client.post("/auth/register", json={
+        "email": "outsider3@test.com", "name": "Out3", "password": "Test1234!",
+    })
+    r = await client.post("/auth/login", json={"email": "outsider3@test.com", "password": "Test1234!"})
+    client.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
+    foreign_machine = (await client.post(
+        "/machines", json={"peer_id": "FFF-0001", "name": "Foreign"}
+    )).json()
+
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [
+            {"company_id": co_a["id"]},
+            {"company_id": co_b["id"]},
+            {"machine_id": foreign_machine["id"]},
+        ]},
+    )
+    assert r.status_code == 404, r.text
+
+
+async def test_put_with_two_distinct_visible_targets_returns_two_rows(auth_client, member_client):
+    """_dedup_grants (team.py) keys on the full (company_id, location_id,
+    group_id, machine_id) tuple. test_duplicate_grants_are_stored_once only
+    ever sends the SAME id twice, so a key that collapsed on something
+    coarser -- e.g. `bool(company_id)` instead of the id itself -- would
+    still pass it while silently merging two DIFFERENT companies into one
+    row. Two distinct visible companies in one PUT must come back as two
+    rows, not one."""
+    _, membership_id = member_client
+    co_a = (await auth_client.post("/companies", json={"name": "A"})).json()
+    co_b = (await auth_client.post("/companies", json={"name": "B"})).json()
+
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"company_id": co_a["id"]}, {"company_id": co_b["id"]}]},
+    )
+    assert r.status_code == 200, r.text
+    assert len(r.json()) == 2
+    assert {g["company_id"] for g in r.json()} == {co_a["id"], co_b["id"]}
