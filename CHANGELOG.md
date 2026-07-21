@@ -2,6 +2,14 @@
 
 All notable changes to PeerDesk are documented here.
 
+## [Unreleased]
+
+### Changed
+- **Accounts replace single-user ownership (internal).** Resources now belong to
+  an account rather than to one user, and every authorization check moved into a
+  single module. No behaviour changes: each existing user became the admin of
+  their own account. This is the groundwork for inviting team members.
+
 ## [0.4.33] — 2026-07-20
 
 ### Fixed
