@@ -73,7 +73,7 @@ ASYNCPG_DSN = f"postgresql://{PG_USER}:{PG_PASSWORD}@localhost:{HOST_PORT}/{PG_D
 SCOPED_TABLES = ["machines", "companies", "api_keys", "registration_tokens", "branding"]
 
 # The expected Alembic head. Bump this in the task that adds a migration.
-HEAD_REVISION = "0015"
+HEAD_REVISION = "0016"
 
 
 def _docker_available() -> bool:
@@ -480,7 +480,6 @@ def test_saved_password_column_is_gone_at_head(pg):
 
 # --- Stage 2: access_grants exactly-one-target CHECK -----------------------
 
-@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
 def test_access_grant_rejects_two_targets(pg):
     """The CHECK is the whole reason a grant cannot mean two things at once.
     A test that only inserts valid rows would pass with no constraint at all."""
@@ -500,7 +499,6 @@ def test_access_grant_rejects_two_targets(pg):
         ))
 
 
-@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
 def test_access_grant_rejects_zero_targets(pg):
     """A grant with no target grants nothing and would sit in the table forever
     looking like access somebody has."""

@@ -2,7 +2,7 @@ import uuid
 import secrets
 import string
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, ForeignKey, DateTime, Text, UniqueConstraint
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, Text, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -324,6 +324,52 @@ class ApiKey(Base):
             kwargs["is_active"] = True
         if "auto_approve" not in kwargs:
             kwargs["auto_approve"] = False
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)
+
+
+class AccessGrant(Base):
+    """One grant of access, anchored to a membership so it belongs by
+    construction to a single (person, account) pair — a grant cannot leak
+    across accounts, and that is a property of the schema rather than an
+    invariant application code has to maintain.
+
+    Exactly one target column is set. A grant with two targets has no defined
+    meaning, so the CHECK makes it impossible rather than merely unlikely.
+    """
+
+    __tablename__ = "access_grants"
+    __table_args__ = (
+        CheckConstraint(
+            "(CASE WHEN company_id  IS NULL THEN 0 ELSE 1 END + "
+            " CASE WHEN location_id IS NULL THEN 0 ELSE 1 END + "
+            " CASE WHEN group_id    IS NULL THEN 0 ELSE 1 END + "
+            " CASE WHEN machine_id  IS NULL THEN 0 ELSE 1 END) = 1",
+            name="ck_access_grant_exactly_one_target",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    membership_id: Mapped[str] = mapped_column(
+        String, ForeignKey("memberships.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Audit only — who granted this.
+    created_by_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    company_id: Mapped[str | None] = mapped_column(String, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+    location_id: Mapped[str | None] = mapped_column(String, ForeignKey("locations.id", ondelete="CASCADE"), nullable=True)
+    group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="CASCADE"), nullable=True)
+    machine_id: Mapped[str | None] = mapped_column(String, ForeignKey("machines.id", ondelete="CASCADE"), nullable=True)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        for target in ("company_id", "location_id", "group_id", "machine_id"):
+            kwargs.setdefault(target, None)
         if "created_at" not in kwargs:
             kwargs["created_at"] = utcnow()
         super().__init__(**kwargs)
