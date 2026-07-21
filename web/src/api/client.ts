@@ -107,7 +107,7 @@ export interface ApiKeyListOut {
 }
 
 export interface CompanyOut {
-  id: string; name: string; owner_id: string; created_at: string;
+  id: string; name: string; created_at: string;
 }
 export interface LocationOut {
   id: string; name: string; company_id: string; created_at: string;

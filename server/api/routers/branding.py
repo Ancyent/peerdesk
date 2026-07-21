@@ -14,28 +14,36 @@ async def _first_account_id(db: AsyncSession) -> str | None:
 
 
 async def _get_or_create(db: AsyncSession, account_id: str | None = None) -> Branding:
-    """Branding is a single, install-wide row (id=1), not per-account — there is
-    no visible_branding() in access.py because nothing filters it by account.
-    account_id is NOT NULL though, so creating the row still needs *an* account
-    to attach to: the caller's own account when known (update_branding), or
-    else the oldest account in the system (get_branding, which is public and
-    has no caller identity — same fallback migration 0013 uses for orphans).
+    """Branding is per-account: each account gets its own row, looked up by
+    account_id — not a single shared row every tenant reads and writes.
+
+    update_branding is authenticated and always passes the caller's own
+    membership.account_id, so writes only ever touch that account's row.
+
+    get_branding is public (the login page calls it before anyone is
+    authenticated), so it has no account to scope to. It falls back to the
+    oldest account's row for display purposes — the same fallback 0013 uses
+    for orphan rows — so a single-tenant deployment's login page still shows
+    whatever branding was configured. If that account has no row yet, or no
+    account exists at all (fresh install, nobody registered), in-memory
+    defaults are returned without persisting anything.
     """
-    result = await db.execute(select(Branding).where(Branding.id == 1))
+    resolved_account_id = account_id if account_id is not None else await _first_account_id(db)
+    if resolved_account_id is None:
+        # Fresh install: nobody has registered yet, so no account exists at all.
+        return Branding()
+
+    result = await db.execute(select(Branding).where(Branding.account_id == resolved_account_id))
     branding = result.scalar_one_or_none()
     if branding:
         return branding
 
-    resolved_account_id = account_id or await _first_account_id(db)
-    if resolved_account_id is None:
-        # Fresh install: nobody has registered yet, so no account exists at all.
-        # Return in-memory defaults without persisting — there is nothing valid
-        # to put in account_id yet. The row gets created for real the first
-        # time an authenticated call (e.g. registration, or update_branding)
-        # has an account to attach it to.
-        return Branding(id=1)
+    if account_id is None:
+        # Public read, and the fallback account has never configured branding.
+        # Don't create a row on its behalf — just show defaults.
+        return Branding()
 
-    branding = Branding(id=1, account_id=resolved_account_id)
+    branding = Branding(account_id=account_id)
     db.add(branding)
     await db.commit()
     await db.refresh(branding)

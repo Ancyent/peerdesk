@@ -226,3 +226,57 @@ async def test_branding_row_gets_a_real_account_id(client, db):
 
     row = (await db.execute(select(Branding).where(Branding.id == 1))).scalar_one()
     assert row.account_id is not None
+
+
+async def test_branding_is_per_account_not_cross_tenant(client, db):
+    """Two different accounts must get two independent branding rows. Writing
+    one account's branding must not affect another account's row — otherwise
+    POST /branding is a cross-tenant write (the bug: every admin after the
+    first ended up reading and mutating the first account's row)."""
+    from sqlalchemy import select
+    from models import Branding, Membership, User
+
+    r_a = await client.post("/auth/register", json={
+        "email": "tenant-a@b.com", "name": "Tenant A", "password": "pass1234"
+    })
+    token_a = r_a.json()["access_token"]
+    r_b = await client.post("/auth/register", json={
+        "email": "tenant-b@b.com", "name": "Tenant B", "password": "pass1234"
+    })
+    token_b = r_b.json()["access_token"]
+
+    r2 = await client.post("/branding",
+        json={"brand_name": "Acme A", "accent_color": "#111111"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert r2.status_code == 200
+
+    r3 = await client.post("/branding",
+        json={"brand_name": "Acme B", "accent_color": "#222222"},
+        headers={"Authorization": f"Bearer {token_b}"},
+    )
+    assert r3.status_code == 200
+
+    async def account_id_for(email: str) -> str:
+        user = (await db.execute(select(User).where(User.email == email))).scalar_one()
+        membership = (await db.execute(
+            select(Membership).where(Membership.user_id == user.id)
+        )).scalar_one()
+        return membership.account_id
+
+    account_a = await account_id_for("tenant-a@b.com")
+    account_b = await account_id_for("tenant-b@b.com")
+    assert account_a != account_b
+
+    row_a = (await db.execute(
+        select(Branding).where(Branding.account_id == account_a)
+    )).scalar_one()
+    row_b = (await db.execute(
+        select(Branding).where(Branding.account_id == account_b)
+    )).scalar_one()
+
+    assert row_a.id != row_b.id
+    assert row_a.brand_name == "Acme A"
+    assert row_a.accent_color == "#111111"
+    assert row_b.brand_name == "Acme B"
+    assert row_b.accent_color == "#222222"
