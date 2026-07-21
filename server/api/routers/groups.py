@@ -60,3 +60,8 @@ async def delete_group(group_id: str, db: AsyncSession = Depends(get_db), member
     group = await _visible_group(group_id, membership, db)
     await db.delete(group)
     await db.commit()
+
+    # AccessGrant's tree FK is ON DELETE CASCADE, so any grant directly on
+    # this group just vanished with it -- a revocation performed by the
+    # database with no sync. See access.sync_saved_passwords_for_account.
+    await access.sync_saved_passwords_for_account(db, membership.account_id)

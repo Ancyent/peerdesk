@@ -173,3 +173,25 @@ async def test_register_machine_stamps_account_id(auth_client, db):
 
     row = (await db.execute(select(Machine).where(Machine.id == machine_id))).scalar_one()
     assert row.account_id == my_membership.account_id
+
+
+@pytest.mark.asyncio
+async def test_admin_registering_a_machine_directly_lands_approved(auth_client):
+    """The admin path through POST /machines: an admin's enrollment is the
+    perimeter decision already, so it lands approved -- see
+    access.enrollment_status_for_role."""
+    r = await auth_client.post("/machines", json={"peer_id": "700000009", "name": "Admin PC"})
+    assert r.status_code == 201, r.text
+    assert r.json()["approval_status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_member_registering_a_machine_directly_lands_pending(member_client):
+    """A member may enroll a machine but not approve it, so POST /machines
+    called by a member (not just the token/redeem path) must also land
+    pending -- see access.enrollment_status_for_role and its call in
+    routers/machines.py's register_machine."""
+    client, _ = member_client
+    r = await client.post("/machines", json={"peer_id": "700000010", "name": "Member PC"})
+    assert r.status_code == 201, r.text
+    assert r.json()["approval_status"] == "pending"

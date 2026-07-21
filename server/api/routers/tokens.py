@@ -5,7 +5,10 @@ from sqlalchemy import select
 from deps import get_db, get_current_user, get_current_membership
 from models import RegistrationToken, Machine, User, ApiKey, Membership, Company, Location, Group
 from schemas import RegistrationTokenCreate, RegistrationTokenOut, TokenRedeemRequest, MachineOut, TokenRedeemResponse
-from access import assert_placement_consistent, visible_companies, visible_groups, visible_locations
+from access import (
+    assert_placement_consistent, enrollment_status_for_token, visible_companies, visible_groups,
+    visible_locations,
+)
 
 router = APIRouter(prefix="/tokens", tags=["tokens"])
 
@@ -83,12 +86,17 @@ async def redeem_token(body: TokenRedeemRequest, db: AsyncSession = Depends(get_
     machine_name = reg.name or body.name
     key = ApiKey(name=f"Agent: {machine_name}", auto_approve=True, created_by=reg.created_by, account_id=reg.account_id)
     db.add(key)
+    # This route is unauthenticated (the agent, not the enroller, calls it), so
+    # there is no caller membership to read a role off of -- the role has to be
+    # resolved from the token itself. See access.enrollment_status_for_token.
+    approval_status = await enrollment_status_for_token(db, reg)
     machine = Machine(
         peer_id=body.peer_id, name=machine_name, os=body.os,
         account_id=reg.account_id,
         created_by_id=reg.created_by,
         company_id=reg.company_id, location_id=reg.location_id, group_id=reg.group_id,
         api_key_id=key.id,
+        approval_status=approval_status,
     )
     db.add(machine)
     reg.used_at = datetime.now(timezone.utc)

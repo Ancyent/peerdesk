@@ -11,7 +11,7 @@ from sqlalchemy import Select, and_, or_, select
 
 from models import (
     AccessGrant, ApiKey, Branding, Company, Group, Invitation, Location, Machine, Membership,
-    SavedConnectPassword, User,
+    RegistrationToken, SavedConnectPassword, User,
 )
 
 
@@ -64,6 +64,43 @@ def visible_machines(membership: Membership) -> Select:
             ),
         )
     )
+
+
+def enrollment_status_for_role(role: str) -> str:
+    """What approval_status a newly-enrolled machine should get, given the
+    role of whoever enrolled it. A member may enroll a machine but not
+    approve it -- admitting a machine into the account's perimeter is a
+    decision about that perimeter, not fieldwork -- so a member's enrollment
+    lands pending and waits in the admin's approval queue (see
+    visible_machines's pending exception, which is what keeps it visible to
+    them in the meantime). An admin's enrollment is the perimeter decision
+    already, so it lands approved directly."""
+    return "approved" if role == "admin" else "pending"
+
+
+async def enrollment_status_for_token(db, reg: RegistrationToken) -> str:
+    """The same decision as enrollment_status_for_role, but for
+    POST /tokens/redeem -- an unauthenticated agent path with no caller
+    membership of its own. The role has to be resolved from the token: who
+    minted it (reg.created_by) and which account it belongs to
+    (reg.account_id). That lookup goes through this module, not
+    routers/tokens.py, like every other account_id/created_by comparison
+    here (see the module docstring and tests/test_access.py's guard test).
+
+    A token whose creator no longer holds a membership in that account (removed
+    since the token was minted) resolves to "member" -- the safer default,
+    since it leaves the machine in the approval queue rather than silently
+    admitting it.
+    """
+    result = await db.execute(
+        select(Membership).where(
+            Membership.user_id == reg.created_by,
+            Membership.account_id == reg.account_id,
+        )
+    )
+    membership = result.scalar_one_or_none()
+    role = membership.role if membership is not None else "member"
+    return enrollment_status_for_role(role)
 
 
 def visible_companies(membership: Membership) -> Select:
@@ -256,6 +293,40 @@ async def sync_saved_passwords(db, membership: Membership) -> int:
     if stale:
         await db.commit()
     return len(stale)
+
+
+async def sync_saved_passwords_for_account(db, account_id: str) -> int:
+    """Runs sync_saved_passwords for every membership in one account. Returns
+    the total number of stale rows deleted.
+
+    Some changes can shrink more than one member's visible set at once, with
+    no single target membership to resync:
+
+    - Deleting a company/location/group. AccessGrant's tree FKs are
+      ON DELETE CASCADE, so by the time the DELETE has committed, every grant
+      that pointed at the deleted node or its descendants is already gone --
+      there is nothing left to query to find out who held them.
+    - Re-placing a machine (PATCH /machines/{id}/placement) out of a
+      company/location/group. Any member granted the old node loses the
+      machine.
+
+    Pinpointing exactly which memberships were affected would mean walking
+    the subtree and cross-referencing grants *before* the delete/update
+    commits, then resyncing just that set -- more moving parts, and a second
+    place that logic could drift from visible_machines itself. At this
+    codebase's scale (a production account with a handful of members) it is
+    simpler and cheap to resync every membership in the account instead, and
+    it cannot be wrong the way a hand-computed affected-set could be:
+    sync_saved_passwords recomputes each membership's visible set from
+    scratch rather than reacting to what supposedly changed.
+    """
+    result = await db.execute(
+        select(Membership).where(Membership.account_id == account_id)
+    )
+    total = 0
+    for membership in result.scalars().all():
+        total += await sync_saved_passwords(db, membership)
+    return total
 
 
 def visible_memberships(membership: Membership) -> Select:

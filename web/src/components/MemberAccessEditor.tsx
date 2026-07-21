@@ -85,6 +85,10 @@ export function MemberAccessEditor({ membershipId }: Props) {
         Bifează companiile, locațiile sau grupurile la care acest membru are acces. Un nod bifat
         și dezactivat este inclus printr-un acces acordat mai sus în arbore (etichetat „via").
       </p>
+      <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-3)' }}>
+        Acest acces controlează ce vede și ce poate deschide membrul din dashboard — nu împiedică
+        o conexiune directă către o mașină a cărei parolă o cunoaște deja dintr-o altă sursă.
+      </p>
 
       {error && (
         <div style={{

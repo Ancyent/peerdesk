@@ -74,6 +74,11 @@ async def register_machine(
         os=body.os,
         account_id=membership.account_id,
         created_by_id=current_user.id,
+        # A member may enroll a machine but not approve it -- see
+        # access.enrollment_status_for_role and visible_machines's pending
+        # exception, which is what keeps this visible to a member who just
+        # registered it.
+        approval_status=access.enrollment_status_for_role(membership.role),
     )
     db.add(machine)
     await db.commit()
@@ -373,4 +378,11 @@ async def set_placement(
     machine.group_id = body.group_id
     await db.commit()
     await db.refresh(machine)
+
+    # Moving a machine out of a granted company/location/group removes it
+    # from every member granted that old node -- see
+    # access.sync_saved_passwords_for_account for why this resyncs the whole
+    # account rather than a computed affected set.
+    await access.sync_saved_passwords_for_account(db, membership.account_id)
+
     return await _to_machine_out(db, membership, machine)

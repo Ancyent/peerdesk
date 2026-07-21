@@ -168,6 +168,12 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
     );
 
   const trailing = (type: NodeType, id: string, name: string) => {
+    // Add/rename/delete are destructive tree edits. In selectable mode
+    // (the per-member access editor) the caller is choosing WHAT a member
+    // can see, not managing the org tree -- rendering them here would put a
+    // hover-away delete button one misclick from cascading a company's
+    // locations and groups while someone is just trying to grant access.
+    if (selectable) return badge(id);
     if (confirmDelete && confirmDelete.type === type && confirmDelete.id === id) {
       return (
         <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 10 }} onClick={e => e.stopPropagation()}>

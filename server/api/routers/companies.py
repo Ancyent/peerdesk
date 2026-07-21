@@ -53,3 +53,9 @@ async def delete_company(company_id: str, db: AsyncSession = Depends(get_db), me
         raise HTTPException(404, "Company not found")
     await db.delete(company)
     await db.commit()
+
+    # AccessGrant's tree FKs are ON DELETE CASCADE, so every grant on this
+    # company or its locations/groups just vanished with it -- a revocation
+    # performed by the database with no sync. See
+    # access.sync_saved_passwords_for_account.
+    await access.sync_saved_passwords_for_account(db, membership.account_id)

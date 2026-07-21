@@ -54,3 +54,8 @@ async def delete_location(location_id: str, db: AsyncSession = Depends(get_db), 
         raise HTTPException(404, "Location not found")
     await db.delete(loc)
     await db.commit()
+
+    # AccessGrant's tree FKs are ON DELETE CASCADE, so every grant on this
+    # location or its groups just vanished with it -- a revocation performed
+    # by the database with no sync. See access.sync_saved_passwords_for_account.
+    await access.sync_saved_passwords_for_account(db, membership.account_id)

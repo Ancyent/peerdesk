@@ -16,6 +16,11 @@ async def _grant_machine(db, membership_id, machine_id):
     await db.commit()
 
 
+async def _grant_company(db, membership_id, company_id):
+    db.add(AccessGrant(membership_id=membership_id, company_id=company_id))
+    await db.commit()
+
+
 async def _reload(db, membership_id):
     return (await db.execute(
         select(Membership).where(Membership.id == membership_id)
@@ -167,3 +172,146 @@ async def test_set_placement_reports_the_callers_saved_password(auth_client, db)
 
     assert r.status_code == 200, r.text
     assert r.json()["has_saved_password"] is True
+
+
+# --- Finding 2: sync_saved_passwords was missing from paths that shrink
+# access out from under a member without ever calling it. Each of these was
+# a genuine revocation -- a grant moved or vanished -- that used to leave the
+# member's stored credential live, ready to resurrect the moment the machine
+# or node came back. ---
+
+
+async def test_moving_a_machine_out_of_a_granted_company_deletes_the_saved_password(
+    auth_client, member_client, db,
+):
+    """set_placement moving a machine out of a granted company must revoke
+    every member granted that company, the same as any other access change
+    -- see access.sync_saved_passwords_for_account and its call in
+    routers/machines.py's set_placement."""
+    client, membership_id = member_client
+    company_a = (await auth_client.post("/companies", json={"name": "A"})).json()["id"]
+    company_b = (await auth_client.post("/companies", json={"name": "B"})).json()["id"]
+    machine_id = (await auth_client.post(
+        "/machines", json={"peer_id": "III-1001", "name": "M"}
+    )).json()["id"]
+    await auth_client.patch(f"/machines/{machine_id}/placement", json={"company_id": company_a})
+    await _grant_company(db, membership_id, company_a)
+    await client.put(f"/machines/{machine_id}/saved-password", json={"password": "member-pw"})
+    assert (await client.get(f"/machines/{machine_id}/saved-password")).status_code == 200
+
+    r = await auth_client.patch(f"/machines/{machine_id}/placement", json={"company_id": company_b})
+    assert r.status_code == 200, r.text
+
+    remaining = (await db.execute(
+        select(SavedConnectPassword).where(SavedConnectPassword.membership_id == membership_id)
+    )).scalars().all()
+    assert remaining == []
+
+
+# The three delete tests below prove wiring (the router calls
+# access.sync_saved_passwords_for_account) rather than exercising the actual
+# cascade end-to-end. AccessGrant's tree FKs are ON DELETE CASCADE, enforced
+# by Postgres (production) but NOT by SQLite (what this whole suite runs
+# against, and deliberately so -- see the note below). Under SQLite, deleting
+# the company/location/group here would leave the AccessGrant row dangling
+# instead of cascading away, so a real end-to-end assertion ("the saved
+# password is gone") would pass or fail for the wrong reason depending on a
+# database quirk unrelated to the code under test. sync_saved_passwords_for_
+# account's own cleanup logic (given a grant that is actually gone) is
+# already proven directly by test_revoking_the_grant_deletes_the_members_copy
+# above; what these three need to prove is narrower and DB-independent: that
+# the router calls it at all.
+#
+# (Enabling `PRAGMA foreign_keys=ON` for the test engine was tried and
+# reverted -- it surfaced 27 unrelated failures across test_grants.py and
+# elsewhere, because SQLAlchemy's unit-of-work only orders inserts across
+# mapper pairs that have a declared `relationship()`; Machine's placement
+# columns are plain ForeignKey columns with none, so nothing orders
+# Company/Location/Group inserts ahead of Machine inserts without an
+# explicit intermediate flush(). Fixing that suite-wide is a real
+# improvement but a separate, larger change, and this pass gates a
+# production deploy -- not the moment to take on that blast radius.)
+
+
+async def _spy_sync(monkeypatch):
+    """Replaces access.sync_saved_passwords_for_account with a spy that
+    records its account_id argument and does nothing else. Patched on the
+    `access` module object itself (not the routers' `import access` names)
+    so every router that does `access.sync_saved_passwords_for_account(...)`
+    picks it up, matching how they actually call it."""
+    import access as access_module
+    calls = []
+
+    async def fake(db_arg, account_id):
+        calls.append(account_id)
+        return 0
+
+    monkeypatch.setattr(access_module, "sync_saved_passwords_for_account", fake)
+    return calls
+
+
+async def _account_id_of(db, membership_id):
+    membership = (await db.execute(
+        select(Membership).where(Membership.id == membership_id)
+    )).scalar_one()
+    return membership.account_id
+
+
+async def test_deleting_a_company_syncs_saved_passwords_for_the_account(
+    auth_client, member_client, db, monkeypatch,
+):
+    """AccessGrant's company_id FK is ON DELETE CASCADE, so deleting the
+    company silently deletes every grant on it in production -- a revocation
+    performed by the database with no sync unless delete_company calls
+    access.sync_saved_passwords_for_account itself (see
+    routers/companies.py)."""
+    _, membership_id = member_client
+    calls = await _spy_sync(monkeypatch)
+    account_id = await _account_id_of(db, membership_id)
+    company_id = (await auth_client.post("/companies", json={"name": "Co"})).json()["id"]
+
+    r = await auth_client.delete(f"/companies/{company_id}")
+
+    assert r.status_code == 204, r.text
+    assert calls == [account_id]
+
+
+async def test_deleting_a_location_syncs_saved_passwords_for_the_account(
+    auth_client, member_client, db, monkeypatch,
+):
+    """Same as the company case, one level down the tree -- see
+    routers/locations.py's delete_location."""
+    _, membership_id = member_client
+    company_id = (await auth_client.post("/companies", json={"name": "Co"})).json()["id"]
+    location_id = (await auth_client.post(
+        f"/companies/{company_id}/locations", json={"name": "HQ"}
+    )).json()["id"]
+    calls = await _spy_sync(monkeypatch)
+    account_id = await _account_id_of(db, membership_id)
+
+    r = await auth_client.delete(f"/locations/{location_id}")
+
+    assert r.status_code == 204, r.text
+    assert calls == [account_id]
+
+
+async def test_deleting_a_group_syncs_saved_passwords_for_the_account(
+    auth_client, member_client, db, monkeypatch,
+):
+    """Same again, at the bottom of the tree -- see routers/groups.py's
+    delete_group."""
+    _, membership_id = member_client
+    company_id = (await auth_client.post("/companies", json={"name": "Co"})).json()["id"]
+    location_id = (await auth_client.post(
+        f"/companies/{company_id}/locations", json={"name": "HQ"}
+    )).json()["id"]
+    group_id = (await auth_client.post(
+        f"/locations/{location_id}/groups", json={"name": "IT"}
+    )).json()["id"]
+    calls = await _spy_sync(monkeypatch)
+    account_id = await _account_id_of(db, membership_id)
+
+    r = await auth_client.delete(f"/groups/{group_id}")
+
+    assert r.status_code == 204, r.text
+    assert calls == [account_id]

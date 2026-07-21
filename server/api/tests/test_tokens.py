@@ -114,6 +114,101 @@ async def test_token_requires_auth(client):
 
 
 @pytest.mark.asyncio
+async def test_member_minted_token_redeems_to_pending(member_client, client):
+    """A member may enroll a machine but not approve it (see access.
+    enrollment_status_for_role): the machine a member's token redeems into
+    must land pending, not approved. redeem_token has no caller membership of
+    its own -- it's an unauthenticated agent path -- so it has to resolve the
+    enroller's role from the token's stored created_by/account_id (see
+    access.enrollment_status_for_token)."""
+    m_client, _ = member_client
+    token_val = (await m_client.post("/tokens", json={})).json()["token"]
+    r = await client.post("/tokens/redeem", json={
+        "token": token_val, "peer_id": "500000001", "name": "Member-PC", "os": "linux",
+    })
+    assert r.status_code == 201, r.text
+    assert r.json()["approval_status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_admin_minted_token_redeems_to_approved(auth_client, client):
+    """The mirror of test_member_minted_token_redeems_to_pending: an admin's
+    enrollment is the perimeter decision already, so it lands approved."""
+    token_val = (await auth_client.post("/tokens", json={})).json()["token"]
+    r = await client.post("/tokens/redeem", json={
+        "token": token_val, "peer_id": "500000002", "name": "Admin-PC", "os": "linux",
+    })
+    assert r.status_code == 201, r.text
+    assert r.json()["approval_status"] == "approved"
+
+
+async def _second_member(db, auth_client, email):
+    """Registers and returns an authenticated client for a second plain
+    member of the same account auth_client administers -- the same recipe
+    conftest.py's member_client fixture uses, inlined here because this test
+    needs two independent members rather than the one member_client gives."""
+    from httpx import AsyncClient, ASGITransport
+    from sqlalchemy import select as _select
+    from models import Membership as _Membership, User as _User
+    from main import app as _app
+    from deps import get_db as _get_db
+
+    admin_user = (await db.execute(
+        _select(_User).where(_User.email == "user@test.com")
+    )).scalar_one()
+    admin_mem = (await db.execute(
+        _select(_Membership).where(_Membership.user_id == admin_user.id)
+    )).scalar_one()
+
+    async def override():
+        yield db
+    _app.dependency_overrides[_get_db] = override
+
+    c = AsyncClient(transport=ASGITransport(app=_app), base_url="http://test")
+    await c.post("/auth/register", json={"email": email, "name": "M2", "password": "Test1234!"})
+    user = (await db.execute(_select(_User).where(_User.email == email))).scalar_one()
+    mem = _Membership(user_id=user.id, account_id=admin_mem.account_id, role="member")
+    db.add(mem)
+    await db.commit()
+
+    r = await c.post("/auth/login", json={"email": email, "password": "Test1234!"})
+    r2 = await c.post(
+        "/auth/switch-account",
+        json={"account_id": admin_mem.account_id},
+        headers={"Authorization": f"Bearer {r.json()['access_token']}"},
+    )
+    c.headers["Authorization"] = f"Bearer {r2.json()['access_token']}"
+    return c
+
+
+@pytest.mark.asyncio
+async def test_members_own_pending_enrollment_visible_only_to_them(auth_client, member_client, client, db):
+    """End-to-end version of access.py's
+    test_member_sees_own_pending_enrollment_without_a_grant /
+    test_member_does_not_see_someone_elses_pending_enrollment, exercised
+    through the real token -> redeem -> list path rather than a hand-built
+    Machine row. A second member in the same account must not see the first
+    member's pending enrollment; the enroller must."""
+    m_client, _ = member_client
+    other_client = await _second_member(db, auth_client, "member2@test.com")
+
+    token_val = (await m_client.post("/tokens", json={})).json()["token"]
+    r = await client.post("/tokens/redeem", json={
+        "token": token_val, "peer_id": "500000003", "name": "Member-PC-2", "os": "linux",
+    })
+    assert r.status_code == 201, r.text
+    machine_id = r.json()["id"]
+    assert r.json()["approval_status"] == "pending"
+
+    mine = await m_client.get("/machines")
+    assert machine_id in [m["id"] for m in mine.json()]
+
+    theirs = await other_client.get("/machines")
+    assert machine_id not in [m["id"] for m in theirs.json()]
+    await other_client.aclose()
+
+
+@pytest.mark.asyncio
 async def test_redeem_issues_working_api_key(auth_client, db):
     r = await auth_client.post("/tokens", json={})
     assert r.status_code == 201, r.text
