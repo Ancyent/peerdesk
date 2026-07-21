@@ -341,6 +341,37 @@ async def test_put_grants_replaces_the_whole_set(auth_client, member_client):
     assert [g["company_id"] for g in r.json()] == [co_b["id"]]
 
 
+async def test_duplicate_grants_are_stored_once(auth_client, member_client):
+    """`{"grants": [{"company_id": X}, {"company_id": X}]}` is harmless for
+    access (grants are a union) but wrong for an endpoint whose contract is
+    "this is the desired state": GET should not hand back two rows that mean
+    the same thing."""
+    _, membership_id = member_client
+    co = (await auth_client.post("/companies", json={"name": "Co"})).json()
+
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"company_id": co["id"]}, {"company_id": co["id"]}]},
+    )
+    assert r.status_code == 200, r.text
+    assert [g["company_id"] for g in r.json()] == [co["id"]]
+
+    listed = (await auth_client.get(f"/team/members/{membership_id}/grants")).json()
+    assert [g["company_id"] for g in listed] == [co["id"]]
+
+
+async def test_grants_over_the_bound_are_refused(auth_client, member_client):
+    """GrantsIn.grants is bounded (Field(max_length=500)) so one PUT can't
+    force the endpoint into an unbounded number of visibility-check round
+    trips while holding the per-member row lock for the duration."""
+    _, membership_id = member_client
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"machine_id": f"m-{i}"} for i in range(501)]},
+    )
+    assert r.status_code == 422, r.text
+
+
 async def test_grant_with_two_targets_is_refused(auth_client, member_client):
     """Rejected at the API boundary with a 422 rather than reaching the CHECK
     constraint and surfacing as a 500."""
@@ -348,6 +379,20 @@ async def test_grant_with_two_targets_is_refused(auth_client, member_client):
     r = await auth_client.put(
         f"/team/members/{membership_id}/grants",
         json={"grants": [{"company_id": "co-1", "machine_id": "mach-1"}]},
+    )
+    assert r.status_code == 422, r.text
+
+
+async def test_grant_with_zero_targets_is_refused(auth_client, member_client):
+    """The other half of exactly_one_target: `sum(...) != 1` also rejects
+    zero targets, not just two. Nothing else pinned that -- relaxing the
+    validator to `> 1` still passes every other grants test, and a grant
+    with no target would insert a row that holds no access but still shows
+    up in GET as though the member has something."""
+    _, membership_id = member_client
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{}]},
     )
     assert r.status_code == 422, r.text
 
@@ -375,6 +420,31 @@ async def test_member_cannot_edit_grants(member_client):
     client, membership_id = member_client
     r = await client.put(f"/team/members/{membership_id}/grants", json={"grants": []})
     assert r.status_code == 403
+
+
+async def test_member_cannot_list_grants(member_client):
+    """GET was never exercised for the member-403 case -- only PUT was."""
+    client, membership_id = member_client
+    r = await client.get(f"/team/members/{membership_id}/grants")
+    assert r.status_code == 403
+
+
+async def test_admin_cannot_list_another_accounts_grants(auth_client, client, db):
+    """GET was never exercised for the cross-account-404 case -- only PUT
+    was. Same isolation as test_admin_cannot_touch_another_accounts_membership,
+    pinned for the grants route specifically."""
+    await client.post("/auth/register", json={
+        "email": "outsider2@test.com", "name": "Out2", "password": "Test1234!",
+    })
+    outsider = (await db.execute(
+        select(User).where(User.email == "outsider2@test.com")
+    )).scalar_one()
+    foreign_mem = (await db.execute(
+        select(Membership).where(Membership.user_id == outsider.id)
+    )).scalar_one()
+
+    r = await auth_client.get(f"/team/members/{foreign_mem.id}/grants")
+    assert r.status_code == 404, r.text
 
 
 async def test_removing_a_grant_syncs_saved_passwords(auth_client, member_client, db):

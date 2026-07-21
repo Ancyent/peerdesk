@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class UserRegister(BaseModel):
@@ -312,7 +312,11 @@ class GrantIn(BaseModel):
 
 
 class GrantsIn(BaseModel):
-    grants: list[GrantIn]
+    # Bounded so a single PUT can't force the endpoint into an unbounded
+    # number of visibility-check round trips or hold the per-member row lock
+    # (see set_grants in routers/team.py) for an unbounded stretch. 500 is
+    # far above any real admin's use of the UI.
+    grants: list[GrantIn] = Field(max_length=500)
 
 
 class GrantOut(BaseModel):

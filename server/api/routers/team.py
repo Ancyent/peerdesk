@@ -22,7 +22,7 @@ from access import (
 from deps import get_current_membership, get_current_user, get_db
 from models import AccessGrant, Company, Group, Invitation, Location, Machine, Membership, User
 from schemas import (
-    GrantOut, GrantsIn, InvitationCreate, InvitationCreatedOut, InvitationOut,
+    GrantIn, GrantOut, GrantsIn, InvitationCreate, InvitationCreatedOut, InvitationOut,
     TeamMemberOut, TeamMemberRoleUpdate,
 )
 
@@ -152,25 +152,54 @@ async def list_grants(
     assert_admin(membership)
     target = await get_membership_in_account(db, membership, membership_id)
     result = await db.execute(
-        select(AccessGrant).where(AccessGrant.membership_id == target.id)
+        select(AccessGrant)
+        .where(AccessGrant.membership_id == target.id)
+        .order_by(AccessGrant.id)
     )
     return list(result.scalars().all())
 
 
-async def _assert_target_visible(db: AsyncSession, membership: Membership, grant) -> None:
-    """The target id is caller-supplied. 404, not 403 -- an admin must not learn
-    that another tenant's company exists from the response code."""
-    checks = (
-        (grant.company_id, visible_companies, Company),
-        (grant.location_id, visible_locations, Location),
-        (grant.group_id, visible_groups, Group),
-        (grant.machine_id, visible_machines, Machine),
-    )
-    for target_id, visible, model in checks:
-        if target_id is None:
+def _dedup_grants(grants: list[GrantIn]) -> list[GrantIn]:
+    """Collapses identical grants (same single target) to one row. Grants are
+    a union for access purposes, so a duplicate is harmless there, but the
+    endpoint's contract is "this is the desired state" and GET should not
+    hand back two rows that mean the same thing."""
+    seen: set[tuple[str | None, str | None, str | None, str | None]] = set()
+    deduped = []
+    for grant in grants:
+        key = (grant.company_id, grant.location_id, grant.group_id, grant.machine_id)
+        if key in seen:
             continue
-        found = await db.execute(visible(membership).where(model.id == target_id))
-        if found.scalar_one_or_none() is None:
+        seen.add(key)
+        deduped.append(grant)
+    return deduped
+
+
+async def _assert_targets_visible(db: AsyncSession, membership: Membership, grants: list[GrantIn]) -> None:
+    """The target ids are caller-supplied. 404, not 403 -- an admin must not
+    learn that another tenant's company/location/group/machine exists from
+    the response code.
+
+    Batched into one IN query per target kind rather than one query per
+    grant: with the per-grant version, a PUT with N grants ran N sequential
+    round trips, each one held open inside the same transaction that also
+    holds the membership row lock acquired in set_grants (see there) for the
+    whole request.
+    """
+    checks = (
+        (lambda g: g.company_id, visible_companies, Company),
+        (lambda g: g.location_id, visible_locations, Location),
+        (lambda g: g.group_id, visible_groups, Group),
+        (lambda g: g.machine_id, visible_machines, Machine),
+    )
+    for target_id_of, visible, model in checks:
+        target_ids = {target_id_of(g) for g in grants if target_id_of(g) is not None}
+        if not target_ids:
+            continue
+        found = await db.execute(visible(membership).where(model.id.in_(target_ids)))
+        found_ids = {row.id for row in found.scalars().all()}
+        missing = target_ids - found_ids
+        if missing:
             raise HTTPException(404, "Grant target not found")
 
 
@@ -191,16 +220,49 @@ async def set_grants(
     assert_admin(membership)
     target = await get_membership_in_account(db, membership, membership_id)
 
-    for grant in body.grants:
-        await _assert_target_visible(db, membership, grant)
+    grants = _dedup_grants(body.grants)
+    await _assert_targets_visible(db, membership, grants)
+
+    # Row-lock the membership for the rest of this transaction, BEFORE
+    # reading the existing grant set. Without this, two concurrent PUTs to
+    # the same member both SELECT the same pre-commit snapshot; the loser's
+    # DELETE then matches zero rows once it re-evaluates after the winner
+    # commits (it was deleting by primary key, and the winner's new rows
+    # were never in the loser's snapshot to delete). AccessGrant has no
+    # version_id_col, so SQLAlchemy treats that zero-rows-matched mismatch as
+    # a warning, not a StaleDataError -- the loser's request still returns
+    # 200, having merged its insert into the winner's set instead of
+    # replacing it. The reachable bad state is therefore "union of both
+    # admins' intents", not an empty grant set -- and critically, an admin
+    # who PUT `{"grants": []}` to revoke a member can have that revocation
+    # silently undone by an unrelated concurrent edit. Locking the row here
+    # forces the second transaction's read to wait until the first commits,
+    # so it starts from the true post-commit state instead of a stale one.
+    #
+    # A plain `DELETE ... WHERE membership_id = ...` in place of the ORM
+    # delete below would NOT fix this on its own: under READ COMMITTED a
+    # bulk DELETE still takes its own snapshot at statement start and can
+    # still miss a concurrent transaction's not-yet-committed inserts. The
+    # lock has to come first.
+    #
+    # `.with_for_update()` is a documented no-op on SQLite, which is what the
+    # unit suite runs against, so no unit test exercises this line's actual
+    # locking behavior -- see task-5-report.md for how it was verified
+    # instead (a real two-connection Postgres check, plus reasoning about
+    # what the lock guarantees).
+    await db.execute(
+        select(Membership.id).where(Membership.id == target.id).with_for_update()
+    )
 
     existing = (await db.execute(
-        select(AccessGrant).where(AccessGrant.membership_id == target.id)
+        select(AccessGrant)
+        .where(AccessGrant.membership_id == target.id)
+        .order_by(AccessGrant.id)
     )).scalars().all()
     for row in existing:
         await db.delete(row)
 
-    for grant in body.grants:
+    for grant in grants:
         db.add(AccessGrant(
             membership_id=target.id,
             created_by_id=user.id,
@@ -216,6 +278,8 @@ async def set_grants(
     await sync_saved_passwords(db, target)
 
     result = await db.execute(
-        select(AccessGrant).where(AccessGrant.membership_id == target.id)
+        select(AccessGrant)
+        .where(AccessGrant.membership_id == target.id)
+        .order_by(AccessGrant.id)
     )
     return list(result.scalars().all())
