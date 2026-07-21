@@ -40,19 +40,38 @@ def test_no_router_builds_its_own_account_filter():
     The old version of this test grepped for the literal `owner_id` only --
     a column that no longer exists -- so it passed while api_keys.py was
     filtering on created_by by hand.
+
+    A later version matched `\\s*==` but exempted any line containing the
+    substring "account_id=" (etc) -- meant to whitelist constructor kwargs
+    like `Machine(account_id=...)`. Because `\\s*` allows zero whitespace,
+    `account_id==x` (no space around the operator) itself CONTAINS the
+    substring "account_id=", so the exemption swallowed the very comparison
+    it was supposed to catch. `account_id == x` (with a space) was the only
+    spelling that still tripped it. This version distinguishes assignment
+    from comparison by matching the operator tokens directly (`==`, `!=`,
+    `.in_(`, `.is_(`, `.isnot(`, or a `filter_by(...)` kwarg) instead of by
+    excluding a substring -- a bare `=` can never match a `==`/`!=` token
+    regex, so no exemption list is needed at all.
     """
     import pathlib
     import re
 
     routers_dir = pathlib.Path(__file__).parent.parent / "routers"
-    # Creation sites legitimately assign these; they do not filter on them.
-    ALLOWED = {"account_id=", "created_by=", "created_by_id="}
-    pattern = re.compile(r"(account_id|created_by|created_by_id)\s*==")
+    columns = r"(?:account_id|created_by_id|created_by)"
+    # A hand-built comparison against one of the authorization columns, in any
+    # of SQLAlchemy's spellings: ==, !=, .in_(...), .is_(...), .isnot(...),
+    # or the `filter_by(col=...)` kwarg form (filter_by's `=` is a comparison,
+    # not an assignment, despite looking like one).
+    patterns = [
+        re.compile(rf"\b{columns}\s*(==|!=)"),
+        re.compile(rf"\b{columns}\.(in_|is_|isnot)\("),
+        re.compile(rf"filter_by\([^)]*\b{columns}\s*=(?!=)"),
+    ]
 
     offenders = []
-    for path in sorted(routers_dir.glob("*.py")):
+    for path in sorted(routers_dir.rglob("*.py")):
         for lineno, line in enumerate(path.read_text().splitlines(), 1):
-            if pattern.search(line) and not any(a in line for a in ALLOWED):
+            if any(p.search(line) for p in patterns):
                 offenders.append(f"{path.name}:{lineno}: {line.strip()}")
 
     assert not offenders, (

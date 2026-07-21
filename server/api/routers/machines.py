@@ -307,33 +307,11 @@ async def set_placement(
 
     # The three columns are denormalized precisely so visible_machines can match
     # a grant with a single OR and no recursive walk (see access.py). That only
-    # holds if the three describe one consistent path down the tree: a machine
-    # placed with group_id set while company_id is NULL or points at a
-    # different company would be invisible to a grant on the company that
-    # actually contains it, or matched by the wrong grant. Enforce the
-    # invariant here, at the only place placement is written, instead of
-    # teaching visible_machines to walk the tree.
-    if body.group_id is not None:
-        row = (
-            await db.execute(
-                select(Group.location_id, Location.company_id)
-                .join(Location, Group.location_id == Location.id)
-                .where(Group.id == body.group_id)
-            )
-        ).first()
-        group_location_id, group_company_id = row
-        if body.location_id != group_location_id or body.company_id != group_company_id:
-            raise HTTPException(
-                400, "placement is inconsistent: group_id does not belong to location_id/company_id"
-            )
-    elif body.location_id is not None:
-        location_company_id = (
-            await db.execute(select(Location.company_id).where(Location.id == body.location_id))
-        ).scalar_one()
-        if body.company_id != location_company_id:
-            raise HTTPException(
-                400, "placement is inconsistent: location_id does not belong to company_id"
-            )
+    # holds if the three describe one consistent path down the tree. Enforced
+    # here, at one of the two places placement is written (create_token in
+    # tokens.py is the other), via the shared helper in access.py so the two
+    # call sites cannot drift.
+    await access.assert_placement_consistent(db, body.company_id, body.location_id, body.group_id)
 
     machine.company_id = body.company_id
     machine.location_id = body.location_id

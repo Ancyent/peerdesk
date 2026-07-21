@@ -188,3 +188,42 @@ def assert_in_account(membership: Membership, machine: Machine) -> None:
     """404, not 403 — a caller must not learn that a machine they cannot reach exists."""
     if machine.account_id != membership.account_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Machine not found")
+
+
+async def assert_placement_consistent(db, company_id, location_id, group_id) -> None:
+    """The three placement columns must describe one consistent path down the
+    tree: company_id/location_id/group_id all naming the same branch. This is
+    what makes visible_machines's single OR over the denormalized columns sound
+    (see visible_machines) — a machine placed with group_id set while
+    company_id/location_id are NULL or point elsewhere would be invisible to a
+    grant on the company that actually contains it, or matched by the wrong
+    grant.
+
+    This is the one place the invariant is checked, called from both
+    set_placement (PATCH /machines/{id}/placement) and create_token
+    (POST /tokens) — the two writers of these columns — so it can never drift
+    between them.
+    """
+    if group_id is not None:
+        row = (
+            await db.execute(
+                select(Group.location_id, Location.company_id)
+                .join(Location, Group.location_id == Location.id)
+                .where(Group.id == group_id)
+            )
+        ).first()
+        if row is None:
+            raise HTTPException(400, "placement is inconsistent: group_id does not exist")
+        group_location_id, group_company_id = row
+        if location_id != group_location_id or company_id != group_company_id:
+            raise HTTPException(
+                400, "placement is inconsistent: group_id does not belong to location_id/company_id"
+            )
+    elif location_id is not None:
+        location_company_id = (
+            await db.execute(select(Location.company_id).where(Location.id == location_id))
+        ).scalar_one_or_none()
+        if location_company_id is None or company_id != location_company_id:
+            raise HTTPException(
+                400, "placement is inconsistent: location_id does not belong to company_id"
+            )

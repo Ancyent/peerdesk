@@ -5,7 +5,7 @@ from sqlalchemy import select
 from deps import get_db, get_current_user, get_current_membership
 from models import RegistrationToken, Machine, User, ApiKey, Membership, Company, Location, Group
 from schemas import RegistrationTokenCreate, RegistrationTokenOut, TokenRedeemRequest, MachineOut, TokenRedeemResponse
-from access import visible_companies, visible_groups, visible_locations
+from access import assert_placement_consistent, visible_companies, visible_groups, visible_locations
 
 router = APIRouter(prefix="/tokens", tags=["tokens"])
 
@@ -22,6 +22,14 @@ async def create_token(
     # redeem_token then stamps it onto the machine, planting a foreign tree
     # reference. For a member this also confines enrollment to their own subtree.
     await _assert_placement_visible(db, membership, body)
+
+    # Each id was just confirmed visible individually; also confirm the three
+    # describe one consistent path down the tree. Without this, an admin could
+    # mint a token with e.g. company_id=A and group_id=G where G actually lives
+    # under company B — both visible to them individually — and redeem_token
+    # would stamp that inconsistent triple straight onto the new machine,
+    # reopening the exact defect set_placement's check exists to close.
+    await assert_placement_consistent(db, body.company_id, body.location_id, body.group_id)
 
     reg = RegistrationToken(
         created_by=user.id,

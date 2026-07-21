@@ -57,6 +57,57 @@ async def test_redeem_invalid(client):
 
 
 @pytest.mark.asyncio
+async def test_create_token_rejects_inconsistent_placement(auth_client):
+    """The three placement columns must describe one consistent path down the
+    tree (see access.assert_placement_consistent) -- visible_machines matches
+    them independently with an OR, so an inconsistent triple would be
+    invisible to the grant that should cover it, or matched by the wrong one.
+    Without this check at issue time, an admin could mint a token with a
+    group_id that doesn't belong to the given company_id/location_id, and
+    redeem_token would stamp that inconsistent triple straight onto the new
+    machine -- the exact shape set_placement rejects, reachable through a path
+    members are allowed to use."""
+    co = (await auth_client.post("/companies", json={"name": "Real Co"})).json()
+    other_co = (await auth_client.post("/companies", json={"name": "Wrong Co"})).json()
+    loc = (await auth_client.post(f"/companies/{co['id']}/locations", json={"name": "HQ"})).json()
+    grp = (await auth_client.post(f"/locations/{loc['id']}/groups", json={"name": "IT"})).json()
+
+    # group_id's real company is `co`, but company_id claims `other_co`.
+    r = await auth_client.post("/tokens", json={
+        "company_id": other_co["id"], "location_id": loc["id"], "group_id": grp["id"],
+    })
+    assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+
+    # Same bug, minimal form: group_id set, location_id/company_id both left NULL.
+    r2 = await auth_client.post("/tokens", json={"group_id": grp["id"]})
+    assert r2.status_code == 400, f"expected 400, got {r2.status_code}: {r2.text}"
+
+
+@pytest.mark.asyncio
+async def test_create_token_accepts_consistent_placement(auth_client, client):
+    """The mirror of test_create_token_rejects_inconsistent_placement: a full,
+    correct company_id/location_id/group_id triple is still accepted, and the
+    redeemed machine carries that same consistent placement through."""
+    co = (await auth_client.post("/companies", json={"name": "Real Co"})).json()
+    loc = (await auth_client.post(f"/companies/{co['id']}/locations", json={"name": "HQ"})).json()
+    grp = (await auth_client.post(f"/locations/{loc['id']}/groups", json={"name": "IT"})).json()
+
+    r = await auth_client.post("/tokens", json={
+        "company_id": co["id"], "location_id": loc["id"], "group_id": grp["id"],
+    })
+    assert r.status_code == 201, r.text
+    token_val = r.json()["token"]
+
+    r2 = await client.post("/tokens/redeem", json={
+        "token": token_val, "peer_id": "444444444", "name": "PC-04", "os": "linux",
+    })
+    assert r2.status_code == 201, r2.text
+    assert r2.json()["company_id"] == co["id"]
+    assert r2.json()["location_id"] == loc["id"]
+    assert r2.json()["group_id"] == grp["id"]
+
+
+@pytest.mark.asyncio
 async def test_token_requires_auth(client):
     r = await client.post("/tokens", json={})
     assert r.status_code == 403
