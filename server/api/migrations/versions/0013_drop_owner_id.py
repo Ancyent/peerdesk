@@ -33,6 +33,14 @@ def upgrade() -> None:
     # than leave the column un-tightenable -- unlike in 0012, where the
     # column was still nullable and deleting would have been unrecoverable.
     op.execute("DELETE FROM branding WHERE account_id IS NULL")
+    # The old app code always inserted branding with an explicit id=1 (a
+    # single shared singleton row), so branding_id_seq's nextval() was never
+    # called on any real deployment and still sits at its initial value.
+    # Branding is now per-account, so the second account to POST /branding
+    # inserts without an explicit id -- Postgres calls nextval(), gets 1, and
+    # collides with the surviving id=1 row (branding_pkey IntegrityError).
+    # Resync the sequence to the current max id so new inserts get fresh ids.
+    op.execute("SELECT setval('branding_id_seq', (SELECT COALESCE(MAX(id), 1) FROM branding))")
     # Every router sets account_id now, so the column can finally be required.
     for table in SCOPED:
         op.alter_column(table, "account_id", nullable=False)
