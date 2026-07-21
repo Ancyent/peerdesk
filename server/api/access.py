@@ -7,7 +7,7 @@ Stage 2 adds per-member grants by changing this module alone.
 from fastapi import HTTPException, status
 from sqlalchemy import Select, select
 
-from models import Company, Group, Location, Machine, Membership
+from models import ApiKey, Company, Group, Location, Machine, Membership
 
 
 async def get_membership(db, user_id: str, account_id: str) -> Membership | None:
@@ -65,6 +65,15 @@ def visible_groups(membership: Membership) -> Select:
         .join(Company, Location.company_id == Company.id)
         .where(Company.account_id == membership.account_id)
     )
+
+
+def visible_api_keys(membership: Membership) -> Select:
+    """API keys the caller may see, as a query to filter further.
+
+    Stage 2 adds the grant condition for `role == "member"` here, so callers
+    keep working unchanged.
+    """
+    return select(ApiKey).where(ApiKey.account_id == membership.account_id)
 
 
 def assert_admin(membership: Membership) -> None:

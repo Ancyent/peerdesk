@@ -30,6 +30,68 @@ async def test_revoke_api_key(auth_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_list_api_keys_excludes_keys_from_another_account(auth_client: AsyncClient, db):
+    """A multi-account user's key list must be scoped to the active account,
+    not to every account they happen to belong to."""
+    from sqlalchemy import select
+    from models import User, Account, Membership
+
+    result = await db.execute(select(User).where(User.email == "user@test.com"))
+    user = result.scalar_one()
+
+    other_account = Account(name="Other Account")
+    db.add(other_account)
+    await db.flush()
+    db.add(Membership(user_id=user.id, account_id=other_account.id, role="admin"))
+    await db.commit()
+
+    switch = await auth_client.post("/auth/switch-account", json={"account_id": other_account.id})
+    other_token = switch.json()["access_token"]
+
+    create = await auth_client.post(
+        "/api-keys", json={"name": "Other Account Key"},
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+    assert create.status_code == 201
+    other_key_id = create.json()["id"]
+
+    resp = await auth_client.get("/api-keys")
+    assert resp.status_code == 200
+    ids = [k["id"] for k in resp.json()]
+    assert other_key_id not in ids
+
+
+@pytest.mark.asyncio
+async def test_revoke_api_key_from_another_account_returns_404(auth_client: AsyncClient, db):
+    """Revoking a key that belongs to another of the caller's accounts must
+    404, not succeed -- the active account, not the user, owns the key."""
+    from sqlalchemy import select
+    from models import User, Account, Membership
+
+    result = await db.execute(select(User).where(User.email == "user@test.com"))
+    user = result.scalar_one()
+
+    other_account = Account(name="Other Account")
+    db.add(other_account)
+    await db.flush()
+    db.add(Membership(user_id=user.id, account_id=other_account.id, role="admin"))
+    await db.commit()
+
+    switch = await auth_client.post("/auth/switch-account", json={"account_id": other_account.id})
+    other_token = switch.json()["access_token"]
+
+    create = await auth_client.post(
+        "/api-keys", json={"name": "Other Account Key"},
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+    assert create.status_code == 201
+    other_key_id = create.json()["id"]
+
+    resp = await auth_client.delete(f"/api-keys/{other_key_id}")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_register_machine_via_api_key_pending(client: AsyncClient, auth_client: AsyncClient):
     create = await auth_client.post("/api-keys", json={"name": "Test Key"})
     api_key = create.json()["key"]

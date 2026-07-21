@@ -210,7 +210,7 @@ def test_upgrade_head_from_empty_succeeds(pg):
     create_all -- except create_all can't fail the way a real migration can."""
     _upgrade("head")
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0013"
+    assert version == "0014"
 
 
 # --- 2. round trip: head -> base -> head -----------------------------------
@@ -233,7 +233,7 @@ def test_upgrade_downgrade_upgrade_roundtrip(pg):
     tables, _ = _run(_reflect())
     assert {"users", "accounts", "machines", "branding"} <= tables
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0013"
+    assert version == "0014"
 
 
 # --- 3. zero-accounts branding: the Critical defect ------------------------
@@ -255,7 +255,7 @@ def test_zero_accounts_branding_survives_upgrade_head(pg):
     _upgrade("head")  # must not raise
 
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0013"
+    assert version == "0014"
     # 0013 deletes orphaned (NULL account_id) branding rows rather than leave
     # an un-tightenable column -- the row is regenerable, the migration is not.
     assert _run(_fetchval("SELECT COUNT(*) FROM branding")) == 0
@@ -315,3 +315,42 @@ def test_migrated_schema_matches_declared_models(pg):
         assert cols[table]["account_id"]["nullable"] is False, (
             f"{table}.account_id should be NOT NULL at head"
         )
+
+
+# --- 6. 0014: auth_sessions.account_id -------------------------------------
+
+def test_auth_sessions_account_id_is_nullable_and_clears_on_account_delete(pg):
+    """0014 adds account_id to auth_sessions so /auth/refresh can persist the
+    active account across a refresh. Unlike SCOPED_TABLES, this column stays
+    nullable forever -- sessions created before the migration have no value
+    and routers/auth.py treats that as "fall back to the oldest membership",
+    so there is nothing to backfill. The FK must be ON DELETE SET NULL (not
+    CASCADE): deleting an account must not destroy the caller's login
+    session, only detach it from that account."""
+    _upgrade("head")
+
+    is_nullable = _run(_fetchval(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_name = 'auth_sessions' AND column_name = 'account_id'"
+    ))
+    assert is_nullable == "YES"
+
+    _run(_execute(
+        "INSERT INTO accounts (id, name, created_at) VALUES ($1, $2, NOW())",
+        "acct-x", "Acme",
+    ))
+    _run(_execute(
+        "INSERT INTO users (id, email, name, password_hash, is_active, created_at) "
+        "VALUES ($1, $2, $3, $4, TRUE, NOW())",
+        "user-x", "x@example.com", "X", "hash",
+    ))
+    _run(_execute(
+        "INSERT INTO auth_sessions (id, user_id, token_hash, account_id, created_at, last_used_at) "
+        "VALUES ($1, $2, $3, $4, NOW(), NOW())",
+        "sess-x", "user-x", "hash", "acct-x",
+    ))
+
+    _run(_execute("DELETE FROM accounts WHERE id = $1", "acct-x"))
+
+    remaining = _run(_fetchval("SELECT account_id FROM auth_sessions WHERE id = $1", "sess-x"))
+    assert remaining is None

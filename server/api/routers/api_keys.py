@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from deps import get_db, get_current_user, get_current_membership
 from models import User, ApiKey, Membership
 from schemas import ApiKeyCreate, ApiKeyOut, ApiKeyListOut
+from access import visible_api_keys
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -11,10 +11,10 @@ router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 @router.get("", response_model=list[ApiKeyListOut])
 async def list_api_keys(
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_membership),
 ):
     result = await db.execute(
-        select(ApiKey).where(ApiKey.created_by == user.id, ApiKey.is_active == True)
+        visible_api_keys(membership).where(ApiKey.is_active == True)
     )
     keys = result.scalars().all()
     return [
@@ -54,10 +54,12 @@ async def create_api_key(
 async def revoke_api_key(
     key_id: str,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_membership),
 ):
+    # 404, not 403 -- a caller must not learn that a key outside their active
+    # account exists (consistent with how machines behave; see access.py).
     result = await db.execute(
-        select(ApiKey).where(ApiKey.id == key_id, ApiKey.created_by == user.id)
+        visible_api_keys(membership).where(ApiKey.id == key_id)
     )
     key = result.scalar_one_or_none()
     if not key:

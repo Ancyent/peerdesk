@@ -159,6 +159,13 @@ class AuthSession(Base):
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(String, nullable=False, index=True)
     remember_me: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The active account at the time of the last login or switch-account, so a
+    # refresh can keep it instead of falling back to the oldest membership.
+    # Nullable: sessions created before this column existed have none, and
+    # /auth/refresh treats NULL as "fall back", not as an error.
+    account_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -168,6 +175,8 @@ class AuthSession(Base):
             kwargs["id"] = str(uuid.uuid4())
         if "remember_me" not in kwargs:
             kwargs["remember_me"] = False
+        if "account_id" not in kwargs:
+            kwargs["account_id"] = None
         now = utcnow()
         if "created_at" not in kwargs:
             kwargs["created_at"] = now

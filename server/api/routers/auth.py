@@ -37,6 +37,7 @@ async def create_session(db: AsyncSession, user_id: str, account_id: str, rememb
     refresh = create_refresh_token(user_id, sid)
     db.add(AuthSession(
         id=sid, user_id=user_id, token_hash=hash_refresh_token(refresh), remember_me=remember_me,
+        account_id=account_id,
     ))
     await db.commit()
     return create_access_token(user_id, account_id), refresh
@@ -122,8 +123,23 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     ):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     session.last_used_at = now
+
+    # Prefer the account the session was last active in (set at login/2FA/register
+    # and updated by /auth/switch-account) so a refresh doesn't silently throw the
+    # user back to their oldest membership. Re-validate it on every refresh: someone
+    # removed from the account must not keep refreshing into it. A NULL account_id
+    # (sessions created before this column existed) falls back the same way an
+    # invalidated one does.
+    account_id = None
+    if session.account_id is not None:
+        membership = await get_membership(db, user_id, session.account_id)
+        if membership is not None:
+            account_id = session.account_id
+    if account_id is None:
+        account_id = await _account_id_for(db, user_id)
+        session.account_id = account_id  # self-heal: backfill NULL/stale sessions going forward
+
     await db.commit()
-    account_id = await _account_id_for(db, user_id)
     return TokenResponse(access_token=create_access_token(user_id, account_id), refresh_token=body.refresh_token)
 
 
@@ -152,6 +168,17 @@ async def switch_account(
     membership = await get_membership(db, current_user.id, body.account_id)
     if not membership:
         raise HTTPException(status_code=403, detail="Not a member of this account")
+
+    # Persist the switch on every session still alive for this user, so the
+    # new active account survives that session's next /auth/refresh instead
+    # of reverting to the oldest membership.
+    result = await db.execute(
+        select(AuthSession).where(AuthSession.user_id == current_user.id, AuthSession.revoked == False)
+    )
+    for session in result.scalars().all():
+        session.account_id = body.account_id
+    await db.commit()
+
     return {"access_token": create_access_token(current_user.id, body.account_id)}
 
 
