@@ -9,6 +9,7 @@ import { DownloadsPage } from './pages/DownloadsPage';
 import { BrandingPage } from './pages/BrandingPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ApiKeysPage } from './pages/ApiKeysPage';
+import { TeamPage } from './pages/TeamPage';
 import { AppShell, type AppPage } from './components/AppShell';
 import { OrgTree, type OrgNode } from './components/OrgTree';
 import { ConnectForm } from './components/ConnectForm';
@@ -33,7 +34,7 @@ import { coerceOs, type OsId } from './pages/downloads/osData';
 type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer';
 
 export default function App() {
-  const { user, loading, setSessionActive, accessToken } = useAuth();
+  const { user, loading, setSessionActive, accessToken, role } = useAuth();
   const initialRoute = parsePath(window.location.pathname);
   const [page, setPage] = useState<FullPage>(initialRoute.page);
   const [downloadsOs, setDownloadsOs] = useState<OsId>(coerceOs(initialRoute.sub));
@@ -315,6 +316,7 @@ export default function App() {
       {effectivePage === 'downloads'     && <DownloadsPage os={downloadsOs} onOsChange={(o) => go('downloads', o)} />}
       {effectivePage === 'branding'      && <BrandingPage onBack={() => go('machines')} />}
       {effectivePage === 'settings'      && <SettingsPage />}
+      {effectivePage === 'team'          && role === 'admin' && <TeamPage />}
     </AppShell>
   );
 }

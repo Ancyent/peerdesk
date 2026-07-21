@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
+import { AccountSwitcher } from './AccountSwitcher';
 
-export type AppPage = 'machines' | 'organization' | 'api-keys' | 'downloads' | 'branding' | 'settings';
+export type AppPage = 'machines' | 'organization' | 'api-keys' | 'downloads' | 'branding' | 'settings' | 'team';
 
 interface Props {
   page: AppPage;
@@ -16,15 +17,17 @@ const NAV: { page: AppPage; icon: string; label: string }[] = [
   { page: 'organization',  icon: '🏢', label: 'Organizare' },
   { page: 'api-keys',      icon: '🔑', label: 'API Keys' },
   { page: 'downloads',     icon: '📦', label: 'Download & Deploy' },
+  { page: 'settings',      icon: '⚙️', label: 'Setări' },
 ];
 
 const ADMIN: { page: AppPage; icon: string; label: string }[] = [
   { page: 'branding', icon: '🎨', label: 'Branding' },
-  { page: 'settings', icon: '⚙️', label: 'Setări' },
+  { page: 'team',     icon: '👥', label: 'Echipă' },
 ];
 
 export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
-  const { user, logout } = useAuth();
+  const { user, logout, role } = useAuth();
+  const isAdmin = role === 'admin';
   const { brand_name, logo_data_url } = useBrandingContext();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -114,11 +117,16 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
           }}>{brand_name || 'PeerDesk'}</span>
         </div>
 
+        {/* Account switcher — only rendered above one membership */}
+        <div style={{ padding: '10px 8px 0' }}>
+          <AccountSwitcher />
+        </div>
+
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 1 }}>
           {NAV.map(n => navItem(n.page, n.icon, n.label))}
-          <div style={{ height: 1, background: 'var(--border-dim)', margin: '8px 0' }} />
-          {ADMIN.map(n => navItem(n.page, n.icon, n.label))}
+          {isAdmin && <div style={{ height: 1, background: 'var(--border-dim)', margin: '8px 0' }} />}
+          {isAdmin && ADMIN.map(n => navItem(n.page, n.icon, n.label))}
         </nav>
 
         {/* Avatar */}

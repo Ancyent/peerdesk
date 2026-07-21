@@ -133,6 +133,12 @@ export interface TurnCredentials {
   ttl: number;
 }
 
+export interface AccountMembershipOut {
+  account_id: string;
+  name: string;
+  role: string;   // "admin" | "member"
+}
+
 export interface ReleaseAsset {
   name: string;
   size: number;
@@ -159,6 +165,14 @@ export const api = {
       }),
     logout: (refresh_token: string) =>
       request<void>('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token }) }),
+    listAccounts: (token: string) =>
+      request<AccountMembershipOut[]>('/auth/accounts', { headers: authHeaders(token) }),
+    switchAccount: (token: string, accountId: string) =>
+      request<{ access_token: string }>('/auth/switch-account', {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ account_id: accountId }),
+      }),
   },
   users: {
     me: (token: string) =>

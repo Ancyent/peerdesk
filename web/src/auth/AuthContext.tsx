@@ -1,10 +1,10 @@
 import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, setOnAuthFailure, refreshAccessToken } from '../api/client';
-import type { UserOut } from '../api/client';
-import { getTokens, setTokens as storeSetTokens, clear as clearStore } from './tokenStore';
+import type { UserOut, AccountMembershipOut } from '../api/client';
+import { getTokens, setTokens as storeSetTokens, clear as clearStore, getStorageKind } from './tokenStore';
 import { isIdleExpired, IDLE_THRESHOLD_MS } from './idle';
-import { tokenExpiringSoon } from './jwt';
+import { tokenExpiringSoon, accountIdFromToken } from './jwt';
 import { useActivityTracker } from '../hooks/useActivityTracker';
 
 interface AuthState {
@@ -14,10 +14,14 @@ interface AuthState {
 }
 
 export interface AuthContextValue extends AuthState {
+  accounts: AccountMembershipOut[];
+  activeAccountId: string | null;
+  role: string | null;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (email: string, name: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   setSessionActive: (active: boolean) => void;
+  switchAccount: (accountId: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -28,9 +32,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     loading: true,
   });
+  const [accounts, setAccounts] = useState<AccountMembershipOut[]>([]);
   const lastActivity = useRef<number>(Date.now());
   const sessionActive = useRef<boolean>(false);
   const pendingLogout = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (!state.accessToken) { setAccounts([]); return; }
+    api.auth.listAccounts(state.accessToken)
+      .then(setAccounts)
+      .catch(() => setAccounts([]));
+  }, [state.accessToken]);
+
+  const activeAccountId = state.accessToken ? accountIdFromToken(state.accessToken) : null;
+  const role = accounts.find(a => a.account_id === activeAccountId)?.role ?? null;
+
+  const switchAccount = useCallback(async (accountId: string) => {
+    const tokens = getTokens();
+    if (!tokens) return;
+    const { access_token } = await api.auth.switchAccount(tokens.access, accountId);
+    // Keep storage in sync with context state (same pattern as login/register)
+    // so a reload before the next token refresh doesn't revert to the old account.
+    storeSetTokens({ access: access_token, refresh: tokens.refresh }, getStorageKind() === 'local');
+    setState(s => ({ ...s, accessToken: access_token }));
+  }, []);
 
   const doLogout = useCallback(() => {
     const refresh = getTokens()?.refresh;
@@ -107,7 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout: doLogout, setSessionActive }}>
+    <AuthContext.Provider value={{
+      ...state, accounts, activeAccountId, role,
+      login, register, logout: doLogout, setSessionActive, switchAccount,
+    }}>
       {children}
     </AuthContext.Provider>
   );

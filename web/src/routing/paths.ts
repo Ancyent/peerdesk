@@ -9,6 +9,7 @@ const PAGE_TO_PATH: Record<RoutablePage, string> = {
   downloads: '/downloads',
   branding: '/branding',
   settings: '/settings',
+  team: '/team',
   login: '/login',
   register: '/register',
 };

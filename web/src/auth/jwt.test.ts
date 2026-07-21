@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tokenExpiringSoon } from './jwt';
+import { tokenExpiringSoon, accountIdFromToken } from './jwt';
 
 function base64url(s: string): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
@@ -37,5 +37,26 @@ describe('tokenExpiringSoon', () => {
   it('returns true for token missing exp field', () => {
     const payload = base64url(JSON.stringify({ sub: 'user' }));
     expect(tokenExpiringSoon(`a.${payload}.b`, NOW_MS, SKEW_MS)).toBe(true);
+  });
+});
+
+describe('accountIdFromToken', () => {
+  it('returns the account_id claim when present', () => {
+    const payload = base64url(JSON.stringify({ sub: 'user', account_id: 'acct-123' }));
+    expect(accountIdFromToken(`a.${payload}.b`)).toBe('acct-123');
+  });
+
+  it('returns null when account_id is missing', () => {
+    const payload = base64url(JSON.stringify({ sub: 'user' }));
+    expect(accountIdFromToken(`a.${payload}.b`)).toBeNull();
+  });
+
+  it('returns null when account_id is not a string', () => {
+    const payload = base64url(JSON.stringify({ sub: 'user', account_id: 42 }));
+    expect(accountIdFromToken(`a.${payload}.b`)).toBeNull();
+  });
+
+  it('returns null for a garbage token', () => {
+    expect(accountIdFromToken('not-a-jwt')).toBeNull();
   });
 });
