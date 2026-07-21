@@ -42,15 +42,17 @@ async def test_save_get_and_clear_password(client):
 @pytest.mark.asyncio
 async def test_saved_password_is_encrypted_at_rest(client, db):
     from sqlalchemy import select
-    from models import Machine
+    from models import SavedConnectPassword
 
     headers = await _register(client, "sp2@b.com")
     mid = await _make_machine(client, headers, "100000002")
     await client.put(f"/machines/{mid}/saved-password", json={"password": "PlainSecret"}, headers=headers)
 
-    row = (await db.execute(select(Machine).where(Machine.id == mid))).scalar_one()
-    assert row.saved_password_enc is not None
-    assert "PlainSecret" not in row.saved_password_enc  # stored ciphertext, not plaintext
+    row = (await db.execute(
+        select(SavedConnectPassword).where(SavedConnectPassword.machine_id == mid)
+    )).scalar_one()
+    assert row.password_enc is not None
+    assert "PlainSecret" not in row.password_enc  # stored ciphertext, not plaintext
 
 
 @pytest.mark.asyncio

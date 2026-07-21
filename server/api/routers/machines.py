@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user, get_api_key, get_current_membership
-from models import User, Machine, ApiKey, Company, Location, Group, Membership
+from models import User, Machine, ApiKey, Company, Location, Group, Membership, SavedConnectPassword, utcnow
 from schemas import (
     MachineRegister, MachineOut, MachinePlacement, MachineRegisterViaKey,
     MachineApprovalStatus, SavedPasswordIn, SavedPasswordOut,
@@ -27,6 +27,17 @@ def _apply_online(machines):
     return machines
 
 
+async def _saved_password_machine_ids(db: AsyncSession, membership: Membership) -> set[str]:
+    """Which machines this caller has stored a password for. One query per
+    request rather than one per machine."""
+    result = await db.execute(
+        select(SavedConnectPassword.machine_id).where(
+            SavedConnectPassword.membership_id == membership.id
+        )
+    )
+    return set(result.scalars().all())
+
+
 @router.get("", response_model=list[MachineOut])
 async def list_machines(
     status: str | None = None,
@@ -37,7 +48,14 @@ async def list_machines(
     if status:
         query = query.where(Machine.approval_status == status)
     result = await db.execute(query)
-    return _apply_online(result.scalars().all())
+    machines = _apply_online(result.scalars().all())
+    saved = await _saved_password_machine_ids(db, membership)
+    out = []
+    for m in machines:
+        item = MachineOut.model_validate(m)
+        item.has_saved_password = m.id in saved
+        out.append(item)
+    return out
 
 
 @router.post("", response_model=MachineOut, status_code=201)
@@ -172,7 +190,9 @@ async def get_machine(
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
     _apply_online([machine])
-    return machine
+    item = MachineOut.model_validate(machine)
+    item.has_saved_password = (await _saved_password_row(db, membership, machine.id)) is not None
+    return item
 
 
 @router.delete("/{machine_id}", status_code=204)
@@ -203,6 +223,18 @@ async def _owned_machine(machine_id: str, db: AsyncSession, membership: Membersh
     return machine
 
 
+async def _saved_password_row(
+    db: AsyncSession, membership: Membership, machine_id: str
+) -> SavedConnectPassword | None:
+    result = await db.execute(
+        select(SavedConnectPassword).where(
+            SavedConnectPassword.membership_id == membership.id,
+            SavedConnectPassword.machine_id == machine_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 @router.put("/{machine_id}/saved-password", status_code=204)
 async def set_saved_password(
     machine_id: str,
@@ -210,13 +242,22 @@ async def set_saved_password(
     db: AsyncSession = Depends(get_db),
     membership: Membership = Depends(get_current_membership),
 ):
-    """Save (encrypted) the connect password for a machine visible to the caller's
-    account, so the web viewer can connect without re-typing it. Opt-in; overwrites
-    any prior one."""
+    """Save (encrypted) the caller's connect password for a machine visible to
+    them, so the web viewer can connect without re-typing it. Opt-in; overwrites
+    any prior copy of theirs. Per-person storage (see models.SavedConnectPassword)
+    so that revoking a grant can delete just their credential."""
     if not body.password:
         raise HTTPException(status_code=400, detail="Password required")
-    machine = await _owned_machine(machine_id, db, membership)
-    machine.saved_password_enc = encrypt_secret(body.password)
+    await _owned_machine(machine_id, db, membership)  # 404s if not visible
+    row = await _saved_password_row(db, membership, machine_id)
+    encrypted = encrypt_secret(body.password)
+    if row is None:
+        db.add(SavedConnectPassword(
+            membership_id=membership.id, machine_id=machine_id, password_enc=encrypted,
+        ))
+    else:
+        row.password_enc = encrypted
+        row.updated_at = utcnow()
     await db.commit()
 
 
@@ -226,10 +267,12 @@ async def clear_saved_password(
     db: AsyncSession = Depends(get_db),
     membership: Membership = Depends(get_current_membership),
 ):
-    """Forget a machine's saved connect password."""
-    machine = await _owned_machine(machine_id, db, membership)
-    machine.saved_password_enc = None
-    await db.commit()
+    """Forget the caller's saved connect password for a machine."""
+    await _owned_machine(machine_id, db, membership)
+    row = await _saved_password_row(db, membership, machine_id)
+    if row is not None:
+        await db.delete(row)
+        await db.commit()
 
 
 @router.get("/{machine_id}/saved-password", response_model=SavedPasswordOut)
@@ -238,15 +281,17 @@ async def get_saved_password(
     db: AsyncSession = Depends(get_db),
     membership: Membership = Depends(get_current_membership),
 ):
-    """Return the decrypted connect password so the web viewer can auto-connect.
-    404 if none saved (or the key rotated and it can't be decrypted)."""
-    machine = await _owned_machine(machine_id, db, membership)
-    if not machine.saved_password_enc:
+    """Return the caller's decrypted connect password so the web viewer can
+    auto-connect. 404 if none saved (or the key rotated and it can't be
+    decrypted)."""
+    await _owned_machine(machine_id, db, membership)
+    row = await _saved_password_row(db, membership, machine_id)
+    if row is None:
         raise HTTPException(status_code=404, detail="No saved password")
-    password = decrypt_secret(machine.saved_password_enc)
+    password = decrypt_secret(row.password_enc)
     if password is None:
         # Key rotated or ciphertext corrupt — drop the stale value and report absent.
-        machine.saved_password_enc = None
+        await db.delete(row)
         await db.commit()
         raise HTTPException(status_code=404, detail="No saved password")
     return SavedPasswordOut(password=password)

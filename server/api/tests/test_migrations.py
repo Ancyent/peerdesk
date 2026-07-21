@@ -73,7 +73,7 @@ ASYNCPG_DSN = f"postgresql://{PG_USER}:{PG_PASSWORD}@localhost:{HOST_PORT}/{PG_D
 SCOPED_TABLES = ["machines", "companies", "api_keys", "registration_tokens", "branding"]
 
 # The expected Alembic head. Bump this in the task that adds a migration.
-HEAD_REVISION = "0016"
+HEAD_REVISION = "0018"
 
 
 def _docker_available() -> bool:
@@ -408,8 +408,14 @@ def test_auth_sessions_account_id_is_nullable_and_clears_on_account_delete(pg):
 # --- Stage 2: saved connect passwords move to (membership, machine) ---------
 
 def _seed_account_user_machine(account_id, user_id, machine_id, peer_id, saved_enc):
-    """Creates account + user + membership + machine at revision 0016, with an
-    optional saved password on the machine. Returns nothing; callers assert."""
+    """Creates account + user + membership + machine, with an optional saved
+    password on the machine.
+
+    saved_password_enc is set via a follow-up UPDATE, not in the INSERT
+    itself, so this stays usable both at revision 0016 (column exists) and at
+    head (0017 has dropped it) -- callers seeding at head always pass
+    saved_enc=None, so the UPDATE simply never runs and the now-nonexistent
+    column is never referenced. Returns nothing; callers assert."""
     _run(_execute(
         "INSERT INTO accounts (id, name, created_at) VALUES ($1, $2, NOW())",
         account_id, "Acme",
@@ -426,13 +432,17 @@ def _seed_account_user_machine(account_id, user_id, machine_id, peer_id, saved_e
     ))
     _run(_execute(
         "INSERT INTO machines (id, peer_id, name, account_id, created_by_id, "
-        "is_online, approval_status, created_at, saved_password_enc) "
-        "VALUES ($1, $2, 'M', $3, $4, FALSE, 'approved', NOW(), $5)",
-        machine_id, peer_id, account_id, user_id, saved_enc,
+        "is_online, approval_status, created_at) "
+        "VALUES ($1, $2, 'M', $3, $4, FALSE, 'approved', NOW())",
+        machine_id, peer_id, account_id, user_id,
     ))
+    if saved_enc is not None:
+        _run(_execute(
+            "UPDATE machines SET saved_password_enc = $1 WHERE id = $2",
+            saved_enc, machine_id,
+        ))
 
 
-@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
 def test_saved_password_moves_to_creators_membership(pg):
     """The ordinary case: the machine's created_by_id is still a member, so the
     stored password becomes that person's copy rather than being lost."""
@@ -450,7 +460,6 @@ def test_saved_password_moves_to_creators_membership(pg):
     assert _run(_fetchval("SELECT COUNT(*) FROM saved_connect_passwords")) == 1
 
 
-@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
 def test_saved_password_dropped_when_creator_is_not_a_member(pg):
     """The rule that matters: a password whose enroller has left the account is
     deleted, not silently reassigned to an admin. Also covers created_by_id
@@ -465,7 +474,6 @@ def test_saved_password_dropped_when_creator_is_not_a_member(pg):
     assert _run(_fetchval("SELECT COUNT(*) FROM saved_connect_passwords")) == 0
 
 
-@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
 def test_saved_password_column_is_gone_at_head(pg):
     """0017 drops machines.saved_password_enc. If it survives, the app and the
     schema disagree about where the credential lives."""
@@ -476,6 +484,127 @@ def test_saved_password_column_is_gone_at_head(pg):
         "WHERE table_name = 'machines' AND column_name = 'saved_password_enc'"
     ))
     assert exists == 0
+
+
+# --- 0018: backfill inconsistent machine placement columns -----------------
+
+def _seed_bare_account_and_user(account_id, user_id):
+    """Just an account + user + admin membership, no machine -- 0018's seed
+    needs the tree (companies/locations/groups) inserted separately per test,
+    so this stops short of _seed_account_user_machine's machine insert (which
+    also still writes the now-dropped saved_password_enc column at 0017+)."""
+    _run(_execute(
+        "INSERT INTO accounts (id, name, created_at) VALUES ($1, $2, NOW())",
+        account_id, "Acme",
+    ))
+    _run(_execute(
+        "INSERT INTO users (id, email, name, password_hash, is_active, created_at) "
+        "VALUES ($1, $2, $3, 'hash', TRUE, NOW())",
+        user_id, f"{user_id}@example.com", "U",
+    ))
+    _run(_execute(
+        "INSERT INTO memberships (id, user_id, account_id, role, created_at) "
+        "VALUES ($1, $2, $3, 'admin', NOW())",
+        f"mem-{user_id}", user_id, account_id,
+    ))
+
+
+def test_backfill_repairs_group_placement_missing_ancestors(pg):
+    """Reproduces the shape a pre-existing test proved reachable: PATCH
+    .../placement with only {"group_id": ...} used to return 200 and leave
+    company_id/location_id NULL. A machine in that state is invisible to a
+    member holding a company- or location-level grant even though it sits
+    inside that company/location (access.visible_machines matches grants
+    against these denormalized columns directly, with no recursive walk).
+    Seeded at 0017 -- the revision before 0018 -- so this exercises exactly
+    the backfill migration and nothing upstream of it."""
+    _upgrade("0017")
+    _seed_bare_account_and_user("acct-bf1", "user-bf1")
+    _run(_execute(
+        "INSERT INTO companies (id, name, account_id, created_at) "
+        "VALUES ('co-bf1', 'Co', 'acct-bf1', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO locations (id, name, company_id, created_at) "
+        "VALUES ('loc-bf1', 'Loc', 'co-bf1', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO groups (id, name, location_id, created_at) "
+        "VALUES ('grp-bf1', 'Grp', 'loc-bf1', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO machines (id, peer_id, name, account_id, created_by_id, "
+        "is_online, approval_status, created_at, group_id) "
+        "VALUES ('mach-bf1', 'GGG-7777', 'M', 'acct-bf1', 'user-bf1', FALSE, "
+        "'approved', NOW(), 'grp-bf1')"
+    ))
+    company_before = _run(_fetchval("SELECT company_id FROM machines WHERE id = 'mach-bf1'"))
+    location_before = _run(_fetchval("SELECT location_id FROM machines WHERE id = 'mach-bf1'"))
+    assert (company_before, location_before) == (None, None)
+
+    _upgrade("0018")
+
+    row_company = _run(_fetchval("SELECT company_id FROM machines WHERE id = 'mach-bf1'"))
+    row_location = _run(_fetchval("SELECT location_id FROM machines WHERE id = 'mach-bf1'"))
+    assert row_company == "co-bf1"
+    assert row_location == "loc-bf1"
+
+
+def test_backfill_repairs_location_placement_wrong_company(pg):
+    """Covers the other reachable inconsistency: location_id set with
+    company_id NULL or pointing at the wrong company. Deterministic because
+    locations.company_id is NOT NULL -- every location has exactly one
+    company, so there is only one correct value to backfill."""
+    _upgrade("0017")
+    _seed_bare_account_and_user("acct-bf2", "user-bf2")
+    _run(_execute(
+        "INSERT INTO companies (id, name, account_id, created_at) "
+        "VALUES ('co-bf2-right', 'Right', 'acct-bf2', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO companies (id, name, account_id, created_at) "
+        "VALUES ('co-bf2-wrong', 'Wrong', 'acct-bf2', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO locations (id, name, company_id, created_at) "
+        "VALUES ('loc-bf2', 'Loc', 'co-bf2-right', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO machines (id, peer_id, name, account_id, created_by_id, "
+        "is_online, approval_status, created_at, location_id, company_id) "
+        "VALUES ('mach-bf2', 'HHH-8888', 'M', 'acct-bf2', 'user-bf2', FALSE, "
+        "'approved', NOW(), 'loc-bf2', 'co-bf2-wrong')"
+    ))
+
+    _upgrade("0018")
+
+    row_company = _run(_fetchval("SELECT company_id FROM machines WHERE id = 'mach-bf2'"))
+    assert row_company == "co-bf2-right"
+
+
+def test_backfill_leaves_consistent_placement_untouched(pg):
+    """A machine that was already consistent (company-only placement, no
+    location/group) must survive the backfill unchanged -- the migration only
+    repairs rows that are wrong, it doesn't touch valid partial placements."""
+    _upgrade("0017")
+    _seed_bare_account_and_user("acct-bf3", "user-bf3")
+    _run(_execute(
+        "INSERT INTO companies (id, name, account_id, created_at) "
+        "VALUES ('co-bf3', 'Co', 'acct-bf3', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO machines (id, peer_id, name, account_id, created_by_id, "
+        "is_online, approval_status, created_at, company_id) "
+        "VALUES ('mach-bf3', 'III-9999', 'M', 'acct-bf3', 'user-bf3', FALSE, "
+        "'approved', NOW(), 'co-bf3')"
+    ))
+
+    _upgrade("0018")
+
+    row_company = _run(_fetchval("SELECT company_id FROM machines WHERE id = 'mach-bf3'"))
+    row_location = _run(_fetchval("SELECT location_id FROM machines WHERE id = 'mach-bf3'"))
+    assert row_company == "co-bf3"
+    assert row_location is None
 
 
 # --- Stage 2: access_grants exactly-one-target CHECK -----------------------

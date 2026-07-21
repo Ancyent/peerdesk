@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy import select
-from models import Account, Machine, Membership, User
+from models import Account, Machine, Membership, SavedConnectPassword, User
 from crypto_box import encrypt_secret
 
 
@@ -138,9 +138,25 @@ async def test_clearing_saved_password_on_another_accounts_machine_returns_404(a
 async def test_getting_saved_password_on_another_accounts_machine_returns_404(auth_client, db):
     """The worst-case leak in this router: a saved connect password is
     plaintext once decrypted, so this route above all must not let a caller
-    outside the machine's account reach it."""
+    outside the machine's account reach it.
+
+    Saved passwords are now per (membership, machine) (see
+    models.SavedConnectPassword), so proving the leak is closed requires a
+    real row belonging to a membership in the *other* account -- setting an
+    attribute on the Machine instance, as the old per-machine-column version
+    of this test did, would silently do nothing now that the column is gone."""
     m = await _other_account_machine(db, peer_id="700000007")
-    m.saved_password_enc = encrypt_secret("OtherAccountsSecret")
+    other_user = User(email="otherowner@test.com", name="Other Owner", password_hash="x")
+    db.add(other_user)
+    await db.flush()
+    other_membership = Membership(user_id=other_user.id, account_id=m.account_id, role="admin")
+    db.add(other_membership)
+    await db.flush()
+    db.add(SavedConnectPassword(
+        membership_id=other_membership.id,
+        machine_id=m.id,
+        password_enc=encrypt_secret("OtherAccountsSecret"),
+    ))
     await db.commit()
 
     r = await auth_client.get(f"/machines/{m.id}/saved-password")

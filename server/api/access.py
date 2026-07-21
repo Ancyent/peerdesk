@@ -7,7 +7,10 @@ Stage 2 adds per-member grants by changing this module alone.
 from fastapi import HTTPException, status
 from sqlalchemy import Select, and_, or_, select
 
-from models import AccessGrant, ApiKey, Branding, Company, Group, Location, Machine, Membership
+from models import (
+    AccessGrant, ApiKey, Branding, Company, Group, Location, Machine, Membership,
+    SavedConnectPassword,
+)
 
 
 async def get_membership(db, user_id: str, account_id: str) -> Membership | None:
@@ -227,3 +230,27 @@ async def assert_placement_consistent(db, company_id, location_id, group_id) -> 
             raise HTTPException(
                 400, "placement is inconsistent: location_id does not belong to company_id"
             )
+
+
+async def sync_saved_passwords(db, membership: Membership) -> int:
+    """Deletes this membership's stored passwords for machines they can no
+    longer see. Returns the number deleted.
+
+    Call after any grant change and after any role change. It recomputes rather
+    than reacting to the specific grant that moved, because grants are additive:
+    deleting one does not imply losing access, and a delete-on-any-change
+    implementation would destroy working credentials.
+    """
+    visible_ids = select(visible_machines(membership).subquery().c.id)
+    result = await db.execute(
+        select(SavedConnectPassword).where(
+            SavedConnectPassword.membership_id == membership.id,
+            SavedConnectPassword.machine_id.not_in(visible_ids),
+        )
+    )
+    stale = result.scalars().all()
+    for row in stale:
+        await db.delete(row)
+    if stale:
+        await db.commit()
+    return len(stale)

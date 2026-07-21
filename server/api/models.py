@@ -95,15 +95,8 @@ class Machine(Base):
     api_key_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True
     )
-    # Fernet-encrypted connect password, saved so the web viewer can connect
-    # without re-typing it. Only set when the owner opts in; never serialized raw.
-    saved_password_enc: Mapped[str | None] = mapped_column(String, nullable=True)
 
     api_key_rel: Mapped["ApiKey | None"] = relationship("ApiKey", back_populates="machines")
-
-    @property
-    def has_saved_password(self) -> bool:
-        return self.saved_password_enc is not None
 
     def __init__(self, **kwargs):
         if "id" not in kwargs:
@@ -372,4 +365,36 @@ class AccessGrant(Base):
             kwargs.setdefault(target, None)
         if "created_at" not in kwargs:
             kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)
+
+
+class SavedConnectPassword(Base):
+    """One person's stored connect password for one machine.
+
+    Per (membership, machine) rather than per machine so that revoking someone's
+    grant can delete their credential. The encryption key is still the server's,
+    not per-user -- this buys meaningful revocation, not confidentiality from
+    the operator.
+    """
+
+    __tablename__ = "saved_connect_passwords"
+    __table_args__ = (
+        UniqueConstraint("membership_id", "machine_id", name="uq_saved_password_membership_machine"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    membership_id: Mapped[str] = mapped_column(
+        String, ForeignKey("memberships.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    machine_id: Mapped[str] = mapped_column(
+        String, ForeignKey("machines.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    password_enc: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "updated_at" not in kwargs:
+            kwargs["updated_at"] = utcnow()
         super().__init__(**kwargs)

@@ -49,9 +49,14 @@ def test_no_router_builds_its_own_account_filter():
     it was supposed to catch. `account_id == x` (with a space) was the only
     spelling that still tripped it. This version distinguishes assignment
     from comparison by matching the operator tokens directly (`==`, `!=`,
-    `.in_(`, `.is_(`, `.isnot(`, or a `filter_by(...)` kwarg) instead of by
-    excluding a substring -- a bare `=` can never match a `==`/`!=` token
-    regex, so no exemption list is needed at all.
+    `.in_(`, `.not_in(`, `.is_(`, `.is_not(`, `.isnot(`, or a `filter_by(...)`
+    kwarg) instead of by excluding a substring -- a bare `=` can never match a
+    `==`/`!=` token regex, so no exemption list is needed at all.
+
+    `.is_not(` and `.not_in(` are SQLAlchemy 2.0's spellings (this codebase is
+    2.0 throughout); `.isnot(` and `.in_(` are the older ones some code and
+    docs still use. All four are covered so a future author reaching for
+    either era's spelling still trips the guard.
     """
     import pathlib
     import re
@@ -59,12 +64,13 @@ def test_no_router_builds_its_own_account_filter():
     routers_dir = pathlib.Path(__file__).parent.parent / "routers"
     columns = r"(?:account_id|created_by_id|created_by)"
     # A hand-built comparison against one of the authorization columns, in any
-    # of SQLAlchemy's spellings: ==, !=, .in_(...), .is_(...), .isnot(...),
-    # or the `filter_by(col=...)` kwarg form (filter_by's `=` is a comparison,
-    # not an assignment, despite looking like one).
+    # of SQLAlchemy's spellings: ==, !=, .in_(...), .not_in(...), .is_(...),
+    # .is_not(...), .isnot(...), or the `filter_by(col=...)` kwarg form
+    # (filter_by's `=` is a comparison, not an assignment, despite looking
+    # like one).
     patterns = [
         re.compile(rf"\b{columns}\s*(==|!=)"),
-        re.compile(rf"\b{columns}\.(in_|is_|isnot)\("),
+        re.compile(rf"\b{columns}\.(in_|not_in|is_not|is_|isnot)\("),
         re.compile(rf"filter_by\([^)]*\b{columns}\s*=(?!=)"),
     ]
 
