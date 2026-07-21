@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
 
 
 class UserRegister(BaseModel):
@@ -295,3 +295,32 @@ class AcceptInviteRequest(BaseModel):
     # Only needed when the accepter has no account yet.
     name: str | None = None
     password: str | None = None
+
+
+class GrantIn(BaseModel):
+    company_id: str | None = None
+    location_id: str | None = None
+    group_id: str | None = None
+    machine_id: str | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_target(self):
+        targets = [self.company_id, self.location_id, self.group_id, self.machine_id]
+        if sum(t is not None for t in targets) != 1:
+            raise ValueError("a grant must target exactly one of company, location, group or machine")
+        return self
+
+
+class GrantsIn(BaseModel):
+    grants: list[GrantIn]
+
+
+class GrantOut(BaseModel):
+    id: str
+    company_id: str | None
+    location_id: str | None
+    group_id: str | None
+    machine_id: str | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

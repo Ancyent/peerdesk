@@ -306,3 +306,93 @@ async def test_authenticated_users_own_email_must_match_invitation_email(auth_cl
     )
     assert r2.status_code == 400, r2.text
     assert r2.json()["detail"] == "Invalid or expired invitation"
+
+
+# --- Task 5: the grants API -------------------------------------------------
+
+async def test_admin_sets_and_reads_a_members_grants(auth_client, member_client):
+    _, membership_id = member_client
+    co = (await auth_client.post("/companies", json={"name": "Co"})).json()
+
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"company_id": co["id"]}]},
+    )
+    assert r.status_code == 200, r.text
+    assert [g["company_id"] for g in r.json()] == [co["id"]]
+
+    listed = (await auth_client.get(f"/team/members/{membership_id}/grants")).json()
+    assert [g["company_id"] for g in listed] == [co["id"]]
+
+
+async def test_put_grants_replaces_the_whole_set(auth_client, member_client):
+    _, membership_id = member_client
+    co_a = (await auth_client.post("/companies", json={"name": "A"})).json()
+    co_b = (await auth_client.post("/companies", json={"name": "B"})).json()
+
+    await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"company_id": co_a["id"]}]},
+    )
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"company_id": co_b["id"]}]},
+    )
+    assert [g["company_id"] for g in r.json()] == [co_b["id"]]
+
+
+async def test_grant_with_two_targets_is_refused(auth_client, member_client):
+    """Rejected at the API boundary with a 422 rather than reaching the CHECK
+    constraint and surfacing as a 500."""
+    _, membership_id = member_client
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"company_id": "co-1", "machine_id": "mach-1"}]},
+    )
+    assert r.status_code == 422, r.text
+
+
+async def test_cannot_grant_a_node_from_another_account(auth_client, member_client, client):
+    """Grants are anchored to membership_id so they cannot cross accounts, but
+    the target id is caller-supplied -- without this check an admin could point a
+    grant at another tenant's company id."""
+    await client.post("/auth/register", json={
+        "email": "other@test.com", "name": "Other", "password": "Test1234!",
+    })
+    r = await client.post("/auth/login", json={"email": "other@test.com", "password": "Test1234!"})
+    client.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
+    foreign_co = (await client.post("/companies", json={"name": "Foreign"})).json()
+
+    _, membership_id = member_client
+    r = await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"company_id": foreign_co["id"]}]},
+    )
+    assert r.status_code == 404, r.text
+
+
+async def test_member_cannot_edit_grants(member_client):
+    client, membership_id = member_client
+    r = await client.put(f"/team/members/{membership_id}/grants", json={"grants": []})
+    assert r.status_code == 403
+
+
+async def test_removing_a_grant_syncs_saved_passwords(auth_client, member_client, db):
+    """The endpoint must call sync_saved_passwords, not merely delete rows from
+    access_grants. Without it, revocation leaves the credential behind."""
+    from models import SavedConnectPassword
+    client, membership_id = member_client
+    m = (await auth_client.post("/machines", json={"peer_id": "GGG-7777", "name": "M"})).json()
+
+    await auth_client.put(
+        f"/team/members/{membership_id}/grants",
+        json={"grants": [{"machine_id": m["id"]}]},
+    )
+    await client.put(f"/machines/{m['id']}/saved-password", json={"password": "pw"})
+
+    await auth_client.put(f"/team/members/{membership_id}/grants", json={"grants": []})
+
+    rows = (await db.execute(
+        select(SavedConnectPassword).where(SavedConnectPassword.membership_id == membership_id)
+    )).scalars().all()
+    assert rows == []

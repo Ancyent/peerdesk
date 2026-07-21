@@ -16,12 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from access import (
     assert_admin, count_admins, get_invitation_in_account, get_membership_in_account,
-    sync_saved_passwords, visible_invitations, visible_memberships,
+    sync_saved_passwords, visible_companies, visible_groups, visible_invitations,
+    visible_locations, visible_machines, visible_memberships,
 )
 from deps import get_current_membership, get_current_user, get_db
-from models import Invitation, Membership, User
+from models import AccessGrant, Company, Group, Invitation, Location, Machine, Membership, User
 from schemas import (
-    InvitationCreate, InvitationCreatedOut, InvitationOut,
+    GrantOut, GrantsIn, InvitationCreate, InvitationCreatedOut, InvitationOut,
     TeamMemberOut, TeamMemberRoleUpdate,
 )
 
@@ -140,3 +141,81 @@ async def revoke_invitation(
     inv = await get_invitation_in_account(db, membership, invitation_id)
     await db.delete(inv)
     await db.commit()
+
+
+@router.get("/members/{membership_id}/grants", response_model=list[GrantOut])
+async def list_grants(
+    membership_id: str,
+    db: AsyncSession = Depends(get_db),
+    membership: Membership = Depends(get_current_membership),
+):
+    assert_admin(membership)
+    target = await get_membership_in_account(db, membership, membership_id)
+    result = await db.execute(
+        select(AccessGrant).where(AccessGrant.membership_id == target.id)
+    )
+    return list(result.scalars().all())
+
+
+async def _assert_target_visible(db: AsyncSession, membership: Membership, grant) -> None:
+    """The target id is caller-supplied. 404, not 403 -- an admin must not learn
+    that another tenant's company exists from the response code."""
+    checks = (
+        (grant.company_id, visible_companies, Company),
+        (grant.location_id, visible_locations, Location),
+        (grant.group_id, visible_groups, Group),
+        (grant.machine_id, visible_machines, Machine),
+    )
+    for target_id, visible, model in checks:
+        if target_id is None:
+            continue
+        found = await db.execute(visible(membership).where(model.id == target_id))
+        if found.scalar_one_or_none() is None:
+            raise HTTPException(404, "Grant target not found")
+
+
+@router.put("/members/{membership_id}/grants", response_model=list[GrantOut])
+async def set_grants(
+    membership_id: str,
+    body: GrantsIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_membership),
+):
+    """Replaces the member's entire grant set.
+
+    Whole-set replacement rather than add/remove deltas: the editor sends the
+    desired state, so two admins editing at once cannot interleave into a
+    half-applied list, and the endpoint has one meaning instead of three.
+    """
+    assert_admin(membership)
+    target = await get_membership_in_account(db, membership, membership_id)
+
+    for grant in body.grants:
+        await _assert_target_visible(db, membership, grant)
+
+    existing = (await db.execute(
+        select(AccessGrant).where(AccessGrant.membership_id == target.id)
+    )).scalars().all()
+    for row in existing:
+        await db.delete(row)
+
+    for grant in body.grants:
+        db.add(AccessGrant(
+            membership_id=target.id,
+            created_by_id=user.id,
+            company_id=grant.company_id,
+            location_id=grant.location_id,
+            group_id=grant.group_id,
+            machine_id=grant.machine_id,
+        ))
+    await db.commit()
+
+    # Recompute rather than guess which machines were lost: grants are additive,
+    # so only the resulting visible set is authoritative.
+    await sync_saved_passwords(db, target)
+
+    result = await db.execute(
+        select(AccessGrant).where(AccessGrant.membership_id == target.id)
+    )
+    return list(result.scalars().all())
