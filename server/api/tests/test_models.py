@@ -9,7 +9,7 @@ def test_user_defaults():
     assert u.is_active is True
 
 def test_machine_defaults():
-    m = Machine(peer_id="123456789", owner_id="some-uuid")
+    m = Machine(peer_id="123456789", account_id="some-account-uuid")
     assert m.peer_id == "123456789"
     assert m.is_online is False
     assert m.name == "My Machine"

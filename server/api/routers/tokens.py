@@ -2,8 +2,8 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from deps import get_db, get_current_user
-from models import RegistrationToken, Machine, User, ApiKey
+from deps import get_db, get_current_user, get_current_membership
+from models import RegistrationToken, Machine, User, ApiKey, Membership
 from schemas import RegistrationTokenCreate, RegistrationTokenOut, TokenRedeemRequest, MachineOut, TokenRedeemResponse
 
 router = APIRouter(prefix="/tokens", tags=["tokens"])
@@ -14,9 +14,11 @@ async def create_token(
     body: RegistrationTokenCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_membership),
 ):
     reg = RegistrationToken(
         created_by=user.id,
+        account_id=membership.account_id,
         expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         company_id=body.company_id,
         location_id=body.location_id,
@@ -48,11 +50,12 @@ async def redeem_token(body: TokenRedeemRequest, db: AsyncSession = Depends(get_
 
     # A name chosen at token-generation time wins over the agent's hostname default.
     machine_name = reg.name or body.name
-    key = ApiKey(name=f"Agent: {machine_name}", auto_approve=True, created_by=reg.created_by)
+    key = ApiKey(name=f"Agent: {machine_name}", auto_approve=True, created_by=reg.created_by, account_id=reg.account_id)
     db.add(key)
     machine = Machine(
         peer_id=body.peer_id, name=machine_name, os=body.os,
-        owner_id=reg.created_by,
+        account_id=reg.account_id,
+        created_by_id=reg.created_by,
         company_id=reg.company_id, location_id=reg.location_id, group_id=reg.group_id,
         api_key_id=key.id,
     )

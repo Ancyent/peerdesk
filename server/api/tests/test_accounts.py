@@ -33,21 +33,26 @@ async def test_machine_carries_account_and_creator_separately(db):
     db.add_all([user, acct])
     await db.flush()
 
-    # owner_id is still NOT NULL (expand/contract keeps it until Task 7), so it
-    # must be supplied here alongside the new columns.
-    m = Machine(peer_id="123456789", name="Server", owner_id=user.id, account_id=acct.id, created_by_id=user.id)
+    # owner_id is gone as of Task 7; account_id and created_by_id fully replace it.
+    m = Machine(peer_id="123456789", name="Server", account_id=acct.id, created_by_id=user.id)
     db.add(m)
     await db.flush()
 
     assert m.account_id == acct.id
     assert m.created_by_id == user.id
-    # owner_id deliberately still exists here: the routers read it until Task 7
-    # moves them onto account_id. Task 7 drops it and asserts it is gone.
 
 
-def test_account_id_is_nullable_until_routers_set_it():
+def test_account_id_is_required_now():
+    """Task 7 contract: every router sets account_id, so the column is no longer
+    nullable — the opposite of what it asserted through Tasks 2-6."""
     from models import ApiKey, Branding, Company, Machine, Membership, RegistrationToken
 
     for model in (Machine, Company, ApiKey, RegistrationToken, Branding):
-        assert model.__table__.c.account_id.nullable is True, f"{model.__name__} must stay nullable until Task 7"
+        assert model.__table__.c.account_id.nullable is False, f"{model.__name__}.account_id must be required now"
     assert Membership.__table__.c.account_id.nullable is False, "a membership without an account is meaningless"
+
+
+@pytest.mark.asyncio
+async def test_owner_id_is_gone(db):
+    from models import Machine
+    assert not hasattr(Machine, "owner_id"), "authorization runs on account_id now"

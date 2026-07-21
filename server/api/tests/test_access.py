@@ -10,8 +10,8 @@ async def test_visible_machines_excludes_other_accounts(db):
     db.add_all([a, b])
     await db.flush()
     db.add_all([
-        Machine(peer_id="111111111", name="mine", owner_id="u1", account_id=a.id),
-        Machine(peer_id="222222222", name="theirs", owner_id="u1", account_id=b.id),
+        Machine(peer_id="111111111", name="mine", account_id=a.id),
+        Machine(peer_id="222222222", name="theirs", account_id=b.id),
     ])
     await db.flush()
 
@@ -30,3 +30,15 @@ def test_assert_admin_rejects_a_member():
 
 def test_assert_admin_allows_an_admin():
     access.assert_admin(Membership(user_id="u1", account_id="a1", role="admin"))
+
+
+def test_no_router_authorizes_on_its_own():
+    """Authorization lives in access.py. A router that filters by itself is how a
+    leak gets introduced, so this fails the build rather than a code review."""
+    import pathlib
+
+    routers = pathlib.Path(__file__).resolve().parents[1] / "routers"
+    offenders = sorted(
+        f.name for f in routers.glob("*.py") if "owner_id" in f.read_text()
+    )
+    assert offenders == [], f"these routers still filter on owner_id: {offenders}"

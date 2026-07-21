@@ -9,8 +9,7 @@ async def test_machines_from_another_account_are_invisible(auth_client, db):
     other = Account(name="Other Co")
     db.add(other)
     await db.flush()
-    # owner_id is still NOT NULL during expand/contract — Task 7 drops it.
-    db.add(Machine(peer_id="999999999", name="not-yours", account_id=other.id, owner_id="someone-else"))
+    db.add(Machine(peer_id="999999999", name="not-yours", account_id=other.id))
     await db.commit()
 
     r = await auth_client.get("/machines")
@@ -23,7 +22,7 @@ async def test_fetching_another_accounts_machine_returns_404(auth_client, db):
     other = Account(name="Other Co")
     db.add(other)
     await db.flush()
-    m = Machine(peer_id="888888888", name="not-yours", account_id=other.id, owner_id="someone-else")
+    m = Machine(peer_id="888888888", name="not-yours", account_id=other.id)
     db.add(m)
     await db.commit()
 
@@ -34,14 +33,15 @@ async def test_fetching_another_accounts_machine_returns_404(auth_client, db):
 @pytest.mark.asyncio
 async def test_machine_owned_by_caller_but_moved_to_another_account_is_invisible(auth_client, db):
     """The load-bearing case for this task: authorization must key off account_id,
-    not owner_id. A machine the caller's user id still owns, but that now belongs
-    to a different account, must not be visible or reachable — proves the router
-    no longer falls back to owner_id under the hood."""
+    not who created the machine. A machine the caller created (created_by_id),
+    but that now belongs to a different account, must not be visible or
+    reachable — proves the router no longer falls back to identity of the
+    creator under the hood."""
     me = (await db.execute(select(User).where(User.email == "user@test.com"))).scalar_one()
     other = Account(name="Other Co")
     db.add(other)
     await db.flush()
-    m = Machine(peer_id="777777777", name="moved-away", account_id=other.id, owner_id=me.id)
+    m = Machine(peer_id="777777777", name="moved-away", account_id=other.id, created_by_id=me.id)
     db.add(m)
     await db.commit()
 
@@ -57,14 +57,15 @@ async def test_machine_owned_by_caller_but_moved_to_another_account_is_invisible
 async def test_machine_owned_by_a_different_user_in_my_account_is_visible(auth_client, db):
     """The reciprocal case: a teammate's machine, registered under a different
     user id, must be visible to me as long as it's in my account — proves the
-    router grants access by account_id rather than restricting to owner_id."""
+    router grants access by account_id rather than restricting to whoever
+    created the machine."""
     me = (await db.execute(select(User).where(User.email == "user@test.com"))).scalar_one()
     my_membership = (await db.execute(select(Membership).where(Membership.user_id == me.id))).scalar_one()
 
     teammate = User(email="teammate@test.com", name="Teammate", password_hash="x")
     db.add(teammate)
     await db.flush()
-    m = Machine(peer_id="666666666", name="teammates-pc", account_id=my_membership.account_id, owner_id=teammate.id)
+    m = Machine(peer_id="666666666", name="teammates-pc", account_id=my_membership.account_id, created_by_id=teammate.id)
     db.add(m)
     await db.commit()
 
@@ -84,7 +85,6 @@ async def _other_account_machine(db, **kwargs) -> Machine:
         peer_id=kwargs.pop("peer_id"),
         name=kwargs.pop("name", "not-yours"),
         account_id=other.id,
-        owner_id="someone-else",
         **kwargs,
     )
     db.add(m)

@@ -123,7 +123,6 @@ class CompanyCreate(BaseModel):
 class CompanyOut(BaseModel):
     id: str
     name: str
-    owner_id: str
     created_at: datetime
     model_config = {"from_attributes": True}
 

@@ -205,3 +205,24 @@ async def test_branding_invalid_color_rejected(client):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert r2.status_code == 400
+
+
+async def test_branding_row_gets_a_real_account_id(client, db):
+    """account_id on branding is NOT NULL as of Task 7. Creating the singleton
+    row through an authenticated call must stamp it with the caller's own
+    account rather than leaving it unset or crashing the insert."""
+    from sqlalchemy import select
+    from models import Branding
+
+    r = await client.post("/auth/register", json={
+        "email": "brandtest3@b.com", "name": "B3", "password": "pass1234"
+    })
+    token = r.json()["access_token"]
+    r2 = await client.post("/branding",
+        json={"brand_name": "Acme"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r2.status_code == 200
+
+    row = (await db.execute(select(Branding).where(Branding.id == 1))).scalar_one()
+    assert row.account_id is not None

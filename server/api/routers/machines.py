@@ -53,7 +53,6 @@ async def register_machine(
         peer_id=body.peer_id,
         name=body.name,
         os=body.os,
-        owner_id=current_user.id,  # still NOT NULL until Task 7 drops the column
         account_id=membership.account_id,
         created_by_id=current_user.id,
     )
@@ -94,7 +93,6 @@ async def register_machine_via_key(
         peer_id=body.peer_id,
         name=body.name,
         os=body.os,
-        owner_id=api_key.created_by,  # still NOT NULL until Task 7 drops the column
         account_id=api_key.account_id or await _account_id_for_creator(db, api_key.created_by),
         created_by_id=api_key.created_by,
         api_key_id=api_key.id,

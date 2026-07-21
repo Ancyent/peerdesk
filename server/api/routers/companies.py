@@ -4,13 +4,14 @@ from sqlalchemy import select
 from deps import get_db, get_current_user, get_current_membership
 from models import Company, User, Membership
 from schemas import CompanyCreate, CompanyOut
+import access
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
 
 @router.get("", response_model=list[CompanyOut])
-async def list_companies(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    result = await db.execute(select(Company).where(Company.owner_id == user.id))
+async def list_companies(db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    result = await db.execute(access.visible_companies(membership))
     return result.scalars().all()
 
 
@@ -21,12 +22,7 @@ async def create_company(
     user: User = Depends(get_current_user),
     membership: Membership = Depends(get_current_membership),
 ):
-    # account_id is stamped here (ahead of this router's own Task 7 migration)
-    # because machines.py's placement handler already validates placement
-    # targets by Company.account_id — without this, every company created
-    # after Task 6 would be unplaceable. Task 7 still owns this router's own
-    # read/update/delete authorization (owner_id, below), unchanged here.
-    company = Company(name=body.name, owner_id=user.id, account_id=membership.account_id)
+    company = Company(name=body.name, account_id=membership.account_id, created_by_id=user.id)
     db.add(company)
     await db.commit()
     await db.refresh(company)
@@ -34,8 +30,8 @@ async def create_company(
 
 
 @router.patch("/{company_id}", response_model=CompanyOut)
-async def update_company(company_id: str, body: CompanyCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    result = await db.execute(select(Company).where(Company.id == company_id, Company.owner_id == user.id))
+async def update_company(company_id: str, body: CompanyCreate, db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    result = await db.execute(access.visible_companies(membership).where(Company.id == company_id))
     company = result.scalar_one_or_none()
     if not company:
         raise HTTPException(404, "Company not found")
@@ -46,8 +42,8 @@ async def update_company(company_id: str, body: CompanyCreate, db: AsyncSession 
 
 
 @router.delete("/{company_id}", status_code=204)
-async def delete_company(company_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    result = await db.execute(select(Company).where(Company.id == company_id, Company.owner_id == user.id))
+async def delete_company(company_id: str, db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    result = await db.execute(access.visible_companies(membership).where(Company.id == company_id))
     company = result.scalar_one_or_none()
     if not company:
         raise HTTPException(404, "Company not found")
