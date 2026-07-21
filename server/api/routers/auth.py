@@ -4,16 +4,18 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from deps import get_db
+from deps import get_db, get_current_user
 from models import User, AuthSession, Account, Membership
 from schemas import (
     UserRegister, UserLogin, TokenResponse, RefreshRequest, LoginStep2Request, LogoutRequest,
+    SwitchAccountIn, AccountMembershipOut,
 )
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     create_pending_2fa_token, decode_token, decode_refresh_token, hash_refresh_token,
     IDLE_TIMEOUT, ABSOLUTE_CAP,
 )
+from access import get_membership
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -123,6 +125,34 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     account_id = await _account_id_for(db, user_id)
     return TokenResponse(access_token=create_access_token(user_id, account_id), refresh_token=body.refresh_token)
+
+
+@router.get("/accounts", response_model=list[AccountMembershipOut])
+async def list_accounts(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await db.execute(
+        select(Membership, Account)
+        .join(Account, Account.id == Membership.account_id)
+        .where(Membership.user_id == current_user.id)
+    )
+    return [
+        AccountMembershipOut(account_id=a.id, name=a.name, role=m.role)
+        for m, a in rows.all()
+    ]
+
+
+@router.post("/switch-account")
+async def switch_account(
+    body: SwitchAccountIn,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    membership = await get_membership(db, current_user.id, body.account_id)
+    if not membership:
+        raise HTTPException(status_code=403, detail="Not a member of this account")
+    return {"access_token": create_access_token(current_user.id, body.account_id)}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

@@ -236,3 +236,13 @@ class MachineApprovalStatus(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: str
+
+
+class SwitchAccountIn(BaseModel):
+    account_id: str
+
+
+class AccountMembershipOut(BaseModel):
+    account_id: str
+    name: str
+    role: str
