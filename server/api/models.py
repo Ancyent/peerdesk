@@ -398,3 +398,40 @@ class SavedConnectPassword(Base):
         if "updated_at" not in kwargs:
             kwargs["updated_at"] = utcnow()
         super().__init__(**kwargs)
+
+
+class Invitation(Base):
+    """A single-use invitation into an account.
+
+    Only the SHA-256 of the token is stored: the plaintext is shown once, at
+    creation, and cannot be recovered afterwards. There is no email
+    infrastructure in this project, and adding SMTP is a real operational
+    dependency for a self-hosted product, so the link is handed over out of band.
+    """
+
+    __tablename__ = "invitations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_id: Mapped[str] = mapped_column(
+        String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
+    role: Mapped[str] = mapped_column(String(10), nullable=False, default="member")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs:
+            kwargs["id"] = str(uuid.uuid4())
+        if "role" not in kwargs:
+            kwargs["role"] = "member"
+        if "accepted_at" not in kwargs:
+            kwargs["accepted_at"] = None
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = utcnow()
+        super().__init__(**kwargs)

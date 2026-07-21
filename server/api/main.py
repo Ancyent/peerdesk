@@ -5,7 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import release_cache
-from routers import auth, machines, users, turn, sessions, totp, branding, companies, locations, groups, tokens, api_keys, releases
+from routers import (
+    auth, machines, users, turn, sessions, totp, branding, companies, locations, groups,
+    tokens, api_keys, releases, team,
+)
 
 
 @asynccontextmanager
@@ -42,6 +45,7 @@ app.include_router(groups.router)
 app.include_router(tokens.router)
 app.include_router(api_keys.router)
 app.include_router(releases.router)
+app.include_router(team.router)
 
 
 @app.get("/health")

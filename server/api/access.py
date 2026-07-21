@@ -4,12 +4,14 @@ Every authorization filter lives here. Routers must never build their own
 `account_id` conditions: one forgotten endpoint is how a leak happens, and
 Stage 2 adds per-member grants by changing this module alone.
 """
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status
-from sqlalchemy import Select, and_, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 
 from models import (
-    AccessGrant, ApiKey, Branding, Company, Group, Location, Machine, Membership,
-    SavedConnectPassword,
+    AccessGrant, ApiKey, Branding, Company, Group, Invitation, Location, Machine, Membership,
+    SavedConnectPassword, User,
 )
 
 
@@ -254,3 +256,72 @@ async def sync_saved_passwords(db, membership: Membership) -> int:
     if stale:
         await db.commit()
     return len(stale)
+
+
+def visible_memberships(membership: Membership) -> Select:
+    """Every membership in the caller's account, joined to its User. /team is
+    admin-only (routers/team.py calls assert_admin before ever reaching this),
+    so unlike visible_machines et al there is no member case to filter
+    further -- an admin administers the whole account's roster."""
+    return (
+        select(Membership, User)
+        .join(User, Membership.user_id == User.id)
+        .where(Membership.account_id == membership.account_id)
+    )
+
+
+async def get_membership_in_account(db, membership: Membership, target_id: str) -> Membership:
+    """Fetches a membership by id, scoped to the caller's account. 404 (not
+    403) if it belongs to someone else's account or doesn't exist at all --
+    an admin must not learn that a membership in another account exists."""
+    result = await db.execute(
+        select(Membership).where(
+            Membership.id == target_id,
+            Membership.account_id == membership.account_id,
+        )
+    )
+    found = result.scalar_one_or_none()
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    return found
+
+
+async def count_admins(db, account_id: str) -> int:
+    """How many admins an account currently has. routers/team.py uses this to
+    enforce that an account can never lose its last admin -- otherwise nobody
+    could administer it and recovery would need database access."""
+    result = await db.execute(
+        select(func.count()).select_from(Membership).where(
+            Membership.account_id == account_id,
+            Membership.role == "admin",
+        )
+    )
+    return result.scalar_one()
+
+
+def visible_invitations(membership: Membership) -> Select:
+    """Invitations in the caller's account that are still redeemable -- not
+    accepted, not expired. /team/invitations is admin-only, so like
+    visible_memberships there is no member case."""
+    return select(Invitation).where(
+        Invitation.account_id == membership.account_id,
+        Invitation.accepted_at.is_(None),
+        Invitation.expires_at > datetime.now(timezone.utc),
+    )
+
+
+async def get_invitation_in_account(db, membership: Membership, invitation_id: str) -> Invitation:
+    """Fetches an invitation by id, scoped to the caller's account, regardless
+    of whether it is still redeemable -- an admin revoking an already-expired
+    or already-accepted invitation is harmless and still needs to find it.
+    404 (not 403) if it belongs to another account or doesn't exist."""
+    result = await db.execute(
+        select(Invitation).where(
+            Invitation.id == invitation_id,
+            Invitation.account_id == membership.account_id,
+        )
+    )
+    inv = result.scalar_one_or_none()
+    if inv is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found")
+    return inv

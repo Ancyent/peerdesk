@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user
-from models import User, AuthSession, Account, Membership
+from models import User, AuthSession, Account, Membership, Invitation
 from schemas import (
     UserRegister, UserLogin, TokenResponse, RefreshRequest, LoginStep2Request, LogoutRequest,
-    SwitchAccountIn, AccountMembershipOut,
+    SwitchAccountIn, AccountMembershipOut, AcceptInviteRequest,
 )
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
@@ -16,6 +16,7 @@ from auth import (
     IDLE_TIMEOUT, ABSOLUTE_CAP,
 )
 from access import get_membership
+from routers.team import hash_invite_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -43,6 +44,17 @@ async def create_session(db: AsyncSession, user_id: str, account_id: str, rememb
     return create_access_token(user_id, account_id), refresh
 
 
+async def _issue_tokens(
+    db: AsyncSession, user_id: str, account_id: str, remember_me: bool = False,
+) -> TokenResponse:
+    """The one place that mints an access/refresh pair and wraps it into a
+    TokenResponse. register, login, login_2fa and accept_invite all end here
+    -- three (now four) copies of session creation is how one of them
+    drifts."""
+    access, refresh = await create_session(db, user_id, account_id, remember_me)
+    return TokenResponse(access_token=access, refresh_token=refresh)
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: UserRegister, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(select(User).where(User.email == body.email))
@@ -57,8 +69,7 @@ async def register(body: UserRegister, db: AsyncSession = Depends(get_db)):
     db.add(Membership(user_id=user.id, account_id=account.id, role="admin"))
     await db.commit()
     await db.refresh(user)
-    access, refresh = await create_session(db, user.id, account.id, body.remember_me)
-    return TokenResponse(access_token=access, refresh_token=refresh)
+    return await _issue_tokens(db, user.id, account.id, body.remember_me)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -78,8 +89,7 @@ async def login(body: UserLogin, db: AsyncSession = Depends(get_db)):
         )
 
     account_id = await _account_id_for(db, user.id)
-    access, refresh = await create_session(db, user.id, account_id, body.remember_me)
-    return TokenResponse(access_token=access, refresh_token=refresh)
+    return await _issue_tokens(db, user.id, account_id, body.remember_me)
 
 
 @router.post("/login/2fa", response_model=TokenResponse)
@@ -95,8 +105,49 @@ async def login_2fa(body: LoginStep2Request, db: AsyncSession = Depends(get_db))
     if not totp.verify(body.code, valid_window=1):
         raise HTTPException(status_code=401, detail="Invalid TOTP code")
     account_id = await _account_id_for(db, user.id)
-    access, refresh = await create_session(db, user.id, account_id, body.remember_me)
-    return TokenResponse(access_token=access, refresh_token=refresh)
+    return await _issue_tokens(db, user.id, account_id, body.remember_me)
+
+
+@router.post("/accept-invite", response_model=TokenResponse)
+async def accept_invite(body: AcceptInviteRequest, db: AsyncSession = Depends(get_db)):
+    """Joins an existing account. Unlike /auth/register, this creates no new
+    account -- that is the whole point of the endpoint.
+
+    Deliberately not behind get_current_user: the common case is someone who
+    has no account yet.
+    """
+    result = await db.execute(
+        select(Invitation).where(
+            Invitation.token_hash == hash_invite_token(body.token),
+            Invitation.accepted_at.is_(None),
+            Invitation.expires_at > datetime.now(timezone.utc),
+        ).with_for_update()
+    )
+    inv = result.scalar_one_or_none()
+    if inv is None:
+        # One message for expired, already-used and forged, so the endpoint
+        # is not an oracle for which tokens exist.
+        raise HTTPException(status_code=400, detail="Invalid or expired invitation")
+
+    existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    if existing is not None:
+        if not body.password or not verify_password(body.password, existing.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        user = existing
+    else:
+        if not body.password or not body.name:
+            raise HTTPException(status_code=400, detail="Name and password are required")
+        user = User(email=body.email, name=body.name, password_hash=hash_password(body.password))
+        db.add(user)
+        await db.flush()
+
+    if await get_membership(db, user.id, inv.account_id) is None:
+        db.add(Membership(user_id=user.id, account_id=inv.account_id, role=inv.role))
+
+    inv.accepted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return await _issue_tokens(db, user.id, inv.account_id)
 
 
 def _aware(dt: datetime) -> datetime:

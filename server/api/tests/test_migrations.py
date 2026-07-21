@@ -73,7 +73,7 @@ ASYNCPG_DSN = f"postgresql://{PG_USER}:{PG_PASSWORD}@localhost:{HOST_PORT}/{PG_D
 SCOPED_TABLES = ["machines", "companies", "api_keys", "registration_tokens", "branding"]
 
 # The expected Alembic head. Bump this in the task that adds a migration.
-HEAD_REVISION = "0018"
+HEAD_REVISION = "0019"
 
 
 def _docker_available() -> bool:

@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr
+from typing import Literal, Optional
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class UserRegister(BaseModel):
@@ -245,3 +245,44 @@ class AccountMembershipOut(BaseModel):
     account_id: str
     name: str
     role: str
+
+
+class TeamMemberOut(BaseModel):
+    membership_id: str
+    user_id: str
+    name: str
+    email: str
+    role: str          # "admin" | "member"
+    created_at: datetime
+
+
+class TeamMemberRoleUpdate(BaseModel):
+    role: Literal["admin", "member"]
+
+
+class InvitationCreate(BaseModel):
+    email: str | None = None
+    role: Literal["admin", "member"] = "member"
+
+
+class InvitationOut(BaseModel):
+    id: str
+    email: str | None
+    role: str
+    expires_at: datetime
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InvitationCreatedOut(InvitationOut):
+    # Shown once, at creation. Never returned by the list endpoint.
+    token: str
+
+
+class AcceptInviteRequest(BaseModel):
+    token: str
+    email: str
+    # Only needed when the accepter has no account yet.
+    name: str | None = None
+    password: str | None = None
