@@ -22,6 +22,11 @@ export interface AuthContextValue extends AuthState {
   logout: () => void;
   setSessionActive: (active: boolean) => void;
   switchAccount: (accountId: string) => Promise<void>;
+  // Persists a fresh token pair and loads the resulting user, the same way
+  // login/register do. Shared with InvitePage, whose /auth/accept-invite
+  // call also mints a token pair (for both the signed-out registration
+  // branch and the signed-in "join with my existing account" branch).
+  applyTokens: (access: string, refresh: string, rememberMe?: boolean) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -117,24 +122,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, user, accessToken: access }));
   };
 
+  const applyTokens = useCallback(async (access: string, refresh: string, rememberMe = false) => {
+    storeSetTokens({ access, refresh }, rememberMe);
+    lastActivity.current = Date.now();
+    await finishAuth(access);
+  }, []);
+
   const login = useCallback(async (email: string, password: string, rememberMe = false) => {
     const tokens = await api.auth.login(email, password, rememberMe);
-    storeSetTokens({ access: tokens.access_token, refresh: tokens.refresh_token }, rememberMe);
-    lastActivity.current = Date.now();
-    await finishAuth(tokens.access_token);
-  }, []);
+    await applyTokens(tokens.access_token, tokens.refresh_token, rememberMe);
+  }, [applyTokens]);
 
   const register = useCallback(async (email: string, name: string, password: string, rememberMe = false) => {
     const tokens = await api.auth.register(email, name, password, rememberMe);
-    storeSetTokens({ access: tokens.access_token, refresh: tokens.refresh_token }, rememberMe);
-    lastActivity.current = Date.now();
-    await finishAuth(tokens.access_token);
-  }, []);
+    await applyTokens(tokens.access_token, tokens.refresh_token, rememberMe);
+  }, [applyTokens]);
 
   return (
     <AuthContext.Provider value={{
       ...state, accounts, activeAccountId, role,
-      login, register, logout: doLogout, setSessionActive, switchAccount,
+      login, register, logout: doLogout, setSessionActive, switchAccount, applyTokens,
     }}>
       {children}
     </AuthContext.Provider>

@@ -10,6 +10,7 @@ import { BrandingPage } from './pages/BrandingPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ApiKeysPage } from './pages/ApiKeysPage';
 import { TeamPage } from './pages/TeamPage';
+import { InvitePage } from './pages/InvitePage';
 import { AppShell, type AppPage } from './components/AppShell';
 import { OrgTree, type OrgNode } from './components/OrgTree';
 import { ConnectForm } from './components/ConnectForm';
@@ -31,13 +32,16 @@ import { parsePath, type RoutablePage } from './routing/paths';
 import { useRoute } from './routing/useRoute';
 import { coerceOs, type OsId } from './pages/downloads/osData';
 
-type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer';
+type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer' | 'invite';
 
 export default function App() {
   const { user, loading, setSessionActive, accessToken, role } = useAuth();
   const initialRoute = parsePath(window.location.pathname);
   const [page, setPage] = useState<FullPage>(initialRoute.page);
   const [downloadsOs, setDownloadsOs] = useState<OsId>(coerceOs(initialRoute.sub));
+  const [inviteToken, setInviteToken] = useState<string | null>(
+    initialRoute.page === 'invite' ? initialRoute.sub : null,
+  );
   const [connectPeerId, setConnectPeerId] = useState('');
   const [connectMachineId, setConnectMachineId] = useState<string | null>(null);
   // Set when a "remember password" connect is in flight; saved once the host accepts.
@@ -80,11 +84,13 @@ export default function App() {
     }
     setPage(p);
     if (p === 'downloads') setDownloadsOs(coerceOs(sub));
+    if (p === 'invite') setInviteToken(sub);
   });
   const go = useCallback((p: RoutablePage, sub?: string) => {
     navigate(p, sub ?? null);
     setPage(p);
     if (p === 'downloads') setDownloadsOs(coerceOs(sub ?? null));
+    if (p === 'invite') setInviteToken(sub ?? null);
   }, [navigate]);
 
   // After login, don't linger on /login or /register.
@@ -203,12 +209,17 @@ export default function App() {
   );
 
   if (!user) {
+    if (page === 'invite' && inviteToken) return <InvitePage token={inviteToken} />;
     if (page === 'register') return <RegisterPage onGoLogin={() => go('login')} />;
     return <LoginPage onGoRegister={() => go('register')} />;
   }
 
   // Fix 2: an authed user who navigated back to /login or /register sees machines
   const effectivePage: FullPage = user && (page === 'login' || page === 'register') ? 'machines' : page;
+
+  // A signed-in user can also open an invite link (e.g. to join a second
+  // account) -- InvitePage itself branches on whether useAuth() has a user.
+  if (effectivePage === 'invite') return <InvitePage token={inviteToken ?? ''} />;
 
   if (effectivePage === 'viewer') {
     if (viewerState === 'connecting') return (

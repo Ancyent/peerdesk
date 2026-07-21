@@ -139,6 +139,27 @@ export interface AccountMembershipOut {
   role: string;   // "admin" | "member"
 }
 
+export interface TeamMemberOut {
+  membership_id: string;
+  user_id: string;
+  name: string;
+  email: string;
+  role: string;   // "admin" | "member"
+  created_at: string;
+}
+
+export interface InvitationOut {
+  id: string;
+  email: string | null;
+  role: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface InvitationCreatedOut extends InvitationOut {
+  token: string;   // shown once, never returned again
+}
+
 export interface ReleaseAsset {
   name: string;
   size: number;
@@ -172,6 +193,19 @@ export const api = {
         method: 'POST',
         headers: authHeaders(token),
         body: JSON.stringify({ account_id: accountId }),
+      }),
+    // No required token argument -- the accepter may have no account yet.
+    // `accessToken`, when passed, attaches the invitation to that signed-in
+    // user server-side and the body's `email` is ignored there; omit it for
+    // the signed-out (registration) path.
+    acceptInvite: (
+      body: { token: string; email: string; name?: string; password?: string },
+      accessToken?: string,
+    ) =>
+      request<TokenResponse>('/auth/accept-invite', {
+        method: 'POST',
+        headers: accessToken ? authHeaders(accessToken) : undefined,
+        body: JSON.stringify(body),
       }),
   },
   users: {
@@ -294,5 +328,27 @@ export const api = {
   },
   releases: {
     latest: () => request<Release>('/releases/latest'),
+  },
+  team: {
+    members: (token: string) =>
+      request<TeamMemberOut[]>('/team/members', { headers: authHeaders(token) }),
+    setRole: (token: string, membershipId: string, role: string) =>
+      request<TeamMemberOut>(`/team/members/${membershipId}`, {
+        method: 'PATCH', headers: authHeaders(token), body: JSON.stringify({ role }),
+      }),
+    removeMember: (token: string, membershipId: string) =>
+      request<void>(`/team/members/${membershipId}`, {
+        method: 'DELETE', headers: authHeaders(token),
+      }),
+    invitations: (token: string) =>
+      request<InvitationOut[]>('/team/invitations', { headers: authHeaders(token) }),
+    invite: (token: string, email: string | null, role: string) =>
+      request<InvitationCreatedOut>('/team/invitations', {
+        method: 'POST', headers: authHeaders(token), body: JSON.stringify({ email, role }),
+      }),
+    revokeInvite: (token: string, invitationId: string) =>
+      request<void>(`/team/invitations/${invitationId}`, {
+        method: 'DELETE', headers: authHeaders(token),
+      }),
   },
 };
