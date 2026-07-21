@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db
-from models import User, AuthSession
+from models import User, AuthSession, Account, Membership
 from schemas import (
     UserRegister, UserLogin, TokenResponse, RefreshRequest, LoginStep2Request, LogoutRequest,
 )
@@ -18,14 +18,21 @@ from auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-async def create_session(db: AsyncSession, user_id: str, remember_me: bool) -> tuple[str, str]:
+async def _account_id_for(db: AsyncSession, user_id: str) -> str:
+    """The account a token should carry: the user's first (only, pre-Task-6) membership."""
+    result = await db.execute(select(Membership).where(Membership.user_id == user_id))
+    membership = result.scalars().first()
+    return membership.account_id
+
+
+async def create_session(db: AsyncSession, user_id: str, account_id: str, remember_me: bool) -> tuple[str, str]:
     sid = str(uuid.uuid4())
     refresh = create_refresh_token(user_id, sid)
     db.add(AuthSession(
         id=sid, user_id=user_id, token_hash=hash_refresh_token(refresh), remember_me=remember_me,
     ))
     await db.commit()
-    return create_access_token(user_id), refresh
+    return create_access_token(user_id, account_id), refresh
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -35,9 +42,14 @@ async def register(body: UserRegister, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already registered")
     user = User(email=body.email, name=body.name, password_hash=hash_password(body.password))
     db.add(user)
+    await db.flush()
+    account = Account(name=f"{user.name}'s Account")
+    db.add(account)
+    await db.flush()
+    db.add(Membership(user_id=user.id, account_id=account.id, role="admin"))
     await db.commit()
     await db.refresh(user)
-    access, refresh = await create_session(db, user.id, body.remember_me)
+    access, refresh = await create_session(db, user.id, account.id, body.remember_me)
     return TokenResponse(access_token=access, refresh_token=refresh)
 
 
@@ -57,7 +69,8 @@ async def login(body: UserLogin, db: AsyncSession = Depends(get_db)):
             temp_token=temp_token,
         )
 
-    access, refresh = await create_session(db, user.id, body.remember_me)
+    account_id = await _account_id_for(db, user.id)
+    access, refresh = await create_session(db, user.id, account_id, body.remember_me)
     return TokenResponse(access_token=access, refresh_token=refresh)
 
 
@@ -73,7 +86,8 @@ async def login_2fa(body: LoginStep2Request, db: AsyncSession = Depends(get_db))
     totp = pyotp.TOTP(user.totp_secret)
     if not totp.verify(body.code, valid_window=1):
         raise HTTPException(status_code=401, detail="Invalid TOTP code")
-    access, refresh = await create_session(db, user.id, body.remember_me)
+    account_id = await _account_id_for(db, user.id)
+    access, refresh = await create_session(db, user.id, account_id, body.remember_me)
     return TokenResponse(access_token=access, refresh_token=refresh)
 
 
@@ -102,7 +116,8 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     session.last_used_at = now
     await db.commit()
-    return TokenResponse(access_token=create_access_token(user_id), refresh_token=body.refresh_token)
+    account_id = await _account_id_for(db, user_id)
+    return TokenResponse(access_token=create_access_token(user_id, account_id), refresh_token=body.refresh_token)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

@@ -24,9 +24,28 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(user_id: str, account_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({"sub": user_id, "exp": expire, "type": "access"}, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(
+        {"sub": user_id, "account_id": account_id, "exp": expire, "type": "access"},
+        SECRET_KEY, algorithm=ALGORITHM,
+    )
+
+
+def decode_access_claims(token: str) -> Optional[tuple[str, Optional[str]]]:
+    """Returns (user_id, account_id). account_id is None for tokens minted before
+    accounts existed; the caller falls back to the user's sole membership so that
+    nobody is logged out by this change."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "access":
+            return None
+        sub = payload.get("sub")
+        if not sub:
+            return None
+        return sub, payload.get("account_id")
+    except JWTError:
+        return None
 
 
 def create_refresh_token(user_id: str, sid: str) -> str:

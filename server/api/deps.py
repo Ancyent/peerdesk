@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import AsyncSessionLocal
-from models import User, ApiKey
+from models import User, ApiKey, Membership
 from auth import decode_token
 
 bearer = HTTPBearer()
@@ -27,6 +27,31 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+async def get_current_membership(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    db: AsyncSession = Depends(get_db),
+) -> Membership:
+    from access import get_membership
+    from auth import decode_access_claims
+
+    claims = decode_access_claims(credentials.credentials)
+    if not claims:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    user_id, account_id = claims
+
+    if account_id is None:
+        result = await db.execute(select(Membership).where(Membership.user_id == user_id))
+        memberships = result.scalars().all()
+        if len(memberships) != 1:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Select an account")
+        return memberships[0]
+
+    membership = await get_membership(db, user_id, account_id)
+    if not membership:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of this account")
+    return membership
 
 
 async def get_api_key(

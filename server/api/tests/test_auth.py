@@ -9,7 +9,7 @@ def test_password_hash_and_verify():
 
 def test_access_token_round_trip():
     from auth import create_access_token, decode_token
-    token = create_access_token("user-123")
+    token = create_access_token("user-123", "acct-123")
     user_id = decode_token(token, "access")
     assert user_id == "user-123"
 
@@ -42,7 +42,7 @@ def test_refresh_token_carries_sid():
 
 def test_decode_refresh_rejects_access_token():
     from auth import create_access_token, decode_refresh_token
-    assert decode_refresh_token(create_access_token("user-1")) is None
+    assert decode_refresh_token(create_access_token("user-1", "acct-1")) is None
 
 def test_hash_refresh_token_stable_and_hex():
     from auth import hash_refresh_token
