@@ -41,6 +41,11 @@ async def get_current_membership(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     user_id, account_id = claims
 
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
     if account_id is None:
         result = await db.execute(select(Membership).where(Membership.user_id == user_id))
         memberships = result.scalars().all()

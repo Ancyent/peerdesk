@@ -19,9 +19,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 async def _account_id_for(db: AsyncSession, user_id: str) -> str:
-    """The account a token should carry: the user's first (only, pre-Task-6) membership."""
-    result = await db.execute(select(Membership).where(Membership.user_id == user_id))
+    """The account a token should carry: the user's oldest membership, so their
+    original account stays their default as further memberships are added."""
+    result = await db.execute(
+        select(Membership).where(Membership.user_id == user_id).order_by(Membership.created_at)
+    )
     membership = result.scalars().first()
+    if membership is None:
+        raise HTTPException(status_code=401, detail="No account membership")
     return membership.account_id
 
 
