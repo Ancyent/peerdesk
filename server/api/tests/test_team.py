@@ -27,12 +27,6 @@ async def test_invitation_is_single_use(auth_client, client):
         "/team/invitations", json={"email": "one@test.com", "role": "member"}
     )).json()["token"]
 
-    # auth_client and client are the same underlying object with the admin's
-    # bearer token already attached (see conftest.auth_client) -- drop it so
-    # this models an actual unauthenticated invitee, not the admin accepting
-    # their own invitation via the authenticated branch.
-    del client.headers["Authorization"]
-
     r1 = await client.post("/auth/accept-invite", json={
         "token": token, "name": "One", "password": "Test1234!", "email": "one@test.com",
     })
@@ -52,8 +46,6 @@ async def test_expired_invitation_is_refused(auth_client, client, db):
     inv.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
     await db.commit()
 
-    del client.headers["Authorization"]  # models an unauthenticated invitee
-
     r = await client.post("/auth/accept-invite", json={
         "token": token, "name": "Late", "password": "Test1234!", "email": "late@test.com",
     })
@@ -68,8 +60,6 @@ async def test_accepting_joins_the_inviting_account_not_a_new_one(auth_client, c
     token = (await auth_client.post(
         "/team/invitations", json={"email": "join@test.com", "role": "member"}
     )).json()["token"]
-
-    del client.headers["Authorization"]  # models an unauthenticated invitee
 
     await client.post("/auth/accept-invite", json={
         "token": token, "name": "Join", "password": "Test1234!", "email": "join@test.com",
@@ -160,8 +150,6 @@ async def test_totp_enabled_users_password_cannot_accept_invite(auth_client, cli
 
     token = (await auth_client.post("/team/invitations", json={"role": "member"})).json()["token"]
 
-    del client.headers["Authorization"]  # models an unauthenticated invitee/attacker
-
     r3 = await client.post("/auth/accept-invite", json={
         "token": token, "email": "bob@test.com", "password": bob_password,
     })
@@ -222,8 +210,6 @@ async def test_unauthenticated_accept_with_registered_email_returns_409_not_sess
     })
     token = (await auth_client.post("/team/invitations", json={"role": "member"})).json()["token"]
 
-    del client.headers["Authorization"]  # models an unauthenticated invitee
-
     r = await client.post("/auth/accept-invite", json={
         "token": token, "email": "dave@test.com", "password": "whatever-guess",
     })
@@ -243,8 +229,6 @@ async def test_invitation_email_is_enforced_when_set(auth_client, client, db):
         "/team/invitations", json={"email": "alice@corp.com", "role": "member"}
     )).json()["token"]
 
-    del client.headers["Authorization"]  # models an unauthenticated invitee
-
     wrong = await client.post("/auth/accept-invite", json={
         "token": token, "email": "mallory@evil.com", "name": "Mallory", "password": "Test1234!",
     })
@@ -262,12 +246,44 @@ async def test_invitation_email_match_is_case_insensitive(auth_client, client):
         "/team/invitations", json={"email": "Alice@Corp.com", "role": "member"}
     )).json()["token"]
 
-    del client.headers["Authorization"]  # models an unauthenticated invitee
-
     r = await client.post("/auth/accept-invite", json={
         "token": token, "email": "alice@corp.com", "name": "Alice", "password": "Test1234!",
     })
     assert r.status_code == 200, r.text
+
+
+async def test_case_variant_of_existing_user_email_cannot_join_as_a_new_identity(
+    auth_client, client, db
+):
+    """Finding 1: _emails_match folds case, so an invitation scoped to
+    alice@corp.com is (rightly) also redeemable with ALICE@corp.com. But the
+    existing-user lookup that follows must fold case too, or an attacker who
+    already knows a real user's address can present a case-swapped variant,
+    sail past the email check, and get a brand-new User row created for
+    what reads as Alice's address instead of hitting the 409 that
+    /auth/register's own case-sensitive-lookup twin would give for an exact
+    match. That would defeat the entire purpose of email-scoped invitations
+    -- the link holder joining as a different identity -- via nothing more
+    than a case change."""
+    await client.post("/auth/register", json={
+        "email": "alice@corp.com", "name": "Alice", "password": "Test1234!",
+    })
+    token = (await auth_client.post(
+        "/team/invitations", json={"email": "alice@corp.com", "role": "member"}
+    )).json()["token"]
+
+    r = await client.post("/auth/accept-invite", json={
+        "token": token, "email": "ALICE@corp.com", "name": "Mallory", "password": "Test1234!",
+    })
+    assert r.status_code == 409, r.text
+    assert "access_token" not in r.json()
+
+    # No shadow account was created for the case-variant address, and the
+    # invitation was not consumed by the rejected attempt.
+    users = (await db.execute(select(User).where(User.name == "Mallory"))).scalars().all()
+    assert users == []
+    inv = (await db.execute(select(Invitation))).scalar_one()
+    assert inv.accepted_at is None
 
 
 async def test_authenticated_users_own_email_must_match_invitation_email(auth_client, client, db):

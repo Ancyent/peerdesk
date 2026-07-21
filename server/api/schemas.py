@@ -261,7 +261,13 @@ class TeamMemberRoleUpdate(BaseModel):
 
 
 class InvitationCreate(BaseModel):
-    email: str | None = None
+    # EmailStr so a typo'd address (e.g. "alice@@corp.com") is rejected at
+    # creation time rather than minting an invitation nobody can ever redeem
+    # -- accept-invite's email check now enforces this address by comparison
+    # (see _emails_match in routers/auth.py), so an unvalidated typo here
+    # fails silently at accept time with the generic "Invalid or expired
+    # invitation", giving the admin no hint why.
+    email: EmailStr | None = None
     role: Literal["admin", "member"] = "member"
 
 

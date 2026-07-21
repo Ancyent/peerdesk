@@ -3,7 +3,7 @@ import pyotp
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from deps import get_db, get_current_user, get_current_user_optional
 from models import User, AuthSession, Account, Membership, Invitation
 from schemas import (
@@ -163,7 +163,16 @@ async def accept_invite(
         if inv.email is not None and not _emails_match(inv.email, body.email):
             raise HTTPException(status_code=400, detail="Invalid or expired invitation")
 
-        existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+        # Case-insensitive to agree with _emails_match above: that check has
+        # already accepted this body.email as equivalent (mod case) to the
+        # invitation's address, so a case-sensitive lookup here would miss
+        # an already-registered user who differs only in letter case and
+        # create a second User row for the same real-world address -- the
+        # exact bypass email scoping exists to prevent. See Finding 1 in
+        # task-4-report.md.
+        existing = (await db.execute(
+            select(User).where(func.lower(User.email) == body.email.strip().lower())
+        )).scalar_one_or_none()
         if existing is not None:
             raise HTTPException(status_code=409, detail="Email already registered")
 

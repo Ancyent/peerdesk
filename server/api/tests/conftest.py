@@ -36,6 +36,17 @@ async def client(db):
 
 @pytest.fixture
 async def auth_client(client):
+    """An AsyncClient authenticated as an admin -- its OWN client, distinct
+    from the `client` fixture. `client` and `auth_client` share the same
+    dependency-overridden `app` (registration/login go through `client`
+    itself), but each gets its own httpx AsyncClient/header set, the same
+    pattern `member_client` below already uses. Previously this mutated and
+    returned the shared `client` object, so a test requesting both fixtures
+    got one client: the admin's Authorization header leaked into calls the
+    test believed were anonymous, papered over in test_team.py with a
+    `del client.headers["Authorization"]` after every auth_client use. See
+    Finding 3 in task-4-report.md.
+    """
     await client.post("/auth/register", json={
         "email": "user@test.com", "name": "Test User", "password": "Test1234!"
     })
@@ -43,8 +54,10 @@ async def auth_client(client):
         "email": "user@test.com", "password": "Test1234!"
     })
     assert r.status_code == 200, f"Login failed: {r.text}"
-    client.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
-    return client
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        c.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
+        yield c
 
 
 @pytest.fixture

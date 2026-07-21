@@ -37,9 +37,16 @@ async def get_current_user_optional(
     """Same identity resolution as get_current_user, but returns None instead
     of raising when no bearer token is present at all -- for POST
     /auth/accept-invite, where the common caller has no session yet. A
-    bearer token that IS present but invalid/expired still raises 401 rather
-    than silently falling back to "anonymous": a caller presenting a broken
-    token gets an error, not a different code path.
+    well-formed `Authorization: Bearer <token>` header with an invalid or
+    expired token still raises 401 rather than silently falling back to
+    "anonymous": a caller presenting a broken bearer token gets an error,
+    not a different code path. This does NOT cover every malformed header,
+    though: HTTPBearer(auto_error=False) only recognizes the Bearer scheme,
+    so e.g. `Authorization: Basic ...` (or any other/malformed scheme) is
+    treated as "no credentials" by FastAPI before this function ever runs,
+    and falls back to anonymous. That is not a privilege escalation -- the
+    anonymous branch never authenticates as anyone -- but it does mean the
+    401-not-anonymous guarantee is scoped to bearer tokens specifically.
     """
     if credentials is None:
         return None
