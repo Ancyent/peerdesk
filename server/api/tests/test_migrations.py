@@ -511,3 +511,17 @@ def test_access_grant_rejects_zero_targets(pg):
             "INSERT INTO access_grants (id, membership_id, created_by_id, created_at) "
             "VALUES ('g-empty', 'mem-user-4', 'user-4', NOW())"
         ))
+
+
+def test_access_grant_created_at_is_not_nullable(pg):
+    """models.py declares created_at: Mapped[datetime] (NOT NULL under
+    create_all). The migration must match, or a fresh install (create_all)
+    and a migrated install (alembic) end up with different schemas for the
+    same table."""
+    _upgrade("head")
+
+    is_nullable = _run(_fetchval(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_name = 'access_grants' AND column_name = 'created_at'"
+    ))
+    assert is_nullable == "NO"

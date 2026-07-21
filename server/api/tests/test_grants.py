@@ -4,7 +4,6 @@ Testing here rather than through endpoints is deliberate: the rule lives in
 one module and is consumed by every router, so proving it once is worth more
 than proving it twenty times through HTTP.
 """
-import pytest
 from sqlalchemy import select
 
 from access import visible_machines, visible_companies, visible_locations, visible_groups
@@ -189,3 +188,179 @@ async def test_counting_machines_uses_the_filtered_query(db):
 
     assert total == 3
     assert visible == 1, "a count built off visible_machines must not reveal hidden machines"
+
+
+# --- Membership anchoring (Finding 1) ---------------------------------------
+
+async def test_two_members_in_same_account_see_only_their_own_grants(db):
+    """Cross-account isolation (test_grant_cannot_reach_into_another_account)
+    is not the same property as this one. That test passes off the
+    account_id filter alone, before any grant condition ever runs. This test
+    forces the grant condition itself to do the work: two memberships in the
+    SAME account hold DIFFERENT grants, so if `_granted()` ever drops its
+    `AccessGrant.membership_id == membership.id` condition, each member
+    inherits the union of every member's grants and this fails."""
+    await _tree(db)
+    m1 = await _member(db, user_id="u-1")
+    m2 = await _member(db, user_id="u-2")
+    db.add(AccessGrant(membership_id=m1.id, company_id="acct:co-A"))
+    db.add(AccessGrant(membership_id=m2.id, company_id="acct:co-B"))
+    await db.commit()
+
+    assert await _ids(db, visible_machines(m1)) == {"acct:mach-A", "acct:mach-loose"}
+    assert await _ids(db, visible_machines(m2)) == {"acct:mach-B"}
+
+
+# --- Unpinned branches (Finding 2) ------------------------------------------
+
+async def test_location_grant_reveals_machines_in_that_location(db):
+    """Pins Machine.location_id.in_(...) in visible_machines: a location
+    grant, with no matching company/group/machine grant, must still surface
+    the machines placed in it."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, location_id="acct:loc-A1"))
+    await db.commit()
+
+    assert await _ids(db, visible_machines(m)) == {"acct:mach-A"}
+
+
+async def test_group_grant_reveals_machines_in_that_group(db):
+    """Pins Machine.group_id.in_(...) in visible_machines."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, group_id="acct:grp-A1a"))
+    await db.commit()
+
+    assert await _ids(db, visible_machines(m)) == {"acct:mach-A"}
+
+
+async def test_admin_sees_every_company_in_the_account(db):
+    """The admin short-circuit in visible_companies. An admin holds no
+    grants, so if `if _is_admin(membership): return base` were deleted, an
+    admin would see zero companies -- silently, since an empty tree raises
+    no error."""
+    await _tree(db)
+    m = await _member(db, user_id="u-adm", role="admin")
+
+    assert await _ids(db, visible_companies(m)) == {"acct:co-A", "acct:co-B"}
+
+
+async def test_admin_sees_every_location_in_the_account(db):
+    """The admin short-circuit in visible_locations."""
+    await _tree(db)
+    m = await _member(db, user_id="u-adm", role="admin")
+
+    assert await _ids(db, visible_locations(m)) == {"acct:loc-A1", "acct:loc-B1"}
+
+
+async def test_admin_sees_every_group_in_the_account(db):
+    """The admin short-circuit in visible_groups."""
+    await _tree(db)
+    m = await _member(db, user_id="u-adm", role="admin")
+
+    assert await _ids(db, visible_groups(m)) == {"acct:grp-A1a", "acct:grp-B1a"}
+
+
+async def test_member_with_no_grants_sees_no_companies(db):
+    await _tree(db)
+    m = await _member(db)
+
+    assert await _ids(db, visible_companies(m)) == set()
+
+
+async def test_member_with_no_grants_sees_no_locations(db):
+    await _tree(db)
+    m = await _member(db)
+
+    assert await _ids(db, visible_locations(m)) == set()
+
+
+async def test_member_with_no_grants_sees_no_groups(db):
+    await _tree(db)
+    m = await _member(db)
+
+    assert await _ids(db, visible_groups(m)) == set()
+
+
+async def test_company_grant_is_visible_in_visible_companies(db):
+    """Pins Company.id.in_(_granted(..., AccessGrant.company_id)) in
+    visible_companies -- distinct from test_grant_on_a_company_reveals_its_descendants,
+    which asserts only the locations/groups a company grant reaches, never
+    the granted company itself."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, company_id="acct:co-A"))
+    await db.commit()
+
+    assert await _ids(db, visible_companies(m)) == {"acct:co-A"}
+
+
+async def test_location_grant_reveals_ancestor_company(db):
+    """Pins the via_location branch in visible_companies: a location grant,
+    with no company grant, must still surface its ancestor company."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, location_id="acct:loc-A1"))
+    await db.commit()
+
+    assert await _ids(db, visible_companies(m)) == {"acct:co-A"}
+
+
+async def test_machine_grant_reveals_ancestor_company(db):
+    """Pins the via_machine branch in visible_companies: a machine grant,
+    with no company/location/group grant, must still surface its ancestor
+    company."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, machine_id="acct:mach-A"))
+    await db.commit()
+
+    assert await _ids(db, visible_companies(m)) == {"acct:co-A"}
+
+
+async def test_location_grant_is_visible_in_visible_locations(db):
+    """Pins Location.id.in_(_granted(..., AccessGrant.location_id)) in
+    visible_locations -- a location grant with no company grant."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, location_id="acct:loc-A1"))
+    await db.commit()
+
+    assert await _ids(db, visible_locations(m)) == {"acct:loc-A1"}
+
+
+async def test_machine_grant_reveals_ancestor_location(db):
+    """Pins the via_machine branch in visible_locations: a machine grant,
+    with no company/location/group grant, must still surface its ancestor
+    location."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, machine_id="acct:mach-A"))
+    await db.commit()
+
+    assert await _ids(db, visible_locations(m)) == {"acct:loc-A1"}
+
+
+async def test_location_grant_reveals_child_groups(db):
+    """Pins Location.id.in_(_granted(..., AccessGrant.location_id)) in
+    visible_groups: a location grant, with no group grant, must still
+    surface the groups under it."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, location_id="acct:loc-A1"))
+    await db.commit()
+
+    assert await _ids(db, visible_groups(m)) == {"acct:grp-A1a"}
+
+
+async def test_machine_grant_reveals_ancestor_group(db):
+    """Pins the via_machine branch in visible_groups: a machine grant, with
+    no company/location/group grant, must still surface its ancestor
+    group."""
+    await _tree(db)
+    m = await _member(db)
+    db.add(AccessGrant(membership_id=m.id, machine_id="acct:mach-A"))
+    await db.commit()
+
+    assert await _ids(db, visible_groups(m)) == {"acct:grp-A1a"}

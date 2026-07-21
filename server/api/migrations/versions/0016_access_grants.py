@@ -18,7 +18,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("membership_id", sa.String(), nullable=False),
         sa.Column("created_by_id", sa.String(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("company_id", sa.String(), nullable=True),
         sa.Column("location_id", sa.String(), nullable=True),
         sa.Column("group_id", sa.String(), nullable=True),
