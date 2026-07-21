@@ -72,6 +72,9 @@ ASYNCPG_DSN = f"postgresql://{PG_USER}:{PG_PASSWORD}@localhost:{HOST_PORT}/{PG_D
 # are account-scoped and must have a NOT NULL account_id at head.
 SCOPED_TABLES = ["machines", "companies", "api_keys", "registration_tokens", "branding"]
 
+# The expected Alembic head. Bump this in the task that adds a migration.
+HEAD_REVISION = "0015"
+
 
 def _docker_available() -> bool:
     if shutil.which("docker") is None:
@@ -210,7 +213,7 @@ def test_upgrade_head_from_empty_succeeds(pg):
     create_all -- except create_all can't fail the way a real migration can."""
     _upgrade("head")
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0015"
+    assert version == HEAD_REVISION
 
 
 # --- 2. round trip: head -> base -> head -----------------------------------
@@ -233,7 +236,7 @@ def test_upgrade_downgrade_upgrade_roundtrip(pg):
     tables, _ = _run(_reflect())
     assert {"users", "accounts", "machines", "branding"} <= tables
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0015"
+    assert version == HEAD_REVISION
 
 
 # --- 3. zero-accounts branding: the Critical defect ------------------------
@@ -255,7 +258,7 @@ def test_zero_accounts_branding_survives_upgrade_head(pg):
     _upgrade("head")  # must not raise
 
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0015"
+    assert version == HEAD_REVISION
     # 0013 deletes orphaned (NULL account_id) branding rows rather than leave
     # an un-tightenable column -- the row is regenerable, the migration is not.
     assert _run(_fetchval("SELECT COUNT(*) FROM branding")) == 0
@@ -327,7 +330,7 @@ def test_duplicate_branding_account_id_deduped_on_upgrade_head(pg):
     _upgrade("head")  # must not raise
 
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0015"
+    assert version == HEAD_REVISION
 
     remaining = _run(_fetchval(
         "SELECT COUNT(*) FROM branding WHERE account_id = $1", "acct-dup"
@@ -400,3 +403,113 @@ def test_auth_sessions_account_id_is_nullable_and_clears_on_account_delete(pg):
 
     remaining = _run(_fetchval("SELECT account_id FROM auth_sessions WHERE id = $1", "sess-x"))
     assert remaining is None
+
+
+# --- Stage 2: saved connect passwords move to (membership, machine) ---------
+
+def _seed_account_user_machine(account_id, user_id, machine_id, peer_id, saved_enc):
+    """Creates account + user + membership + machine at revision 0016, with an
+    optional saved password on the machine. Returns nothing; callers assert."""
+    _run(_execute(
+        "INSERT INTO accounts (id, name, created_at) VALUES ($1, $2, NOW())",
+        account_id, "Acme",
+    ))
+    _run(_execute(
+        "INSERT INTO users (id, email, name, password_hash, is_active, created_at) "
+        "VALUES ($1, $2, $3, 'hash', TRUE, NOW())",
+        user_id, f"{user_id}@example.com", "U",
+    ))
+    _run(_execute(
+        "INSERT INTO memberships (id, user_id, account_id, role, created_at) "
+        "VALUES ($1, $2, $3, 'admin', NOW())",
+        f"mem-{user_id}", user_id, account_id,
+    ))
+    _run(_execute(
+        "INSERT INTO machines (id, peer_id, name, account_id, created_by_id, "
+        "is_online, approval_status, created_at, saved_password_enc) "
+        "VALUES ($1, $2, 'M', $3, $4, FALSE, 'approved', NOW(), $5)",
+        machine_id, peer_id, account_id, user_id, saved_enc,
+    ))
+
+
+@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
+def test_saved_password_moves_to_creators_membership(pg):
+    """The ordinary case: the machine's created_by_id is still a member, so the
+    stored password becomes that person's copy rather than being lost."""
+    _upgrade("0016")
+    _seed_account_user_machine("acct-1", "user-1", "mach-1", "AAA-1111", "enc-secret")
+
+    _upgrade("0017")
+
+    row = _run(_fetchval(
+        "SELECT password_enc FROM saved_connect_passwords "
+        "WHERE machine_id = $1 AND membership_id = $2",
+        "mach-1", "mem-user-1",
+    ))
+    assert row == "enc-secret"
+    assert _run(_fetchval("SELECT COUNT(*) FROM saved_connect_passwords")) == 1
+
+
+@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
+def test_saved_password_dropped_when_creator_is_not_a_member(pg):
+    """The rule that matters: a password whose enroller has left the account is
+    deleted, not silently reassigned to an admin. Also covers created_by_id
+    being NULL, which its ON DELETE SET NULL foreign key produces."""
+    _upgrade("0016")
+    _seed_account_user_machine("acct-2", "user-2", "mach-2", "BBB-2222", "orphan-enc")
+    # user-2 leaves the account; the machine keeps created_by_id pointing at them
+    _run(_execute("DELETE FROM memberships WHERE user_id = $1", "user-2"))
+
+    _upgrade("0017")
+
+    assert _run(_fetchval("SELECT COUNT(*) FROM saved_connect_passwords")) == 0
+
+
+@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
+def test_saved_password_column_is_gone_at_head(pg):
+    """0017 drops machines.saved_password_enc. If it survives, the app and the
+    schema disagree about where the credential lives."""
+    _upgrade("head")
+
+    exists = _run(_fetchval(
+        "SELECT COUNT(*) FROM information_schema.columns "
+        "WHERE table_name = 'machines' AND column_name = 'saved_password_enc'"
+    ))
+    assert exists == 0
+
+
+# --- Stage 2: access_grants exactly-one-target CHECK -----------------------
+
+@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
+def test_access_grant_rejects_two_targets(pg):
+    """The CHECK is the whole reason a grant cannot mean two things at once.
+    A test that only inserts valid rows would pass with no constraint at all."""
+    _upgrade("head")
+    _seed_account_user_machine("acct-3", "user-3", "mach-3", "CCC-3333", None)
+    _run(_execute(
+        "INSERT INTO companies (id, name, account_id, created_at) "
+        "VALUES ('co-3', 'Co', 'acct-3', NOW())"
+    ))
+
+    import asyncpg as _asyncpg
+    with pytest.raises(_asyncpg.exceptions.CheckViolationError):
+        _run(_execute(
+            "INSERT INTO access_grants (id, membership_id, created_by_id, created_at, "
+            "company_id, machine_id) VALUES ('g-bad', 'mem-user-3', 'user-3', NOW(), "
+            "'co-3', 'mach-3')"
+        ))
+
+
+@pytest.mark.xfail(reason="migration lands in a later task of this plan", strict=True)
+def test_access_grant_rejects_zero_targets(pg):
+    """A grant with no target grants nothing and would sit in the table forever
+    looking like access somebody has."""
+    _upgrade("head")
+    _seed_account_user_machine("acct-4", "user-4", "mach-4", "DDD-4444", None)
+
+    import asyncpg as _asyncpg
+    with pytest.raises(_asyncpg.exceptions.CheckViolationError):
+        _run(_execute(
+            "INSERT INTO access_grants (id, membership_id, created_by_id, created_at) "
+            "VALUES ('g-empty', 'mem-user-4', 'user-4', NOW())"
+        ))
