@@ -282,7 +282,10 @@ class InvitationCreatedOut(InvitationOut):
 
 class AcceptInviteRequest(BaseModel):
     token: str
-    email: str
+    # Every other user-creating path (UserRegister.email above) validates
+    # with EmailStr; this is the only route into the users table that used
+    # to skip it.
+    email: EmailStr
     # Only needed when the accepter has no account yet.
     name: str | None = None
     password: str | None = None

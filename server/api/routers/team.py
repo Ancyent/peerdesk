@@ -62,7 +62,7 @@ async def update_member_role(
     target = await get_membership_in_account(db, membership, membership_id)
 
     if (target.role == "admin" and body.role != "admin"
-            and await count_admins(db, membership.account_id) == 1):
+            and await count_admins(db, membership) == 1):
         raise HTTPException(400, "An account must keep at least one admin")
 
     target.role = body.role
@@ -85,7 +85,7 @@ async def remove_member(
     assert_admin(membership)
     target = await get_membership_in_account(db, membership, membership_id)
 
-    if target.role == "admin" and await count_admins(db, membership.account_id) == 1:
+    if target.role == "admin" and await count_admins(db, membership) == 1:
         raise HTTPException(400, "An account must keep at least one admin")
 
     # Grants and saved passwords are anchored to membership_id with ON DELETE

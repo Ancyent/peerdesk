@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from deps import get_db, get_current_user
+from deps import get_db, get_current_user, get_current_user_optional
 from models import User, AuthSession, Account, Membership, Invitation
 from schemas import (
     UserRegister, UserLogin, TokenResponse, RefreshRequest, LoginStep2Request, LogoutRequest,
@@ -108,13 +108,38 @@ async def login_2fa(body: LoginStep2Request, db: AsyncSession = Depends(get_db))
     return await _issue_tokens(db, user.id, account_id, body.remember_me)
 
 
+def _emails_match(a: str, b: str) -> bool:
+    return a.strip().lower() == b.strip().lower()
+
+
 @router.post("/accept-invite", response_model=TokenResponse)
-async def accept_invite(body: AcceptInviteRequest, db: AsyncSession = Depends(get_db)):
+async def accept_invite(
+    body: AcceptInviteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
     """Joins an existing account. Unlike /auth/register, this creates no new
     account -- that is the whole point of the endpoint.
 
-    Deliberately not behind get_current_user: the common case is someone who
-    has no account yet.
+    The bearer token is OPTIONAL (get_current_user_optional, not
+    get_current_user): the common case is someone with no account yet.
+    There are exactly two branches:
+
+      - Caller is authenticated: attach the membership to THAT user. Any
+        email in the body is ignored -- it is not the caller's word to give.
+      - Caller is not authenticated: this must be a brand-new user, created
+        from the body. If that email already belongs to a registered user,
+        this returns the same 409 /auth/register uses rather than
+        authenticating them here -- accept-invite must never become a second
+        login path, since it has no 2FA step and login does.
+
+    This endpoint used to accept a password for an already-registered email
+    and log them straight in on a match, with no check for user.totp_enabled.
+    That was a full second login path with the 2FA step missing: an attacker
+    holding a leaked/reused password who cannot get past /auth/login could
+    get a session here instead, and a failed guess didn't even consume the
+    invitation, so it doubled as an unlimited password-guessing oracle. See
+    Finding 1 in task-4-report.md.
     """
     result = await db.execute(
         select(Invitation).where(
@@ -125,16 +150,23 @@ async def accept_invite(body: AcceptInviteRequest, db: AsyncSession = Depends(ge
     )
     inv = result.scalar_one_or_none()
     if inv is None:
-        # One message for expired, already-used and forged, so the endpoint
-        # is not an oracle for which tokens exist.
+        # One message for expired, already-used, forged AND email-mismatched
+        # (below), so the endpoint is not an oracle for which tokens exist or
+        # who was invited.
         raise HTTPException(status_code=400, detail="Invalid or expired invitation")
 
-    existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
-    if existing is not None:
-        if not body.password or not verify_password(body.password, existing.password_hash):
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-        user = existing
+    if current_user is not None:
+        if inv.email is not None and not _emails_match(inv.email, current_user.email):
+            raise HTTPException(status_code=400, detail="Invalid or expired invitation")
+        user = current_user
     else:
+        if inv.email is not None and not _emails_match(inv.email, body.email):
+            raise HTTPException(status_code=400, detail="Invalid or expired invitation")
+
+        existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Email already registered")
+
         if not body.password or not body.name:
             raise HTTPException(status_code=400, detail="Name and password are required")
         user = User(email=body.email, name=body.name, password_hash=hash_password(body.password))

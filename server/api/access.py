@@ -7,7 +7,7 @@ Stage 2 adds per-member grants by changing this module alone.
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, or_, select
 
 from models import (
     AccessGrant, ApiKey, Branding, Company, Group, Invitation, Location, Machine, Membership,
@@ -286,17 +286,33 @@ async def get_membership_in_account(db, membership: Membership, target_id: str) 
     return found
 
 
-async def count_admins(db, account_id: str) -> int:
-    """How many admins an account currently has. routers/team.py uses this to
-    enforce that an account can never lose its last admin -- otherwise nobody
-    could administer it and recovery would need database access."""
+async def count_admins(db, membership: Membership) -> int:
+    """How many admins the caller's account currently has. routers/team.py
+    uses this to enforce that an account can never lose its last admin --
+    otherwise nobody could administer it and recovery would need database
+    access.
+
+    Takes a membership (like every other helper here), not a raw account id
+    -- that shape stops a future caller from passing an account id it did not
+    derive from the caller's own membership.
+
+    Takes a row lock (`SELECT ... FOR UPDATE`) over the account's admin
+    memberships rather than a plain COUNT. Under Postgres READ COMMITTED, two
+    concurrent requests demoting/removing two different admins of a
+    two-admin account would otherwise both read count == 2, both pass the
+    "not the last admin" guard, and both commit -- leaving zero admins. The
+    lock makes the second request block until the first commits, then
+    re-count against the post-commit state (1 admin), so it correctly fails.
+    This is a genuine no-op on SQLite, what the unit tests run against, so no
+    unit test exercises the actual blocking; it is verified by reasoning
+    about Postgres locking semantics only -- see task-4-report.md."""
     result = await db.execute(
-        select(func.count()).select_from(Membership).where(
-            Membership.account_id == account_id,
+        select(Membership).where(
+            Membership.account_id == membership.account_id,
             Membership.role == "admin",
-        )
+        ).with_for_update()
     )
-    return result.scalar_one()
+    return len(result.scalars().all())
 
 
 def visible_invitations(membership: Membership) -> Select:

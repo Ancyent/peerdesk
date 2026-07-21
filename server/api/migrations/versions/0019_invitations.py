@@ -23,14 +23,13 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("accepted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_by_id", sa.String(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["account_id"], ["accounts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["created_by_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("token_hash", name="uq_invitations_token_hash"),
     )
     op.create_index(op.f("ix_invitations_account_id"), "invitations", ["account_id"])
-    op.create_index(op.f("ix_invitations_token_hash"), "invitations", ["token_hash"])
+    op.create_index(op.f("ix_invitations_token_hash"), "invitations", ["token_hash"], unique=True)
 
 
 def downgrade() -> None:
