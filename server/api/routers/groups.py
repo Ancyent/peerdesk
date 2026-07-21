@@ -4,6 +4,7 @@ from sqlalchemy import select
 from deps import get_db, get_current_membership
 from models import Group, Location, Company, Membership
 from schemas import GroupCreate, GroupOut
+from access import assert_admin
 import access
 
 router = APIRouter(tags=["groups"])
@@ -34,6 +35,7 @@ async def list_groups(location_id: str, db: AsyncSession = Depends(get_db), memb
 
 @router.post("/locations/{location_id}/groups", response_model=GroupOut, status_code=201)
 async def create_group(location_id: str, body: GroupCreate, db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    assert_admin(membership)
     await _visible_location(location_id, membership, db)
     group = Group(name=body.name, location_id=location_id)
     db.add(group)
@@ -44,6 +46,7 @@ async def create_group(location_id: str, body: GroupCreate, db: AsyncSession = D
 
 @router.patch("/groups/{group_id}", response_model=GroupOut)
 async def update_group(group_id: str, body: GroupCreate, db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    assert_admin(membership)
     group = await _visible_group(group_id, membership, db)
     group.name = body.name
     await db.commit()
@@ -53,6 +56,7 @@ async def update_group(group_id: str, body: GroupCreate, db: AsyncSession = Depe
 
 @router.delete("/groups/{group_id}", status_code=204)
 async def delete_group(group_id: str, db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    assert_admin(membership)
     group = await _visible_group(group_id, membership, db)
     await db.delete(group)
     await db.commit()

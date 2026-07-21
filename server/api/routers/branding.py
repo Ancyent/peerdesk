@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from deps import get_db, get_current_user, get_current_membership
 from models import Account, Branding, Membership, User
 from schemas import BrandingOut, BrandingUpdate
+from access import assert_admin, branding_for_account
 
 router = APIRouter(prefix="/branding", tags=["branding"])
 
@@ -34,7 +35,7 @@ async def _get_or_create(db: AsyncSession, account_id: str | None = None) -> Bra
         # Fresh install: nobody has registered yet, so no account exists at all.
         return Branding()
 
-    result = await db.execute(select(Branding).where(Branding.account_id == resolved_account_id))
+    result = await db.execute(branding_for_account(resolved_account_id))
     branding = result.scalar_one_or_none()
     if branding:
         return branding
@@ -54,7 +55,7 @@ async def _get_or_create(db: AsyncSession, account_id: str | None = None) -> Bra
         # The other request's commit already succeeded, so read its row back
         # instead of surfacing an error for a race this caller did not cause.
         await db.rollback()
-        result = await db.execute(select(Branding).where(Branding.account_id == account_id))
+        result = await db.execute(branding_for_account(account_id))
         return result.scalar_one()
     await db.refresh(branding)
     return branding
@@ -73,7 +74,8 @@ async def update_branding(
     _: User = Depends(get_current_user),
     membership: Membership = Depends(get_current_membership),
 ):
-    """Update branding. Requires authentication."""
+    """Update branding. Requires authentication and the admin role."""
+    assert_admin(membership)
     branding = await _get_or_create(db, account_id=membership.account_id)
 
     if body.brand_name is not None:

@@ -32,13 +32,30 @@ def test_assert_admin_allows_an_admin():
     access.assert_admin(Membership(user_id="u1", account_id="a1", role="admin"))
 
 
-def test_no_router_authorizes_on_its_own():
-    """Authorization lives in access.py. A router that filters by itself is how a
-    leak gets introduced, so this fails the build rather than a code review."""
-    import pathlib
+def test_no_router_builds_its_own_account_filter():
+    """Authorization lives in access.py. A router that writes its own
+    account_id/created_by condition is how one forgotten endpoint becomes a
+    leak six months later.
 
-    routers = pathlib.Path(__file__).resolve().parents[1] / "routers"
-    offenders = sorted(
-        f.name for f in routers.glob("*.py") if "owner_id" in f.read_text()
+    The old version of this test grepped for the literal `owner_id` only --
+    a column that no longer exists -- so it passed while api_keys.py was
+    filtering on created_by by hand.
+    """
+    import pathlib
+    import re
+
+    routers_dir = pathlib.Path(__file__).parent.parent / "routers"
+    # Creation sites legitimately assign these; they do not filter on them.
+    ALLOWED = {"account_id=", "created_by=", "created_by_id="}
+    pattern = re.compile(r"(account_id|created_by|created_by_id)\s*==")
+
+    offenders = []
+    for path in sorted(routers_dir.glob("*.py")):
+        for lineno, line in enumerate(path.read_text().splitlines(), 1):
+            if pattern.search(line) and not any(a in line for a in ALLOWED):
+                offenders.append(f"{path.name}:{lineno}: {line.strip()}")
+
+    assert not offenders, (
+        "these routers build their own authorization filter instead of using "
+        "access.py:\n" + "\n".join(offenders)
     )
-    assert offenders == [], f"these routers still filter on owner_id: {offenders}"

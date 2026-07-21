@@ -7,7 +7,7 @@ Stage 2 adds per-member grants by changing this module alone.
 from fastapi import HTTPException, status
 from sqlalchemy import Select, and_, or_, select
 
-from models import AccessGrant, ApiKey, Company, Group, Location, Machine, Membership
+from models import AccessGrant, ApiKey, Branding, Company, Group, Location, Machine, Membership
 
 
 async def get_membership(db, user_id: str, account_id: str) -> Membership | None:
@@ -162,10 +162,21 @@ def visible_groups(membership: Membership) -> Select:
 def visible_api_keys(membership: Membership) -> Select:
     """API keys the caller may see, as a query to filter further.
 
-    Stage 2 adds the grant condition for `role == "member"` here, so callers
-    keep working unchanged.
+    Unlike the other visible_* helpers, this has no member case to handle:
+    Task 2 makes API keys admin-only in full (see routers/api_keys.py), so a
+    member never reaches this helper at all.
     """
     return select(ApiKey).where(ApiKey.account_id == membership.account_id)
+
+
+def branding_for_account(account_id: str) -> Select:
+    """The branding row for one account. Branding is a singleton per account —
+    it has no company/location/group/machine grant tree to delegate to, so
+    there is no visible_branding — but the account_id comparison still
+    belongs here rather than hand-rolled in routers/branding.py, same as
+    every other account_id filter in this codebase.
+    """
+    return select(Branding).where(Branding.account_id == account_id)
 
 
 def assert_admin(membership: Membership) -> None:

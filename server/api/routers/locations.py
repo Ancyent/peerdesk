@@ -4,6 +4,7 @@ from sqlalchemy import select
 from deps import get_db, get_current_membership
 from models import Location, Company, Membership
 from schemas import LocationCreate, LocationOut
+from access import assert_admin
 import access
 
 router = APIRouter(tags=["locations"])
@@ -20,6 +21,7 @@ async def list_locations(company_id: str, db: AsyncSession = Depends(get_db), me
 
 @router.post("/companies/{company_id}/locations", response_model=LocationOut, status_code=201)
 async def create_location(company_id: str, body: LocationCreate, db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    assert_admin(membership)
     co = (await db.execute(access.visible_companies(membership).where(Company.id == company_id))).scalar_one_or_none()
     if not co:
         raise HTTPException(404, "Company not found")
@@ -32,6 +34,7 @@ async def create_location(company_id: str, body: LocationCreate, db: AsyncSessio
 
 @router.patch("/locations/{location_id}", response_model=LocationOut)
 async def update_location(location_id: str, body: LocationCreate, db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    assert_admin(membership)
     result = await db.execute(access.visible_locations(membership).where(Location.id == location_id))
     loc = result.scalar_one_or_none()
     if not loc:
@@ -44,6 +47,7 @@ async def update_location(location_id: str, body: LocationCreate, db: AsyncSessi
 
 @router.delete("/locations/{location_id}", status_code=204)
 async def delete_location(location_id: str, db: AsyncSession = Depends(get_db), membership: Membership = Depends(get_current_membership)):
+    assert_admin(membership)
     result = await db.execute(access.visible_locations(membership).where(Location.id == location_id))
     loc = result.scalar_one_or_none()
     if not loc:

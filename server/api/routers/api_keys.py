@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from deps import get_db, get_current_user, get_current_membership
 from models import User, ApiKey, Membership
 from schemas import ApiKeyCreate, ApiKeyOut, ApiKeyListOut
-from access import visible_api_keys
+from access import visible_api_keys, assert_admin
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -13,6 +13,7 @@ async def list_api_keys(
     db: AsyncSession = Depends(get_db),
     membership: Membership = Depends(get_current_membership),
 ):
+    assert_admin(membership)
     result = await db.execute(
         visible_api_keys(membership).where(ApiKey.is_active == True)
     )
@@ -38,6 +39,7 @@ async def create_api_key(
     user: User = Depends(get_current_user),
     membership: Membership = Depends(get_current_membership),
 ):
+    assert_admin(membership)
     key = ApiKey(
         name=body.name,
         auto_approve=body.auto_approve,
@@ -56,6 +58,7 @@ async def revoke_api_key(
     db: AsyncSession = Depends(get_db),
     membership: Membership = Depends(get_current_membership),
 ):
+    assert_admin(membership)
     # 404, not 403 -- a caller must not learn that a key outside their active
     # account exists (consistent with how machines behave; see access.py).
     result = await db.execute(

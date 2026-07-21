@@ -3,8 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user, get_current_membership
-from models import RegistrationToken, Machine, User, ApiKey, Membership
+from models import RegistrationToken, Machine, User, ApiKey, Membership, Company, Location, Group
 from schemas import RegistrationTokenCreate, RegistrationTokenOut, TokenRedeemRequest, MachineOut, TokenRedeemResponse
+from access import visible_companies, visible_groups, visible_locations
 
 router = APIRouter(prefix="/tokens", tags=["tokens"])
 
@@ -16,6 +17,12 @@ async def create_token(
     user: User = Depends(get_current_user),
     membership: Membership = Depends(get_current_membership),
 ):
+    # Each placement id must be one the caller can actually see. Without this the
+    # endpoint accepts any id at all -- including another account's -- and
+    # redeem_token then stamps it onto the machine, planting a foreign tree
+    # reference. For a member this also confines enrollment to their own subtree.
+    await _assert_placement_visible(db, membership, body)
+
     reg = RegistrationToken(
         created_by=user.id,
         account_id=membership.account_id,
@@ -29,6 +36,22 @@ async def create_token(
     await db.commit()
     await db.refresh(reg)
     return reg
+
+
+async def _assert_placement_visible(db, membership, body) -> None:
+    checks = (
+        (body.company_id, visible_companies, Company),
+        (body.location_id, visible_locations, Location),
+        (body.group_id, visible_groups, Group),
+    )
+    for target_id, visible, model in checks:
+        if target_id is None:
+            continue
+        found = await db.execute(visible(membership).where(model.id == target_id))
+        if found.scalar_one_or_none() is None:
+            # 404, not 403: the caller must not learn that an id they cannot
+            # reach exists.
+            raise HTTPException(404, "Placement target not found")
 
 
 @router.post("/redeem", response_model=TokenRedeemResponse, status_code=201)
