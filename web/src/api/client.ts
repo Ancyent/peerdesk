@@ -160,6 +160,22 @@ export interface InvitationCreatedOut extends InvitationOut {
   token: string;   // shown once, never returned again
 }
 
+export interface GrantIn {
+  company_id?: string | null;
+  location_id?: string | null;
+  group_id?: string | null;
+  machine_id?: string | null;
+}
+
+export interface GrantOut {
+  id: string;
+  company_id: string | null;
+  location_id: string | null;
+  group_id: string | null;
+  machine_id: string | null;
+  created_at: string;
+}
+
 export interface ReleaseAsset {
   name: string;
   size: number;
@@ -349,6 +365,12 @@ export const api = {
     revokeInvite: (token: string, invitationId: string) =>
       request<void>(`/team/invitations/${invitationId}`, {
         method: 'DELETE', headers: authHeaders(token),
+      }),
+    grants: (token: string, membershipId: string) =>
+      request<GrantOut[]>(`/team/members/${membershipId}/grants`, { headers: authHeaders(token) }),
+    setGrants: (token: string, membershipId: string, grants: GrantIn[]) =>
+      request<GrantOut[]>(`/team/members/${membershipId}/grants`, {
+        method: 'PUT', headers: authHeaders(token), body: JSON.stringify({ grants }),
       }),
   },
 };

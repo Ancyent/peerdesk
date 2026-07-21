@@ -123,7 +123,17 @@ export function MachinesPage({ onConnect }: Props) {
             {pending.map(m => (
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 8 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{m.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{m.name}</div>
+                    {m.approval_status === 'pending' && (
+                      <span style={{
+                        fontSize: 11, color: 'var(--text-3)', background: 'var(--bg-hover)',
+                        border: '1px solid var(--border-dim)', borderRadius: 10, padding: '1px 8px',
+                      }}>
+                        în așteptarea aprobării
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
                     ID: {m.peer_id} · {m.os ?? 'Unknown OS'} · {new Date(m.created_at).toLocaleDateString()}
                   </div>

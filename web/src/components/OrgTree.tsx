@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { api, type CompanyOut, type LocationOut, type GroupOut } from '../api/client';
+import { api, type CompanyOut, type LocationOut, type GroupOut, type GrantOut } from '../api/client';
 import {
-  childTypeOf, renameInList, removeFromList, renameInRecord, removeFromRecord, type NodeType,
+  childTypeOf, renameInList, removeFromList, renameInRecord, removeFromRecord, coveredBy,
+  type NodeType, type GrantNode,
 } from './orgTreeOps';
 
 export type OrgNode =
@@ -12,17 +13,34 @@ export type OrgNode =
   | { type: 'location'; id: string }
   | { type: 'group';    id: string };
 
+/** Lets a caller (the per-member access editor) turn OrgTree into a checkbox
+ *  tree without OrgTree itself knowing anything about grants beyond the pure
+ *  `coveredBy` computation. Omitting this prop entirely (the organization
+ *  page's usage) renders the tree exactly as before. */
+export interface OrgTreeSelectable {
+  grants: GrantOut[];
+  onToggle: (node: GrantNode, checked: boolean) => void;
+}
+
 interface Props {
   selected: OrgNode;
   onSelect: (node: OrgNode) => void;
   machineCounts: Record<string, number>;
+  selectable?: OrgTreeSelectable;
 }
 
+// Width a checkbox (plus its margin) occupies as the row's first child, so
+// the location/group indents below can be reduced by it and the tree doesn't
+// visibly shift right compared to its non-selectable layout.
+const CHECKBOX_OFFSET = 18;
+
 const iconBtn: CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: '0 2px', color: 'var(--text-3)' };
+const checkboxStyle: CSSProperties = { marginRight: 4, flexShrink: 0 };
+const viaLabel: CSSProperties = { fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' };
 const inputStyle: CSSProperties = { flex: 1, padding: '3px 6px', fontSize: 11, border: '1px solid var(--border-dim)', borderRadius: 4, background: 'var(--bg-hover)', color: 'var(--text-1)' };
 const confirmBtn: CSSProperties = { padding: '3px 6px', fontSize: 11, background: 'var(--accent)', color: 'var(--text-1)', border: 'none', borderRadius: 4, cursor: 'pointer' };
 
-export function OrgTree({ selected, onSelect, machineCounts }: Props) {
+export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [locations, setLocations] = useState<Record<string, LocationOut[]>>({});
@@ -185,39 +203,81 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
         <div style={{ ...ns({ type: 'all' }), marginBottom: 4 }} onClick={() => onSelect({ type: 'all' })}>
           <span>📋</span><span>Toate</span>
         </div>
-        {companies.map(co => (
+        {companies.map(co => {
+          const companyCov = selectable ? coveredBy(selectable.grants, { type: 'company', id: co.id }) : null;
+          return (
           <div key={co.id}>
             <div style={{ ...ns({ type: 'company', id: co.id }) }}
               onMouseEnter={() => setHovered(co.id)} onMouseLeave={() => setHovered(h => h === co.id ? null : h)}
               onClick={() => { onSelect({ type: 'company', id: co.id }); toggle(co.id, 'company'); }}>
+              {selectable && (
+                <input type="checkbox" checked={companyCov!.checked} disabled={companyCov!.via !== null}
+                  aria-label={`Acces la ${co.name}`}
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => selectable.onToggle({ type: 'company', id: co.id }, e.target.checked)}
+                  style={checkboxStyle} />
+              )}
               <span style={{ fontSize: 9, width: 10, color: 'var(--text-3)' }}>{expanded.has(co.id) ? '▼' : '▶'}</span>
               <span>🏢</span>
               {nameCell('company', co.id, co.name)}
+              {/* A company has no ancestor in this tree, so companyCov.via is always null
+                  -- there's nothing to label here, unlike location/group below. */}
               {trailing('company', co.id, co.name)}
             </div>
             {expanded.has(co.id) && (
               <>
-                {(locations[co.id] ?? []).map(loc => (
+                {(locations[co.id] ?? []).map(loc => {
+                  const locationCov = selectable
+                    ? coveredBy(selectable.grants, { type: 'location', id: loc.id, companyId: co.id })
+                    : null;
+                  return (
                   <div key={loc.id}>
-                    <div style={{ ...ns({ type: 'location', id: loc.id }), paddingLeft: 20 }}
+                    <div style={{ ...ns({ type: 'location', id: loc.id }), paddingLeft: selectable ? 20 - CHECKBOX_OFFSET : 20 }}
                       onMouseEnter={() => setHovered(loc.id)} onMouseLeave={() => setHovered(h => h === loc.id ? null : h)}
                       onClick={() => { onSelect({ type: 'location', id: loc.id }); toggle(loc.id, 'location'); }}>
+                      {selectable && (
+                        <input type="checkbox" checked={locationCov!.checked} disabled={locationCov!.via !== null}
+                          aria-label={`Acces la ${loc.name}`}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => selectable.onToggle({ type: 'location', id: loc.id, companyId: co.id }, e.target.checked)}
+                          style={checkboxStyle} />
+                      )}
                       <span style={{ fontSize: 9, width: 10, color: 'var(--text-3)' }}>{expanded.has(loc.id) ? '▼' : '▶'}</span>
                       <span>📍</span>
                       {nameCell('location', loc.id, loc.name)}
+                      {/* The only possible ancestor of a location is its company, already in scope. */}
+                      {selectable && locationCov!.via !== null && <span style={viaLabel}>via {co.name}</span>}
                       {trailing('location', loc.id, loc.name)}
                     </div>
                     {expanded.has(loc.id) && (
                       <>
-                        {(groups[loc.id] ?? []).map(grp => (
-                          <div key={grp.id} style={{ ...ns({ type: 'group', id: grp.id }), paddingLeft: 34 }}
+                        {(groups[loc.id] ?? []).map(grp => {
+                          const groupCov = selectable
+                            ? coveredBy(selectable.grants, { type: 'group', id: grp.id, companyId: co.id, locationId: loc.id })
+                            : null;
+                          return (
+                          <div key={grp.id} style={{ ...ns({ type: 'group', id: grp.id }), paddingLeft: selectable ? 34 - CHECKBOX_OFFSET : 34 }}
                             onMouseEnter={() => setHovered(grp.id)} onMouseLeave={() => setHovered(h => h === grp.id ? null : h)}
                             onClick={() => onSelect({ type: 'group', id: grp.id })}>
+                            {selectable && (
+                              <input type="checkbox" checked={groupCov!.checked} disabled={groupCov!.via !== null}
+                                aria-label={`Acces la ${grp.name}`}
+                                onClick={e => e.stopPropagation()}
+                                onChange={e => selectable.onToggle(
+                                  { type: 'group', id: grp.id, companyId: co.id, locationId: loc.id }, e.target.checked,
+                                )}
+                                style={checkboxStyle} />
+                            )}
                             <span>📁</span>
                             {nameCell('group', grp.id, grp.name)}
+                            {/* The only possible ancestors of a group are its location (nearest) and company. */}
+                            {selectable && groupCov!.via !== null && (
+                              <span style={viaLabel}>via {groupCov!.via === loc.id ? loc.name : co.name}</span>
+                            )}
                             {trailing('group', grp.id, grp.name)}
                           </div>
-                        ))}
+                          );
+                        })}
                         {addingChild && addingChild.type === 'location' && addingChild.id === loc.id && (
                           <div style={{ display: 'flex', gap: 4, paddingLeft: 34, marginTop: 4 }}>
                             <input autoFocus value={childName} onChange={e => setChildName(e.target.value)}
@@ -229,7 +289,8 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
                       </>
                     )}
                   </div>
-                ))}
+                  );
+                })}
                 {addingChild && addingChild.type === 'company' && addingChild.id === co.id && (
                   <div style={{ display: 'flex', gap: 4, paddingLeft: 20, marginTop: 4 }}>
                     <input autoFocus value={childName} onChange={e => setChildName(e.target.value)}
@@ -241,7 +302,8 @@ export function OrgTree({ selected, onSelect, machineCounts }: Props) {
               </>
             )}
           </div>
-        ))}
+          );
+        })}
         {adding && (
           <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
             <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}

@@ -4,6 +4,7 @@ import {
   api, ApiError, type TeamMemberOut, type InvitationOut, type InvitationCreatedOut,
 } from '../api/client';
 import { copyText } from '../lib/clipboard';
+import { MemberAccessEditor } from '../components/MemberAccessEditor';
 
 const rowStyle = {
   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
@@ -232,10 +233,10 @@ export function TeamPage() {
                 </div>
                 {expandedAccess === m.membership_id && (
                   <div style={{
-                    padding: '10px 16px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)',
-                    borderTop: 'none', borderRadius: '0 0 8px 8px', fontSize: 12, color: 'var(--text-3)',
+                    padding: '12px 16px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)',
+                    borderTop: 'none', borderRadius: '0 0 8px 8px',
                   }}>
-                    Editorul de acces vine în curând.
+                    <MemberAccessEditor membershipId={m.membership_id} />
                   </div>
                 )}
               </div>

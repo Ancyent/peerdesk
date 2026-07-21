@@ -21,6 +21,9 @@ describe('parsePath', () => {
     expect(parsePath('/login')).toEqual({ page: 'login', sub: null });
     expect(parsePath('/register')).toEqual({ page: 'register', sub: null });
   });
+  it('invite with token sub', () => {
+    expect(parsePath('/invite/abc123')).toEqual({ page: 'invite', sub: 'abc123' });
+  });
   it('unknown path → machines', () => {
     expect(parsePath('/nope/x')).toEqual({ page: 'machines', sub: null });
   });
@@ -35,8 +38,14 @@ describe('pathFor', () => {
   it('downloads with sub', () => {
     expect(pathFor('downloads', 'windows')).toBe('/downloads/windows');
   });
+  it('invite with a token sub', () => {
+    // The central trap of Task 7: pathFor once re-appended `sub` only for
+    // `downloads`, so an invite link silently lost its token on navigation.
+    expect(pathFor('invite', 'abc123')).toBe('/invite/abc123');
+  });
   it('round-trips', () => {
     expect(parsePath(pathFor('downloads', 'windows'))).toEqual({ page: 'downloads', sub: 'windows' });
     expect(parsePath(pathFor('settings'))).toEqual({ page: 'settings', sub: null });
+    expect(parsePath(pathFor('invite', 'abc123'))).toEqual({ page: 'invite', sub: 'abc123' });
   });
 });
