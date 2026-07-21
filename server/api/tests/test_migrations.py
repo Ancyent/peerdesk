@@ -210,7 +210,7 @@ def test_upgrade_head_from_empty_succeeds(pg):
     create_all -- except create_all can't fail the way a real migration can."""
     _upgrade("head")
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0014"
+    assert version == "0015"
 
 
 # --- 2. round trip: head -> base -> head -----------------------------------
@@ -233,7 +233,7 @@ def test_upgrade_downgrade_upgrade_roundtrip(pg):
     tables, _ = _run(_reflect())
     assert {"users", "accounts", "machines", "branding"} <= tables
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0014"
+    assert version == "0015"
 
 
 # --- 3. zero-accounts branding: the Critical defect ------------------------
@@ -255,7 +255,7 @@ def test_zero_accounts_branding_survives_upgrade_head(pg):
     _upgrade("head")  # must not raise
 
     version = _run(_fetchval("SELECT version_num FROM alembic_version"))
-    assert version == "0014"
+    assert version == "0015"
     # 0013 deletes orphaned (NULL account_id) branding rows rather than leave
     # an un-tightenable column -- the row is regenerable, the migration is not.
     assert _run(_fetchval("SELECT COUNT(*) FROM branding")) == 0
@@ -292,6 +292,52 @@ def test_branding_sequence_resynced_after_upgrade(pg):
     assert new_id is not None
     assert new_id != 1
     assert _run(_fetchval("SELECT COUNT(*) FROM branding")) == 2
+
+
+# --- 4b. 0015: duplicate branding.account_id rows survive dedup ------------
+
+def test_duplicate_branding_account_id_deduped_on_upgrade_head(pg):
+    """Reproduces the Critical defect from the branding review: branding has
+    no UNIQUE constraint on account_id, and _get_or_create's
+    scalar_one_or_none() read-then-insert is racy, so two concurrent
+    first-time POST /branding calls from the same account can each insert a
+    row. Once that happens, every GET /branding -- public, called by the
+    unauthenticated login page -- raises MultipleResultsFound and returns
+    500 forever. Migration 0015 must deduplicate existing rows (keeping the
+    lowest id per account_id) before creating the UNIQUE constraint, the
+    same way 0013 had to survive unexpected data rather than abort mid-run."""
+    _upgrade("0014")
+
+    _run(_execute(
+        "INSERT INTO accounts (id, name, created_at) VALUES ($1, $2, NOW())",
+        "acct-dup", "Acme",
+    ))
+    lower_id = _run(_fetchval(
+        "INSERT INTO branding (account_id, brand_name) VALUES ($1, 'First') RETURNING id",
+        "acct-dup",
+    ))
+    higher_id = _run(_fetchval(
+        "INSERT INTO branding (account_id, brand_name) VALUES ($1, 'Second') RETURNING id",
+        "acct-dup",
+    ))
+    assert _run(_fetchval(
+        "SELECT COUNT(*) FROM branding WHERE account_id = $1", "acct-dup"
+    )) == 2
+
+    _upgrade("head")  # must not raise
+
+    version = _run(_fetchval("SELECT version_num FROM alembic_version"))
+    assert version == "0015"
+
+    remaining = _run(_fetchval(
+        "SELECT COUNT(*) FROM branding WHERE account_id = $1", "acct-dup"
+    ))
+    assert remaining == 1
+    surviving_id = _run(_fetchval(
+        "SELECT id FROM branding WHERE account_id = $1", "acct-dup"
+    ))
+    assert surviving_id == lower_id
+    assert surviving_id != higher_id
 
 
 # --- 5. schema parity between Alembic head and Base.metadata ---------------

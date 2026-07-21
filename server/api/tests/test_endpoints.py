@@ -280,3 +280,69 @@ async def test_branding_is_per_account_not_cross_tenant(client, db):
     assert row_a.accent_color == "#111111"
     assert row_b.brand_name == "Acme B"
     assert row_b.accent_color == "#222222"
+
+
+async def test_get_or_create_race_returns_same_row_not_error(tmp_path):
+    """Two concurrent first-time _get_or_create calls for the same account
+    (the shape of two racing first-time POST /branding requests) must both
+    return the same row, not raise or silently create a duplicate. Without a
+    UNIQUE constraint on branding.account_id and IntegrityError handling in
+    _get_or_create, both calls see no existing row and both insert one --
+    two rows for one account_id. Every GET /branding afterwards then raises
+    MultipleResultsFound and returns 500, permanently, on the unauthenticated
+    login page.
+
+    Uses a file-backed SQLite database (not the usual in-memory `db`
+    fixture): SQLAlchemy pools a single shared connection for `:memory:`
+    databases, so two sessions on it don't behave like two independent
+    concurrent connections the way two real Postgres connections would. A
+    file-backed database gives each session its own connection, which is
+    what actually reproduces the race.
+    """
+    import asyncio
+    import uuid
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    from database import Base
+    from models import Account, Branding
+    from routers.branding import _get_or_create
+
+    db_path = tmp_path / "branding_race.db"
+    engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        async with factory() as setup_session:
+            account = Account(id=str(uuid.uuid4()), name="Acme", created_at=datetime.now(timezone.utc))
+            setup_session.add(account)
+            await setup_session.commit()
+            account_id = account.id
+
+        # Two independent sessions on two independent connections, standing
+        # in for two concurrent requests -- neither sees the other's
+        # uncommitted insert, which is what makes the race real.
+        session_a = factory()
+        session_b = factory()
+        try:
+            results = await asyncio.gather(
+                _get_or_create(session_a, account_id=account_id),
+                _get_or_create(session_b, account_id=account_id),
+            )
+        finally:
+            await session_a.close()
+            await session_b.close()
+
+        assert results[0].id == results[1].id
+
+        async with factory() as verify_session:
+            rows = (await verify_session.execute(
+                select(Branding).where(Branding.account_id == account_id)
+            )).scalars().all()
+            assert len(rows) == 1
+    finally:
+        await engine.dispose()

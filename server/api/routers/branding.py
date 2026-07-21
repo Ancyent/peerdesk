@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from deps import get_db, get_current_user, get_current_membership
 from models import Account, Branding, Membership, User
 from schemas import BrandingOut, BrandingUpdate
@@ -45,7 +46,16 @@ async def _get_or_create(db: AsyncSession, account_id: str | None = None) -> Bra
 
     branding = Branding(account_id=account_id)
     db.add(branding)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Lost a race against another request creating this account's row
+        # concurrently (branding.account_id is UNIQUE — see migration 0015).
+        # The other request's commit already succeeded, so read its row back
+        # instead of surfacing an error for a race this caller did not cause.
+        await db.rollback()
+        result = await db.execute(select(Branding).where(Branding.account_id == account_id))
+        return result.scalar_one()
     await db.refresh(branding)
     return branding
 

@@ -191,7 +191,7 @@ class Branding(Base):
     __tablename__ = "branding"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    account_id: Mapped[str] = mapped_column(String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id: Mapped[str] = mapped_column(String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     brand_name: Mapped[str] = mapped_column(String(100), default="PeerDesk")
     logo_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     accent_color: Mapped[str] = mapped_column(String(7), default="#2563eb")
