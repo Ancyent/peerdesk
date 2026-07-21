@@ -125,3 +125,45 @@ async def test_a_remaining_grant_keeps_the_copy(auth_client, member_client, db):
 
     assert deleted == 0
     assert (await client.get(f"/machines/{machine_id}/saved-password")).status_code == 200
+
+
+async def test_approve_reports_the_callers_saved_password(auth_client, db):
+    """approve_machine returns the ORM Machine straight through MachineOut.
+    That object has no has_saved_password attribute any more (it moved to
+    SavedConnectPassword), so the response must be built through
+    _to_machine_out rather than handed back as-is, or it silently reports
+    False no matter what the caller has stored."""
+    machine_id = (await auth_client.post(
+        "/machines", json={"peer_id": "FFF-6666", "name": "M"}
+    )).json()["id"]
+    await auth_client.put(f"/machines/{machine_id}/saved-password", json={"password": "admin-pw"})
+
+    r = await auth_client.post(f"/machines/{machine_id}/approve")
+
+    assert r.status_code == 200, r.text
+    assert r.json()["has_saved_password"] is True
+
+
+async def test_deny_reports_the_callers_saved_password(auth_client, db):
+    machine_id = (await auth_client.post(
+        "/machines", json={"peer_id": "GGG-7777", "name": "M"}
+    )).json()["id"]
+    await auth_client.put(f"/machines/{machine_id}/saved-password", json={"password": "admin-pw"})
+
+    r = await auth_client.post(f"/machines/{machine_id}/deny")
+
+    assert r.status_code == 200, r.text
+    assert r.json()["has_saved_password"] is True
+
+
+async def test_set_placement_reports_the_callers_saved_password(auth_client, db):
+    company_id = (await auth_client.post("/companies", json={"name": "Co"})).json()["id"]
+    machine_id = (await auth_client.post(
+        "/machines", json={"peer_id": "HHH-8888", "name": "M"}
+    )).json()["id"]
+    await auth_client.put(f"/machines/{machine_id}/saved-password", json={"password": "admin-pw"})
+
+    r = await auth_client.patch(f"/machines/{machine_id}/placement", json={"company_id": company_id})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["has_saved_password"] is True

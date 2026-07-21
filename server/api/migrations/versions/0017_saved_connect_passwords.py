@@ -54,7 +54,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.add_column("machines", sa.Column("saved_password_enc", sa.String(), nullable=True))
     # Lossy by nature: several people may have held a copy and the column can
-    # hold only one. Takes the oldest, which is the enroller's in the common case.
+    # hold only one. Picks by oldest updated_at, but that only discriminates
+    # between rows written organically (via PUT .../saved-password) at
+    # different times. Rows this same migration's upgrade() created are all
+    # stamped updated_at = NOW() at migration time, so for a machine whose
+    # saved-password rows are still exactly what upgrade() produced, every
+    # candidate is tied and DISTINCT ON's pick among them is arbitrary --
+    # not the enroller's in particular.
     op.execute(
         """
         UPDATE machines m

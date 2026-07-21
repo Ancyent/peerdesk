@@ -34,6 +34,14 @@ def upgrade() -> None:
     # Machines placed at group level: derive location_id and company_id from
     # the group's own ancestry, overwriting whatever (possibly NULL, possibly
     # wrong) values are currently there.
+    #
+    # Also require the group's company to belong to the machine's own account.
+    # The FKs on groups/locations/companies permit a machine to reference a
+    # group in a completely different account (nothing before Task 2's
+    # invariants stopped that), and without this guard a cross-account row
+    # would get "repaired" straight onto another account's company -- a
+    # correctness bug worse than the one being fixed. Almost certainly zero
+    # rows hit this in practice, but the repair should be safe regardless.
     op.execute(
         """
         UPDATE machines m
@@ -41,21 +49,25 @@ def upgrade() -> None:
             company_id = l.company_id
         FROM groups g
         JOIN locations l ON l.id = g.location_id
+        JOIN companies c ON c.id = l.company_id
         WHERE m.group_id = g.id
+          AND c.account_id = m.account_id
           AND (m.location_id IS DISTINCT FROM g.location_id
                OR m.company_id IS DISTINCT FROM l.company_id)
         """
     )
 
     # Machines placed at location level only (no group): derive company_id
-    # from the location.
+    # from the location. Same cross-account guard as above.
     op.execute(
         """
         UPDATE machines m
         SET company_id = l.company_id
         FROM locations l
+        JOIN companies c ON c.id = l.company_id
         WHERE m.location_id = l.id
           AND m.group_id IS NULL
+          AND c.account_id = m.account_id
           AND m.company_id IS DISTINCT FROM l.company_id
         """
     )

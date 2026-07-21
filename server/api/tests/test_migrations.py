@@ -607,6 +607,45 @@ def test_backfill_leaves_consistent_placement_untouched(pg):
     assert row_location is None
 
 
+def test_backfill_skips_cross_account_group_placement(pg):
+    """The FKs on machines/groups/locations/companies never enforced that a
+    machine's account matches its placement's account -- that guard is
+    app-level (assert_placement_consistent) and postdates rows like this one.
+    A machine in account A with group_id pointing into account B's tree must
+    NOT get company_id/location_id backfilled from B's tree: that would leak
+    account B's company id onto an account A machine. Left inconsistent
+    (NULL) is the safe outcome here, not silently "repaired" cross-account."""
+    _upgrade("0017")
+    _seed_bare_account_and_user("acct-bf4a", "user-bf4a")
+    _seed_bare_account_and_user("acct-bf4b", "user-bf4b")
+    _run(_execute(
+        "INSERT INTO companies (id, name, account_id, created_at) "
+        "VALUES ('co-bf4b', 'Co B', 'acct-bf4b', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO locations (id, name, company_id, created_at) "
+        "VALUES ('loc-bf4b', 'Loc B', 'co-bf4b', NOW())"
+    ))
+    _run(_execute(
+        "INSERT INTO groups (id, name, location_id, created_at) "
+        "VALUES ('grp-bf4b', 'Grp B', 'loc-bf4b', NOW())"
+    ))
+    # Machine belongs to account A but its group_id points into account B's tree.
+    _run(_execute(
+        "INSERT INTO machines (id, peer_id, name, account_id, created_by_id, "
+        "is_online, approval_status, created_at, group_id) "
+        "VALUES ('mach-bf4', 'JJJ-0000', 'M', 'acct-bf4a', 'user-bf4a', FALSE, "
+        "'approved', NOW(), 'grp-bf4b')"
+    ))
+
+    _upgrade("0018")
+
+    row_company = _run(_fetchval("SELECT company_id FROM machines WHERE id = 'mach-bf4'"))
+    row_location = _run(_fetchval("SELECT location_id FROM machines WHERE id = 'mach-bf4'"))
+    assert row_company is None
+    assert row_location is None
+
+
 # --- Stage 2: access_grants exactly-one-target CHECK -----------------------
 
 def test_access_grant_rejects_two_targets(pg):

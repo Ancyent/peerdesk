@@ -155,7 +155,7 @@ async def approve_machine(
     machine.approval_status = "approved"
     await db.commit()
     await db.refresh(machine)
-    return machine
+    return await _to_machine_out(db, membership, machine)
 
 
 @router.post("/{machine_id}/deny", response_model=MachineOut)
@@ -174,7 +174,7 @@ async def deny_machine(
     machine.approval_status = "denied"
     await db.commit()
     await db.refresh(machine)
-    return machine
+    return await _to_machine_out(db, membership, machine)
 
 
 @router.get("/{machine_id}", response_model=MachineOut)
@@ -190,9 +190,7 @@ async def get_machine(
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
     _apply_online([machine])
-    item = MachineOut.model_validate(machine)
-    item.has_saved_password = (await _saved_password_row(db, membership, machine.id)) is not None
-    return item
+    return await _to_machine_out(db, membership, machine)
 
 
 @router.delete("/{machine_id}", status_code=204)
@@ -233,6 +231,18 @@ async def _saved_password_row(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def _to_machine_out(db: AsyncSession, membership: Membership, machine: Machine) -> MachineOut:
+    """Build a MachineOut for a single already-fetched Machine, filling in
+    has_saved_password for the CALLER. Every route that hands back an existing
+    ORM Machine under response_model=MachineOut must go through this (or
+    list_machines' own per-caller batch lookup) — the field is not on the ORM
+    object any more, so returning `machine` directly silently reports False
+    for everyone, regardless of what the caller actually has stored."""
+    item = MachineOut.model_validate(machine)
+    item.has_saved_password = (await _saved_password_row(db, membership, machine.id)) is not None
+    return item
 
 
 @router.put("/{machine_id}/saved-password", status_code=204)
@@ -363,4 +373,4 @@ async def set_placement(
     machine.group_id = body.group_id
     await db.commit()
     await db.refresh(machine)
-    return machine
+    return await _to_machine_out(db, membership, machine)
