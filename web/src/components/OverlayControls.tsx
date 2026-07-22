@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { QualitySettings } from '../quality';
 import { QualitySelector } from './QualitySelector';
 import { DisplaySelector } from './DisplaySelector';
@@ -39,6 +40,7 @@ function latencyColor(ms: number | null): string {
 }
 
 export function OverlayControls(props: Props) {
+  const { t } = useTranslation('viewer');
   const {
     peerId, latencyMs, fps, isViewOnly, videoRef, fullscreenTargetRef,
     onDisconnect, onCtrlAltDel, onToggleViewOnly, onFileTransfer, onQualityChange,
@@ -103,7 +105,7 @@ export function OverlayControls(props: Props) {
       onPointerDown={onHandleDown}
       onPointerMove={onHandleMove}
       onPointerUp={onHandleUp}
-      title="Drag to move"
+      title={t('viewer:controls.dragToMove')}
       style={{
         cursor: 'grab', touchAction: 'none', color: 'var(--text-3)',
         fontSize: 13, lineHeight: 1, textAlign: 'center', userSelect: 'none',
@@ -151,9 +153,9 @@ export function OverlayControls(props: Props) {
     return (
       <div style={{ ...shellBase, width: 36, alignItems: 'center', gap: 4, padding: '4px 0' }}>
         {dragHandle}
-        <button style={iconBtn()} title="Open controls" onClick={() => setCollapsed(false)}>›</button>
-        <button style={iconBtn()} title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} onClick={toggleFullscreen}>⛶</button>
-        <button style={iconBtn(true)} title="Disconnect" onClick={onDisconnect}>✕</button>
+        <button style={iconBtn()} title={t('viewer:controls.open')} onClick={() => setCollapsed(false)}>›</button>
+        <button style={iconBtn()} title={isFullscreen ? t('viewer:controls.exitFullscreen') : t('viewer:controls.fullscreen')} onClick={toggleFullscreen}>⛶</button>
+        <button style={iconBtn(true)} title={t('viewer:controls.disconnect')} onClick={onDisconnect}>✕</button>
       </div>
     );
   }
@@ -163,9 +165,9 @@ export function OverlayControls(props: Props) {
       {/* header: drag handle + collapse/fullscreen/disconnect */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <div style={{ flex: 1 }}>{dragHandle}</div>
-        <button style={iconBtn()} title="Collapse" onClick={() => setCollapsed(true)}>‹</button>
-        <button style={iconBtn()} title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} onClick={toggleFullscreen}>⛶</button>
-        <button style={iconBtn(true)} title="Disconnect" onClick={onDisconnect}>✕</button>
+        <button style={iconBtn()} title={t('viewer:controls.collapse')} onClick={() => setCollapsed(true)}>‹</button>
+        <button style={iconBtn()} title={isFullscreen ? t('viewer:controls.exitFullscreen') : t('viewer:controls.fullscreen')} onClick={toggleFullscreen}>⛶</button>
+        <button style={iconBtn(true)} title={t('viewer:controls.disconnect')} onClick={onDisconnect}>✕</button>
       </div>
 
       {/* latency / fps */}
@@ -185,10 +187,10 @@ export function OverlayControls(props: Props) {
         <DisplaySelector displays={displays} current={currentDisplay} onChange={onDisplayChange} inline />
       )}
 
-      <button style={btn(showStats)} onClick={onToggleStats}>📊 Stats</button>
-      <button style={btn(showCursor)} onClick={onToggleCursor}>🖱 Cursor</button>
+      <button style={btn(showStats)} onClick={onToggleStats}>📊 {t('viewer:controls.stats')}</button>
+      <button style={btn(showCursor)} onClick={onToggleCursor}>🖱 {t('viewer:controls.cursor')}</button>
       <div style={{ position: 'relative' }}>
-        <button style={btn(qOpen)} onClick={() => setQOpen(o => !o)}>⚙ Quality</button>
+        <button style={btn(qOpen)} onClick={() => setQOpen(o => !o)}>⚙ {t('viewer:controls.quality')}</button>
         <div style={{
           position: 'absolute', top: '110%', left: 0, zIndex: 20, background: '#0d1117',
           border: '1px solid #30363d', borderRadius: 8, padding: 8, display: qOpen ? 'block' : 'none',
@@ -197,10 +199,10 @@ export function OverlayControls(props: Props) {
           <QualitySelector onChange={onQualityChange} />
         </div>
       </div>
-      <button style={btn(isViewOnly)} onClick={onToggleViewOnly}>👁 {isViewOnly ? 'View-Only ON' : 'View-Only'}</button>
-      <button style={btn()} onClick={onFileTransfer}>📁 Fișiere</button>
-      <button style={btn()} onClick={handleScreenshot}>📸 Screenshot</button>
-      <button style={btn()} onClick={onCtrlAltDel}>⌨ Ctrl+Alt+Del</button>
+      <button style={btn(isViewOnly)} onClick={onToggleViewOnly}>👁 {isViewOnly ? t('viewer:controls.viewOnlyOn') : t('viewer:controls.viewOnly')}</button>
+      <button style={btn()} onClick={onFileTransfer}>📁 {t('viewer:controls.files')}</button>
+      <button style={btn()} onClick={handleScreenshot}>📸 {t('viewer:controls.screenshot')}</button>
+      <button style={btn()} onClick={onCtrlAltDel}>⌨ {t('viewer:controls.ctrlAltDel')}</button>
 
       <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'monospace', textAlign: 'center' }}>
         {peerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1·$2·$3')}

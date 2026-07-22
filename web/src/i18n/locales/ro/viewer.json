@@ -1,0 +1,42 @@
+{
+  "audio": {
+    "mute": "Dezactivează sunetul",
+    "unmute": "Activează sunetul"
+  },
+  "controls": {
+    "dragToMove": "Trage pentru a muta",
+    "open": "Deschide comenzile",
+    "collapse": "Restrânge",
+    "fullscreen": "Ecran complet",
+    "exitFullscreen": "Ieși din ecran complet",
+    "disconnect": "Deconectare",
+    "stats": "Statistici",
+    "cursor": "Cursor",
+    "quality": "Calitate",
+    "viewOnly": "Doar vizualizare",
+    "viewOnlyOn": "Doar vizualizare (activă)",
+    "files": "Fișiere",
+    "screenshot": "Captură de ecran",
+    "ctrlAltDel": "Ctrl+Alt+Del"
+  },
+  "stats": {
+    "speed": "Viteză",
+    "target": "Țintă",
+    "delay": "Întârziere",
+    "res": "Rez.",
+    "loss": "Pierderi"
+  },
+  "display": {
+    "monitorLabel": "Monitor {{n}} ({{width}}×{{height}})",
+    "default": "Implicit"
+  },
+  "fileTransfer": {
+    "sendFile": "Trimite fișier",
+    "sent": "Trimis",
+    "failed": "Eșuat"
+  },
+  "codeBlock": {
+    "copy": "Copiază comanda",
+    "copied": "Copiat"
+  }
+}

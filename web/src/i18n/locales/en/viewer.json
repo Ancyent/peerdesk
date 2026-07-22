@@ -1,0 +1,42 @@
+{
+  "audio": {
+    "mute": "Mute",
+    "unmute": "Unmute"
+  },
+  "controls": {
+    "dragToMove": "Drag to move",
+    "open": "Open controls",
+    "collapse": "Collapse",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "disconnect": "Disconnect",
+    "stats": "Stats",
+    "cursor": "Cursor",
+    "quality": "Quality",
+    "viewOnly": "View-Only",
+    "viewOnlyOn": "View-Only ON",
+    "files": "Files",
+    "screenshot": "Screenshot",
+    "ctrlAltDel": "Ctrl+Alt+Del"
+  },
+  "stats": {
+    "speed": "Speed",
+    "target": "Target",
+    "delay": "Delay",
+    "res": "Res",
+    "loss": "Loss"
+  },
+  "display": {
+    "monitorLabel": "Monitor {{n}} ({{width}}×{{height}})",
+    "default": "Default"
+  },
+  "fileTransfer": {
+    "sendFile": "Send File",
+    "sent": "Sent",
+    "failed": "Failed"
+  },
+  "codeBlock": {
+    "copy": "Copy command",
+    "copied": "Copied"
+  }
+}

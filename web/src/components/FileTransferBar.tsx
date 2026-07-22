@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TransferState } from '../hooks/useFileTransfer';
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export function FileTransferBar({ transfer, onSendFile }: Props) {
+  const { t } = useTranslation('viewer');
   const inputRef = useRef<HTMLInputElement>(null);
   const pct = transfer ? Math.round((transfer.sent / transfer.size) * 100) : 0;
 
@@ -29,7 +31,7 @@ export function FileTransferBar({ transfer, onSendFile }: Props) {
         style={{ padding: '5px 14px', borderRadius: 5, background: 'var(--accent)',
           border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 500 }}
       >
-        Send File
+        {t('viewer:fileTransfer.sendFile')}
       </button>
 
       {transfer && (
@@ -40,8 +42,8 @@ export function FileTransferBar({ transfer, onSendFile }: Props) {
             </span>
             <span style={{ marginLeft: 8, color: '#9ca3af', flexShrink: 0 }}>
               {transfer.status === 'sending' && `${pct}%`}
-              {transfer.status === 'done' && <span style={{ color: '#22c55e' }}>&#10003; Sent</span>}
-              {transfer.status === 'error' && <span style={{ color: '#ef4444' }}>Failed</span>}
+              {transfer.status === 'done' && <span style={{ color: '#22c55e' }}>&#10003; {t('viewer:fileTransfer.sent')}</span>}
+              {transfer.status === 'error' && <span style={{ color: '#ef4444' }}>{t('viewer:fileTransfer.failed')}</span>}
             </span>
           </div>
           {transfer.status === 'sending' && (

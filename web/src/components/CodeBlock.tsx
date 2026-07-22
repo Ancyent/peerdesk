@@ -1,5 +1,6 @@
 // web/src/components/CodeBlock.tsx
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { copyText } from '../lib/clipboard';
 
 const box: React.CSSProperties = {
@@ -14,6 +15,7 @@ const btn = (copied: boolean): React.CSSProperties => ({
 });
 
 export function CodeBlock({ code, empty }: { code: string; empty?: string }) {
+  const { t } = useTranslation('viewer');
   const [copied, setCopied] = useState(false);
   if (!code) {
     return <div style={{ ...box, color: 'var(--text-3)' }}>{empty ?? '—'}</div>;
@@ -27,7 +29,7 @@ export function CodeBlock({ code, empty }: { code: string; empty?: string }) {
   return (
     <div>
       <div style={box}>{code}</div>
-      <button onClick={copy} aria-label="Copiază comanda" style={btn(copied)}>{copied ? '✓ Copiat' : '📋 Copiază comanda'}</button>
+      <button onClick={copy} aria-label={t('viewer:codeBlock.copy')} style={btn(copied)}>{copied ? `✓ ${t('viewer:codeBlock.copied')}` : `📋 ${t('viewer:codeBlock.copy')}`}</button>
     </div>
   );
 }

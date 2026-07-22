@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { pickerItemColors } from '../lib/pickerColors';
 
 interface DisplayInfo {
@@ -26,6 +27,7 @@ function ordered(displays: DisplayInfo[]): DisplayInfo[] {
 }
 
 export function DisplaySelector({ displays, current, onChange, inline = false }: Props) {
+  const { t } = useTranslation('viewer');
   if (displays.length <= 1) return null;
   const wrap = inline
     ? { display: 'flex', gap: 6 }
@@ -34,12 +36,13 @@ export function DisplaySelector({ displays, current, onChange, inline = false }:
     <div style={wrap}>
       {ordered(displays).map((d, pos) => {
         const c = pickerItemColors(d.is_primary, d.index === current);
+        const label = `${t('viewer:display.monitorLabel', { n: pos + 1, width: d.width, height: d.height })}${d.is_primary ? ` — ${t('viewer:display.default')}` : ''}`;
         return (
           <button
             key={d.index}
             onClick={() => onChange(d.index)}
-            title={`Monitor ${pos + 1} (${d.width}×${d.height})${d.is_primary ? ' — Default' : ''}`}
-            aria-label={`Monitor ${pos + 1} (${d.width}×${d.height})${d.is_primary ? ' — Default' : ''}`}
+            title={label}
+            aria-label={label}
             style={{
               position: 'relative',
               width: 46,

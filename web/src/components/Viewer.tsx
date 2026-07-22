@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { normToPx } from '../lib/viewerGeom';
 
 interface Props {
@@ -22,6 +23,7 @@ export const Viewer = forwardRef<ViewerHandle, Props>(function Viewer(
   { stream, audioStream, isViewOnly = false, onMouseMove, onMouseDown, onMouseUp, onKeyDown, onKeyUp, onScroll, cursor },
   ref
 ) {
+  const { t } = useTranslation('viewer');
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -95,7 +97,7 @@ export const Viewer = forwardRef<ViewerHandle, Props>(function Viewer(
           <>
             <audio ref={audioRef} autoPlay muted={audioMuted} style={{ display: 'none' }} />
             <button onClick={() => setAudioMuted(m => !m)} style={{ position: 'absolute', top: 8, right: 8, zIndex: 5, padding: '4px 10px', borderRadius: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 }}>
-              {audioMuted ? '🔇 Unmute' : '🔊 Mute'}
+              {audioMuted ? `🔇 ${t('viewer:audio.unmute')}` : `🔊 ${t('viewer:audio.mute')}`}
             </button>
           </>
         )}
