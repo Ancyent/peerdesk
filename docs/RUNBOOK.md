@@ -79,3 +79,28 @@ Troubleshooting "machine doesn't appear":
   so it never goes stale — no code change needed per release.
 - After changing the **agent** (`agent/`) or **desktop** (`desktop/`), users need a **new client build**
   (new tag). After changing **web/server**, redeploy with `docker compose up -d --build`.
+
+## 6. Desktop auto-update (signing)
+
+The desktop viewer verifies every update against a Tauri signing key. The public
+key is committed in `desktop/src-tauri/tauri.conf.json`; the private key is a CI
+secret and is NEVER committed.
+
+**One-time maintainer setup (required before the next tagged release):**
+Add two GitHub Actions secrets (Settings → Secrets and variables → Actions):
+- `TAURI_SIGNING_PRIVATE_KEY` — the full contents of the generated private key
+  file (`peerdesk-updater.key`).
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — the password chosen when generating it.
+
+Without these, the Linux and Windows viewer build jobs FAIL (they are
+`continue-on-error`, so the release still publishes — but without the viewer
+bundles). Store the private key in a password manager; losing it means no future
+client can verify updates and every user must reinstall manually.
+
+**First updater-enabled release caveat:** clients built BEFORE auto-update
+shipped have no updater and cannot auto-install this first signed release. Users
+on older builds need ONE manual update (download from the releases page) to the
+first updater-enabled version; every release after that is seamless.
+
+**Not self-updatable:** `.deb`/`.rpm` installs and Android get a notify+link
+(open the releases page), not in-app install — same as before.
