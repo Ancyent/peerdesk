@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useAgent } from '../hooks/useAgent';
 import { useSettings } from '../hooks/useSettings';
 import i18n, { resolveLanguage } from '../i18n';
+import { UpdateProvider } from '../update/UpdateManager';
 
 type AgentValue = ReturnType<typeof useAgent>;
 type SettingsValue = ReturnType<typeof useSettings>;
@@ -35,7 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AgentContext.Provider value={agent}>
       <SettingsContext.Provider value={settings}>
-        {children}
+        <UpdateProvider>{children}</UpdateProvider>
       </SettingsContext.Provider>
     </AgentContext.Provider>
   );
