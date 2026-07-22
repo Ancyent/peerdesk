@@ -67,7 +67,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
       const info = await invoke<UpdateInfo | null>('check_for_update');
       if (info) { setLatest(info.version); setNotes(info.notes || ''); }
       else { setLatest(null); setNotes(''); }
-      if (manual) setDismissed(false);
+      setDismissed(false);
       setStatus('idle');
     } catch {
       setStatus('error'); // no server / offline / old server without the endpoint — never crash
