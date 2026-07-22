@@ -1,0 +1,37 @@
+{
+  "page": {
+    "title": "Machines",
+    "search": "Search...",
+    "onlineCount": "{{count}} online",
+    "pendingApproval": "{{count}} pending approval",
+    "tabs": {
+      "active": "Active",
+      "pending": "Pending"
+    },
+    "loading": "Loading...",
+    "emptySearch": "No machine found.",
+    "emptyNone": "No machine registered. Use the Download section.",
+    "noPending": "No machines pending approval.",
+    "pendingBadge": "awaiting approval",
+    "unknownOs": "Unknown OS",
+    "idLine": "ID: {{peerId}} · {{os}} · {{date}}",
+    "approve": "Approve",
+    "deny": "Deny",
+    "deleteConfirm": "Delete machine {{name}} ({{peerId}})? It will need to be re-registered."
+  },
+  "card": {
+    "online": "Online",
+    "offline": "Offline",
+    "justNow": "just now",
+    "minutesShort": "{{n}}m",
+    "hoursShort": "{{n}}h",
+    "daysShort": "{{n}}d",
+    "offlineSince": "offline {{time}}",
+    "lastActivityNow": "last activity: just now",
+    "defaultOs": "Linux",
+    "connect": "⚡ Connect",
+    "connectSaved": "⚡ Connect 🔑",
+    "forgetPassword": "Forget saved password",
+    "deleteMachine": "Delete machine"
+  }
+}

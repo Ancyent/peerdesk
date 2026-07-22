@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useBrandingContext } from '../branding/BrandingContext';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props) {
+  const { t } = useTranslation('connect');
   const [peerId, setPeerId] = useState(initialPeerId ?? '');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -47,7 +49,7 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
               }}>{brand_name || 'PeerDesk'}</div>
           }
           <p style={{ color: 'var(--text-3)', margin: '8px 0 0', fontSize: 13 }}>
-            Conectează-te la o mașinărie remotă
+            {t('connect:subtitle')}
           </p>
         </div>
 
@@ -63,11 +65,11 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
           style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
-              Peer ID
+              {t('connect:peerIdLabel')}
             </label>
             <input
               type="text"
-              placeholder="000 000 000"
+              placeholder={t('connect:peerIdPlaceholder')}
               value={peerId}
               onChange={e => setPeerId(e.target.value.replace(/\D/g, '').slice(0, 9))}
               style={{ ...inp, fontSize: 20, letterSpacing: 6, textAlign: 'center', fontFamily: 'monospace' }}
@@ -78,11 +80,11 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
           </div>
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
-              Parolă
+              {t('connect:passwordLabel')}
             </label>
             <input
               type="password"
-              placeholder="••••••••"
+              placeholder={t('connect:passwordPlaceholder')}
               value={password}
               onChange={e => setPassword(e.target.value)}
               style={inp}
@@ -92,7 +94,7 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
           {canSave && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}>
               <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
-              Salvează parola pentru această mașină (conectare directă data viitoare)
+              {t('connect:rememberPassword')}
             </label>
           )}
           <button
@@ -109,7 +111,7 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
               transition: 'all 0.2s',
             }}
           >
-            {peerId.length === 9 ? '⚡ Conectează' : 'Introdu ID-ul'}
+            {peerId.length === 9 ? t('connect:connect') : t('connect:enterId')}
           </button>
         </form>
       </div>

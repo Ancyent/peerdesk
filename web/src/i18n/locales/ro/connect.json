@@ -1,0 +1,10 @@
+{
+  "subtitle": "Conectează-te la o mașinărie remotă",
+  "peerIdLabel": "Peer ID",
+  "peerIdPlaceholder": "000 000 000",
+  "passwordLabel": "Parolă",
+  "passwordPlaceholder": "••••••••",
+  "rememberPassword": "Salvează parola pentru această mașină (conectare directă data viitoare)",
+  "connect": "⚡ Conectează",
+  "enterId": "Introdu ID-ul"
+}

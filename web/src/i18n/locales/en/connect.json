@@ -1,0 +1,10 @@
+{
+  "subtitle": "Connect to a remote machine",
+  "peerIdLabel": "Peer ID",
+  "peerIdPlaceholder": "000 000 000",
+  "passwordLabel": "Password",
+  "passwordPlaceholder": "••••••••",
+  "rememberPassword": "Save password for this machine (direct connect next time)",
+  "connect": "⚡ Connect",
+  "enterId": "Enter the ID"
+}

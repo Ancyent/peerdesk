@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { MachineOut } from '../api/client';
 
 interface Props {
@@ -14,17 +16,18 @@ function getOsConfig(os: string | null): { icon: string; bg: string } {
   return { icon: '🐧', bg: 'linear-gradient(135deg,#182538,#1c2e42)' };
 }
 
-function formatLastSeen(ts: string | null): string {
+function formatLastSeen(ts: string | null, t: TFunction): string {
   if (!ts) return '';
   const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-  if (m < 1) return 'acum';
-  if (m < 60) return `${m}m`;
+  if (m < 1) return t('machines:card.justNow');
+  if (m < 60) return t('machines:card.minutesShort', { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}z`;
+  if (h < 24) return t('machines:card.hoursShort', { n: h });
+  return t('machines:card.daysShort', { n: Math.floor(h / 24) });
 }
 
 export function MachineCard({ machine: m, onConnect, onDelete, onForget }: Props) {
+  const { t } = useTranslation('machines');
   const { icon, bg } = getOsConfig(m.os);
   const online = m.is_online;
   const saved = m.has_saved_password;
@@ -44,7 +47,7 @@ export function MachineCard({ machine: m, onConnect, onDelete, onForget }: Props
         )}
         <div style={{ position: 'absolute', top: 10, left: 12, background: 'rgba(17,24,36,0.8)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '3px 10px', fontSize: 10, fontWeight: 600, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 5, height: 5, borderRadius: '50%', background: online ? 'var(--green)' : 'var(--text-3)', boxShadow: online ? '0 0 5px var(--green)' : 'none', animation: online ? 'pulse-dot 2s infinite' : 'none' }} />
-          {online ? 'Online' : 'Offline'}
+          {online ? t('machines:card.online') : t('machines:card.offline')}
         </div>
       </div>
 
@@ -60,17 +63,17 @@ export function MachineCard({ machine: m, onConnect, onDelete, onForget }: Props
           </div>
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-2)', marginBottom: 11 }}>
-          {m.os ?? 'Linux'}{!online && m.last_seen_at ? ` · offline ${formatLastSeen(m.last_seen_at)}` : online ? ' · ultima activitate: acum' : ''}
+          {m.os ?? t('machines:card.defaultOs')}{!online && m.last_seen_at ? ` · ${t('machines:card.offlineSince', { time: formatLastSeen(m.last_seen_at, t) })}` : online ? ` · ${t('machines:card.lastActivityNow')}` : ''}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button disabled={!online} onClick={() => online && onConnect(m)} style={{ flex: 1, padding: '8px 0', background: online ? 'linear-gradient(135deg, var(--accent), var(--accent-2))' : 'var(--bg-hover)', border: 'none', borderRadius: 8, color: online ? 'var(--text-1)' : 'var(--text-3)', fontSize: 12, fontWeight: 700, cursor: online ? 'pointer' : 'default', boxShadow: online ? '0 2px 12px rgba(0,200,150,0.38)' : 'none', transition: 'all 0.2s' }}>
-            {online ? (saved ? '⚡ Conectează 🔑' : '⚡ Conectează') : 'Offline'}
+            {online ? (saved ? t('machines:card.connectSaved') : t('machines:card.connect')) : t('machines:card.offline')}
           </button>
           {saved && onForget && (
-            <button onClick={() => onForget(m)} title="Uită parola salvată" aria-label="Uită parola salvată" style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>🔑✕</button>
+            <button onClick={() => onForget(m)} title={t('machines:card.forgetPassword')} aria-label={t('machines:card.forgetPassword')} style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>🔑✕</button>
           )}
           {onDelete && (
-            <button onClick={() => onDelete(m.id)} title="Șterge mașina" aria-label="Șterge mașina" style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>···</button>
+            <button onClick={() => onDelete(m.id)} title={t('machines:card.deleteMachine')} aria-label={t('machines:card.deleteMachine')} style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>···</button>
           )}
         </div>
       </div>

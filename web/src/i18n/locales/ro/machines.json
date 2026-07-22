@@ -1,0 +1,37 @@
+{
+  "page": {
+    "title": "Mașini",
+    "search": "Caută...",
+    "onlineCount": "{{count}} online",
+    "pendingApproval": "{{count}} pending approval",
+    "tabs": {
+      "active": "Active",
+      "pending": "Pending"
+    },
+    "loading": "Se încarcă...",
+    "emptySearch": "Nicio mașinărie găsită.",
+    "emptyNone": "Nicio mașinărie înregistrată. Folosește secțiunea Download.",
+    "noPending": "No machines pending approval.",
+    "pendingBadge": "în așteptarea aprobării",
+    "unknownOs": "Unknown OS",
+    "idLine": "ID: {{peerId}} · {{os}} · {{date}}",
+    "approve": "Approve",
+    "deny": "Deny",
+    "deleteConfirm": "Ștergi mașina {{name}} ({{peerId}})? Va trebui reînregistrată."
+  },
+  "card": {
+    "online": "Online",
+    "offline": "Offline",
+    "justNow": "acum",
+    "minutesShort": "{{n}}m",
+    "hoursShort": "{{n}}h",
+    "daysShort": "{{n}}z",
+    "offlineSince": "offline {{time}}",
+    "lastActivityNow": "ultima activitate: acum",
+    "defaultOs": "Linux",
+    "connect": "⚡ Conectează",
+    "connectSaved": "⚡ Conectează 🔑",
+    "forgetPassword": "Uită parola salvată",
+    "deleteMachine": "Șterge mașina"
+  }
+}
