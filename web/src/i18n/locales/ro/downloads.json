@@ -1,6 +1,6 @@
 {
   "page": {
-    "title": "Download & Deploy",
+    "title": "Descărcare și implementare",
     "allReleasesLink": "Toate versiunile pe GitHub →",
     "tokenLabel": "Token de înregistrare",
     "machineNamePlaceholder": "Nume mașină (opțional — altfel hostname-ul)",
@@ -18,7 +18,7 @@
     "noFileForOs": "Niciun fișier pentru {{os}} în {{tag}}.",
     "download": "Descarcă",
     "agentBinary": "Agent (binar)",
-    "deploy": "Deploy",
+    "deploy": "Implementare",
     "passwordPlaceholder": "Parolă (gol = auto-generată)",
     "modeAutoTitle": "Detectează automat (recomandat)",
     "modeHeadlessTitle": "Fără GUI — server/terminal",
@@ -28,15 +28,15 @@
     "modeGui": "GUI",
     "generateTokenFirst": "Generează un token mai întâi ↑",
     "uninstallTerminal": "Dezinstalare (terminal)",
-    "uninstallInfo": "Sunt două lucruri diferite: <agentBold>Agentul</agentBold> (instalat cu <installCmd/>) este un binar + serviciu systemd, <notPackageBold>NU un pachet apt/dnf</notPackageBold> — se dezinstalează cu comanda de la „Agent” de mai jos. Comanda „Client / viewer” (<uninstallCmd/>) e doar pentru aplicația desktop instalată dintr-un <extCmd/>.",
-    "clientViewerLabel": "Client / viewer ({{distro}}) — doar dacă ai instalat aplicația desktop",
+    "uninstallInfo": "Sunt două lucruri diferite: <agentBold>Agentul</agentBold> (instalat cu <installCmd/>) este un binar + serviciu systemd, <notPackageBold>NU un pachet apt/dnf</notPackageBold> — se dezinstalează cu comanda de la „Agent” de mai jos. Comanda „Client / vizualizator” (<uninstallCmd/>) e doar pentru aplicația desktop instalată dintr-un <extCmd/>.",
+    "clientViewerLabel": "Client / vizualizator ({{distro}}) — doar dacă ai instalat aplicația desktop",
     "agentUninstallLabel": "Agent (serviciu + binar + config) — instalat cu curl … | bash",
     "agentUninstallLabelWindows": "Agent (PowerShell ca Administrator)",
-    "viewerUninstallWindows": "Viewer-ul desktop se dezinstalează din Setări → Aplicații.",
+    "viewerUninstallWindows": "Vizualizatorul desktop se dezinstalează din Setări → Aplicații.",
     "uninstallAndroid": "Dezinstalează aplicația din launcher-ul Android.",
     "agentArgsTitle": "Argumente (agent)",
     "agentArgsSubtitle": "Aceleași pe Linux și Windows. Le folosești dacă rulezi binarul manual sau în mod portabil.",
-    "webViewerTitle": "Viewer Web",
+    "webViewerTitle": "Vizualizator web",
     "webViewerSubtitle": "Rulează direct în browser — ești deja pe el."
   },
   "osTabs": {
@@ -56,7 +56,7 @@
   },
   "assetLabel": {
     "portableExe": "portabil (.exe)",
-    "installerExe": "installer (.exe)",
+    "installerExe": "instalator (.exe)",
     "agentExe": "agent .exe",
     "headlessLinuxAgent": "agent headless (Linux, fără GUI)",
     "linuxAgent": "agent (Linux)"
