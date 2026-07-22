@@ -17,11 +17,11 @@
 ## Contents
 
 1. [Requirements](#1-requirements)
-2. [Dev — quick start (everything in Docker)](#2-dev--quick-start)
-3. [Production with nginx included](#3-production--full-deployment)
-4. [Production without internal nginx](#4-production-without-internal-nginx-behind-an-external-proxy)
-5. [Automated testing](#5-automated-testing)
-6. [Updating the application](#6-updating-the-application)
+2. [Dev — Quick Start](#2-dev--quick-start)
+3. [Production — Full Deployment](#3-production--full-deployment)
+4. [Production without Internal nginx (Behind an External Proxy)](#4-production-without-internal-nginx-behind-an-external-proxy)
+5. [Automated Testing](#5-automated-testing)
+6. [Updating the Application](#6-updating-the-application)
 7. [Troubleshooting](#7-troubleshooting)
 
 ---
