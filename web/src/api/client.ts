@@ -76,6 +76,7 @@ export interface UserOut {
   email: string;
   name: string;
   created_at: string;
+  language?: string | null;
 }
 
 export interface MachineOut {
@@ -228,7 +229,7 @@ export const api = {
   users: {
     me: (token: string) =>
       request<UserOut>('/users/me', { headers: authHeaders(token) }),
-    update: (token: string, data: { name?: string; email?: string }) =>
+    update: (token: string, data: { name?: string; email?: string; language?: string }) =>
       request<UserOut>('/users/me', { method: 'PATCH', headers: authHeaders(token), body: JSON.stringify(data) }),
     changePassword: (token: string, current_password: string, new_password: string) =>
       request<void>('/users/me/password', { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ current_password, new_password }) }),

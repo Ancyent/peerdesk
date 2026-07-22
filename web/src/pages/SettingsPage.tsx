@@ -65,7 +65,11 @@ export function SettingsPage() {
             <select
               style={inp}
               value={i18n.language.split('-')[0]}
-              onChange={e => i18n.changeLanguage(e.target.value)}
+              onChange={e => {
+                const value = e.target.value;
+                i18n.changeLanguage(value);
+                if (accessToken) api.users.update(accessToken, { language: value }).catch(() => {});
+              }}
             >
               {SUPPORTED_LANGUAGES.map(lng => (
                 <option key={lng} value={lng}>{LANGUAGE_NAMES[lng]}</option>

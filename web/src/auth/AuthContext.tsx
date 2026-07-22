@@ -6,6 +6,17 @@ import { getTokens, setTokens as storeSetTokens, clear as clearStore, getStorage
 import { isIdleExpired, IDLE_THRESHOLD_MS } from './idle';
 import { tokenExpiringSoon, accountIdFromToken } from './jwt';
 import { useActivityTracker } from '../hooks/useActivityTracker';
+import i18n from '../i18n';
+
+// DB wins on load: once a user record with a supported, different language
+// is available, it overrides the local/browser default P1 set via
+// i18next-browser-languagedetector.
+export function applyUserLanguage(user: { language?: string | null } | null) {
+  const lng = user?.language;
+  if (lng && (lng === 'en' || lng === 'ro') && i18n.language !== lng) {
+    void i18n.changeLanguage(lng);
+  }
+}
 
 interface AuthState {
   accessToken: string | null;
@@ -95,7 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const tokens = getTokens();
     if (!tokens) { setState(s => ({ ...s, loading: false })); return; }
     api.users.me(tokens.access)
-      .then(user => setState(s => ({ ...s, user, accessToken: getTokens()?.access ?? null, loading: false })))
+      .then(user => {
+        applyUserLanguage(user);
+        setState(s => ({ ...s, user, accessToken: getTokens()?.access ?? null, loading: false }));
+      })
       .catch(() => { clearStore(); setState({ accessToken: null, user: null, loading: false }); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -119,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const finishAuth = async (access: string) => {
     const user = await api.users.me(access);
+    applyUserLanguage(user);
     setState(s => ({ ...s, user, accessToken: access }));
   };
 
