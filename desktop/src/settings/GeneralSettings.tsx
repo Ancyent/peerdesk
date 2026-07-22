@@ -1,5 +1,7 @@
 import type { AppSettings } from '../types';
 import { Toggle } from '../components/Toggle';
+import i18n from '../i18n';
+import { SUPPORTED_LANGUAGES, LANGUAGE_NAMES } from '../i18n/languages';
 
 interface Props {
   settings: AppSettings;
@@ -23,6 +25,23 @@ export function GeneralSettings({ settings, updateSetting }: Props) {
           <Toggle value={settings[item.key]} onChange={v => updateSetting(item.key, v)} />
         </div>
       ))}
+      <div style={{ fontSize: 10, color: '#b3bdca', letterSpacing: 1, fontWeight: 600, marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #21262d', textTransform: 'uppercase', marginTop: 24 }}>Language</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+        <div style={{ fontSize: 12, color: '#e6ebf1' }}>Language</div>
+        <select
+          value={settings.language || i18n.language}
+          onChange={e => {
+            const v = e.target.value;
+            updateSetting('language', v);
+            i18n.changeLanguage(v);
+          }}
+          style={{ background: '#21262d', border: '1px solid #30363d', borderRadius: 5, padding: '3px 6px', fontSize: 11, color: '#e6ebf1' }}
+        >
+          {SUPPORTED_LANGUAGES.map(lng => (
+            <option key={lng} value={lng}>{LANGUAGE_NAMES[lng]}</option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

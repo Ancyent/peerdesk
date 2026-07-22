@@ -285,6 +285,11 @@ pub struct AppSettings {
     pub start_on_boot: bool,
     #[serde(default = "default_true")]
     pub minimize_to_tray: bool,
+    /// Desktop UI language ("" = unset, resolved from OS locale; "en"/"ro" once
+    /// chosen). The agent itself is headless and never sets this; it exists on
+    /// the shared struct only so the desktop can persist it via save_settings.
+    #[serde(default)]
+    pub language: String,
 }
 
 fn default_true() -> bool {
@@ -321,6 +326,7 @@ impl Default for AppSettings {
             hardware_acceleration: true,
             start_on_boot: false,
             minimize_to_tray: true,
+            language: String::new(),
         }
     }
 }
