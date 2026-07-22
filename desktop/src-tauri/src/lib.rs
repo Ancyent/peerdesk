@@ -566,9 +566,16 @@ pub fn run() {
     init_logging();
     let shared_state: SharedAgentState = Arc::new(Mutex::new(AgentState::default()));
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .manage(shared_state)
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_shell::init());
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             get_agent_status,
             start_agent,

@@ -32,5 +32,13 @@
     "active": true,
     "targets": "all",
     "icon": ["icons/icon.png", "icons/icon.ico"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU1RDY0ODhFOTdDMjcwNwpSV1FISjN6cGlHUmREdlIrR2ppVHVxTmg4cmo4L3Z2YkJUR2x3eE0yS042eDE5YzNMbHpVeGYxMgo=",
+      "endpoints": [
+        "https://updates.invalid/api/releases/update/{{target}}/{{arch}}/{{current_version}}"
+      ]
+    }
   }
 }
