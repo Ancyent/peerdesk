@@ -1,0 +1,55 @@
+{
+  "title": "Echipă",
+  "subtitle": "Membrii contului, rolurile lor și invitațiile în așteptare.",
+  "loading": "Se încarcă...",
+  "close": "Închide",
+  "errors": {
+    "loadFailed": "Nu am putut încărca echipa",
+    "roleChangeFailed": "Nu am putut schimba rolul",
+    "removeFailed": "Nu am putut elimina membrul",
+    "inviteFailed": "Nu am putut crea invitația",
+    "revokeFailed": "Nu am putut revoca invitația"
+  },
+  "role": {
+    "member": "Membru",
+    "admin": "Admin"
+  },
+  "invite": {
+    "emailPlaceholder": "Email (opțional — lasă gol pentru un link pe care îl poate folosi oricine)",
+    "submit": "Invită",
+    "submitting": "Se creează...",
+    "created": "✓ Invitație creată — copiază linkul acum, nu va mai fi afișat din nou.",
+    "copy": "Copiază",
+    "copied": "Copiat!",
+    "dismiss": "Renunță",
+    "oneTimeNotice": "Linkul se afișează o singură dată."
+  },
+  "members": {
+    "heading": "Membri",
+    "memberSince": "membru din {{date}}",
+    "access": "Acces",
+    "deleteConfirm": "Șterge?",
+    "confirmRemove": "Confirmă eliminarea",
+    "cancel": "Anulează",
+    "remove": "Elimină"
+  },
+  "invitations": {
+    "heading": "Invitații în așteptare",
+    "empty": "Nicio invitație în așteptare.",
+    "openLink": "Link deschis — poate fi folosit de oricine",
+    "expires": "expiră {{date}}",
+    "revoke": "Revocă"
+  },
+  "access": {
+    "loading": "Se încarcă accesul...",
+    "explainCheckbox": "Bifează companiile, locațiile sau grupurile la care acest membru are acces. Un nod bifat și dezactivat este inclus printr-un acces acordat mai sus în arbore (etichetat „via”).",
+    "explainVisibility": "Acest acces controlează ce vede și ce poate deschide membrul din dashboard — nu împiedică o conexiune directă către o mașină a cărei parolă o cunoaște deja dintr-o altă sursă.",
+    "errors": {
+      "loadFailed": "Nu am putut încărca accesul",
+      "saveFailed": "Nu am putut salva accesul"
+    },
+    "unsaved": "Modificări nesalvate",
+    "save": "Salvează accesul",
+    "saving": "Se salvează..."
+  }
+}

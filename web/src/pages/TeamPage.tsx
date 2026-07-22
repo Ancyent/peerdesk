@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import {
   api, ApiError, type TeamMemberOut, type InvitationOut, type InvitationCreatedOut,
@@ -21,6 +22,7 @@ const selectStyle = {
 };
 
 export function TeamPage() {
+  const { t } = useTranslation('team');
   const { accessToken } = useAuth();
   const [members, setMembers] = useState<TeamMemberOut[]>([]);
   const [invitations, setInvitations] = useState<InvitationOut[]>([]);
@@ -52,7 +54,7 @@ export function TeamPage() {
       // Real error surfacing (not console.error): a member who lands here at
       // all is an admin (App.tsx gates the route), so a failure here is a
       // real problem worth reading, not routine noise.
-      setError(errorMessage(e, 'Nu am putut încărca echipa'));
+      setError(errorMessage(e, t('team:errors.loadFailed')));
     } finally {
       setLoading(false);
     }
@@ -69,7 +71,7 @@ export function TeamPage() {
     } catch (e) {
       // The last-admin guard lives here: demoting the account's only admin
       // returns 400 with a message the user has to read.
-      setError(errorMessage(e, 'Nu am putut schimba rolul'));
+      setError(errorMessage(e, t('team:errors.roleChangeFailed')));
     }
   };
 
@@ -81,7 +83,7 @@ export function TeamPage() {
       setMembers(prev => prev.filter(m => m.membership_id !== membershipId));
     } catch (e) {
       // Same last-admin guard as above, on the delete path.
-      setError(errorMessage(e, 'Nu am putut elimina membrul'));
+      setError(errorMessage(e, t('team:errors.removeFailed')));
     } finally {
       setConfirmDelete(null);
     }
@@ -99,7 +101,7 @@ export function TeamPage() {
       const inv = await api.team.invitations(accessToken).catch(() => null);
       if (inv) setInvitations(inv);
     } catch (e) {
-      setError(errorMessage(e, 'Nu am putut crea invitația'));
+      setError(errorMessage(e, t('team:errors.inviteFailed')));
     } finally {
       setInviting(false);
     }
@@ -112,7 +114,7 @@ export function TeamPage() {
       await api.team.revokeInvite(accessToken, id);
       setInvitations(prev => prev.filter(i => i.id !== id));
     } catch (e) {
-      setError(errorMessage(e, 'Nu am putut revoca invitația'));
+      setError(errorMessage(e, t('team:errors.revokeFailed')));
     }
   };
 
@@ -126,9 +128,9 @@ export function TeamPage() {
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 760, background: 'var(--bg-base)', minHeight: '100%' }}>
-      <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>Echipă</h2>
+      <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('team:title')}</h2>
       <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
-        Membrii contului, rolurile lor și invitațiile în așteptare.
+        {t('team:subtitle')}
       </p>
 
       {error && (
@@ -138,7 +140,7 @@ export function TeamPage() {
           border: '1px solid var(--red)', borderRadius: 8,
         }}>
           <span style={{ fontSize: 13, color: 'var(--red)' }}>{error}</span>
-          <button onClick={() => setError(null)} title="Închide" aria-label="Închide"
+          <button onClick={() => setError(null)} title={t('team:close')} aria-label={t('team:close')}
             style={{ ...iconBtn, color: 'var(--red)' }}>✕</button>
         </div>
       )}
@@ -148,20 +150,20 @@ export function TeamPage() {
         <input
           value={inviteEmail}
           onChange={e => setInviteEmail(e.target.value)}
-          placeholder="Email (opțional — lasă gol pentru un link pe care îl poate folosi oricine)"
+          placeholder={t('team:invite.emailPlaceholder')}
           style={{ flex: 1, padding: '7px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-hover)', color: 'var(--text-1)' }}
           onKeyDown={e => e.key === 'Enter' && handleInvite()}
         />
         <select value={inviteRole} onChange={e => setInviteRole(e.target.value as 'admin' | 'member')} style={selectStyle}>
-          <option value="member">Membru</option>
-          <option value="admin">Admin</option>
+          <option value="member">{t('team:role.member')}</option>
+          <option value="admin">{t('team:role.admin')}</option>
         </select>
         <button
           onClick={handleInvite}
           disabled={inviting}
           style={{ padding: '7px 16px', fontSize: 13, fontWeight: 600, background: 'var(--accent-2)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: inviting ? 0.5 : 1 }}
         >
-          {inviting ? 'Se creează...' : 'Invită'}
+          {inviting ? t('team:invite.submitting') : t('team:invite.submit')}
         </button>
       </div>
 
@@ -169,7 +171,7 @@ export function TeamPage() {
       {newInvite && (
         <div style={{ marginBottom: 20, padding: 16, background: 'var(--green-bg)', border: '1px solid var(--green-glow)', borderRadius: 8 }}>
           <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>
-            ✓ Invitație creată — copiază linkul acum, nu va mai fi afișat din nou.
+            {t('team:invite.created')}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input
@@ -179,25 +181,25 @@ export function TeamPage() {
               style={{ flex: 1, padding: '6px 10px', background: 'rgba(0,229,160,0.15)', border: 'none', borderRadius: 4, fontSize: 12, fontFamily: 'monospace', color: 'var(--text-1)' }}
             />
             <button onClick={() => handleCopy(inviteLink)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-              {copied ? 'Copiat!' : 'Copiază'}
+              {copied ? t('team:invite.copied') : t('team:invite.copy')}
             </button>
             <button onClick={() => setNewInvite(null)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--bg-hover)', color: 'var(--text-2)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-              Renunță
+              {t('team:invite.dismiss')}
             </button>
           </div>
           <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-2)' }}>
-            Linkul se afișează o singură dată.
+            {t('team:invite.oneTimeNotice')}
           </p>
         </div>
       )}
 
-      {loading && <p style={{ color: 'var(--text-3)', fontSize: 13 }}>Se încarcă...</p>}
+      {loading && <p style={{ color: 'var(--text-3)', fontSize: 13 }}>{t('team:loading')}</p>}
 
       {/* Members */}
       {!loading && (
         <>
           <h3 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-            Membri
+            {t('team:members.heading')}
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
             {members.map(m => (
@@ -206,28 +208,28 @@ export function TeamPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{m.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                      {m.email} · membru din {new Date(m.created_at).toLocaleDateString('ro-RO')}
+                      {m.email} · {t('team:members.memberSince', { date: new Date(m.created_at).toLocaleDateString() })}
                     </div>
                   </div>
                   <select value={m.role} onChange={e => handleRoleChange(m.membership_id, e.target.value)} style={selectStyle}>
-                    <option value="member">Membru</option>
-                    <option value="admin">Admin</option>
+                    <option value="member">{t('team:role.member')}</option>
+                    <option value="admin">{t('team:role.admin')}</option>
                   </select>
                   <button
                     onClick={() => setExpandedAccess(id => (id === m.membership_id ? null : m.membership_id))}
                     style={smallBtn('var(--bg-hover)', 'var(--text-2)')}
                   >
-                    Acces
+                    {t('team:members.access')}
                   </button>
                   {confirmDelete === m.membership_id ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                      <span style={{ color: 'var(--text-3)' }}>Șterge?</span>
-                      <button title="Confirmă eliminarea" aria-label="Confirmă eliminarea" style={{ ...iconBtn, color: 'var(--red)' }} onClick={() => handleRemove(m.membership_id)}>✓</button>
-                      <button title="Anulează" aria-label="Anulează" style={iconBtn} onClick={() => setConfirmDelete(null)}>✕</button>
+                      <span style={{ color: 'var(--text-3)' }}>{t('team:members.deleteConfirm')}</span>
+                      <button title={t('team:members.confirmRemove')} aria-label={t('team:members.confirmRemove')} style={{ ...iconBtn, color: 'var(--red)' }} onClick={() => handleRemove(m.membership_id)}>✓</button>
+                      <button title={t('team:members.cancel')} aria-label={t('team:members.cancel')} style={iconBtn} onClick={() => setConfirmDelete(null)}>✕</button>
                     </span>
                   ) : (
                     <button onClick={() => setConfirmDelete(m.membership_id)} style={smallBtn('var(--red-bg)', 'var(--red)')}>
-                      Elimină
+                      {t('team:members.remove')}
                     </button>
                   )}
                 </div>
@@ -245,11 +247,11 @@ export function TeamPage() {
 
           {/* Pending invitations */}
           <h3 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-            Invitații în așteptare
+            {t('team:invitations.heading')}
           </h3>
           {invitations.length === 0 ? (
             <div style={{ padding: 24, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
-              Nicio invitație în așteptare.
+              {t('team:invitations.empty')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -257,14 +259,14 @@ export function TeamPage() {
                 <div key={inv.id} style={rowStyle}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: 'var(--text-1)' }}>
-                      {inv.email ?? 'Link deschis — poate fi folosit de oricine'}
+                      {inv.email ?? t('team:invitations.openLink')}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                      {inv.role === 'admin' ? 'Admin' : 'Membru'} · expiră {new Date(inv.expires_at).toLocaleDateString('ro-RO')}
+                      {inv.role === 'admin' ? t('team:role.admin') : t('team:role.member')} · {t('team:invitations.expires', { date: new Date(inv.expires_at).toLocaleDateString() })}
                     </div>
                   </div>
                   <button onClick={() => handleRevoke(inv.id)} style={smallBtn('var(--red-bg)', 'var(--red)')}>
-                    Revocă
+                    {t('team:invitations.revoke')}
                   </button>
                 </div>
               ))}

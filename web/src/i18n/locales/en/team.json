@@ -1,0 +1,55 @@
+{
+  "title": "Team",
+  "subtitle": "Account members, their roles, and pending invitations.",
+  "loading": "Loading...",
+  "close": "Close",
+  "errors": {
+    "loadFailed": "Could not load the team",
+    "roleChangeFailed": "Could not change the role",
+    "removeFailed": "Could not remove the member",
+    "inviteFailed": "Could not create the invitation",
+    "revokeFailed": "Could not revoke the invitation"
+  },
+  "role": {
+    "member": "Member",
+    "admin": "Admin"
+  },
+  "invite": {
+    "emailPlaceholder": "Email (optional — leave blank for a link anyone can use)",
+    "submit": "Invite",
+    "submitting": "Creating...",
+    "created": "✓ Invitation created — copy the link now, it will not be shown again.",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "dismiss": "Dismiss",
+    "oneTimeNotice": "The link is shown only once."
+  },
+  "members": {
+    "heading": "Members",
+    "memberSince": "member since {{date}}",
+    "access": "Access",
+    "deleteConfirm": "Delete?",
+    "confirmRemove": "Confirm removal",
+    "cancel": "Cancel",
+    "remove": "Remove"
+  },
+  "invitations": {
+    "heading": "Pending invitations",
+    "empty": "No pending invitations.",
+    "openLink": "Open link — usable by anyone",
+    "expires": "expires {{date}}",
+    "revoke": "Revoke"
+  },
+  "access": {
+    "loading": "Loading access...",
+    "explainCheckbox": "Check the companies, locations, or groups this member has access to. A node that appears checked and disabled is included through a grant made higher up the tree (labeled \"via\").",
+    "explainVisibility": "This access controls what the member can see and open from the dashboard — it does not prevent a direct connection to a machine whose password they already know from another source.",
+    "errors": {
+      "loadFailed": "Could not load the access",
+      "saveFailed": "Could not save the access"
+    },
+    "unsaved": "Unsaved changes",
+    "save": "Save access",
+    "saving": "Saving..."
+  }
+}

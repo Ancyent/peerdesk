@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError, type GrantOut, type GrantIn } from '../api/client';
 import { OrgTree, type OrgNode } from './OrgTree';
@@ -20,6 +21,7 @@ function toGrantIn(g: GrantOut): GrantIn {
 }
 
 export function MemberAccessEditor({ membershipId }: Props) {
+  const { t } = useTranslation('team');
   const { accessToken } = useAuth();
   const [grants, setGrants] = useState<GrantOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ export function MemberAccessEditor({ membershipId }: Props) {
     setError(null);
     api.team.grants(accessToken, membershipId)
       .then(g => { setGrants(g); setDirty(false); })
-      .catch(e => setError(errorMessage(e, 'Nu am putut încărca accesul')))
+      .catch(e => setError(errorMessage(e, t('team:access.errors.loadFailed'))))
       .finally(() => setLoading(false));
   }, [accessToken, membershipId]);
 
@@ -71,23 +73,21 @@ export function MemberAccessEditor({ membershipId }: Props) {
       setGrants(updated);
       setDirty(false);
     } catch (e) {
-      setError(errorMessage(e, 'Nu am putut salva accesul'));
+      setError(errorMessage(e, t('team:access.errors.saveFailed')));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>Se încarcă accesul...</p>;
+  if (loading) return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>{t('team:access.loading')}</p>;
 
   return (
     <div>
       <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-3)' }}>
-        Bifează companiile, locațiile sau grupurile la care acest membru are acces. Un nod bifat
-        și dezactivat este inclus printr-un acces acordat mai sus în arbore (etichetat „via").
+        {t('team:access.explainCheckbox')}
       </p>
       <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-3)' }}>
-        Acest acces controlează ce vede și ce poate deschide membrul din dashboard — nu împiedică
-        o conexiune directă către o mașină a cărei parolă o cunoaște deja dintr-o altă sursă.
+        {t('team:access.explainVisibility')}
       </p>
 
       {error && (
@@ -97,7 +97,7 @@ export function MemberAccessEditor({ membershipId }: Props) {
           border: '1px solid var(--red)', borderRadius: 6,
         }}>
           <span style={{ fontSize: 12, color: 'var(--red)' }}>{error}</span>
-          <button onClick={() => setError(null)} title="Închide" aria-label="Închide"
+          <button onClick={() => setError(null)} title={t('team:close')} aria-label={t('team:close')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: 12 }}>✕</button>
         </div>
       )}
@@ -112,7 +112,7 @@ export function MemberAccessEditor({ membershipId }: Props) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-        {dirty && <span style={{ fontSize: 11, color: 'var(--yellow)' }}>Modificări nesalvate</span>}
+        {dirty && <span style={{ fontSize: 11, color: 'var(--yellow)' }}>{t('team:access.unsaved')}</span>}
         <button
           onClick={save}
           disabled={!dirty || saving}
@@ -122,7 +122,7 @@ export function MemberAccessEditor({ membershipId }: Props) {
             opacity: dirty && !saving ? 1 : 0.5,
           }}
         >
-          {saving ? 'Se salvează...' : 'Salvează accesul'}
+          {saving ? t('team:access.saving') : t('team:access.save')}
         </button>
       </div>
     </div>
