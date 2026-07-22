@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 
 /** Live view of the agent's activity (connect, register, errors, reconnects),
  *  polled from the Rust log buffer. */
 export function LogPanel() {
+  const { t } = useTranslation('viewer');
   const [lines, setLines] = useState<string[]>([]);
   const boxRef = useRef<HTMLDivElement>(null);
   // Auto-scroll to newest only while the user is already at the bottom; if they
@@ -36,7 +38,7 @@ export function LogPanel() {
   return (
     <div style={{ marginTop: 20 }}>
       <div style={{ fontSize: 10, color: '#93a0b2', letterSpacing: 1, fontWeight: 600, marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid #21262d', textTransform: 'uppercase' }}>
-        Activity log
+        {t('viewer:log.title')}
       </div>
       <div
         ref={boxRef}
@@ -48,7 +50,7 @@ export function LogPanel() {
         }}
       >
         {lines.length === 0 ? (
-          <div style={{ color: '#93a0b2' }}>No activity yet.</div>
+          <div style={{ color: '#93a0b2' }}>{t('viewer:log.empty')}</div>
         ) : (
           lines.slice(-250).map((l, i) => (
             <div key={i} style={{ color: color(l), whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{l}</div>

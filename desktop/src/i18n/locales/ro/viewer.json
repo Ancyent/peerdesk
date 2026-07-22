@@ -1,0 +1,87 @@
+{
+  "connecting": {
+    "eyebrow": "Conectare la distanță",
+    "passwordPlaceholder": "Parolă",
+    "connect": "Conectează"
+  },
+  "negotiating": {
+    "establishing": "Se stabilește conexiunea..."
+  },
+  "error": {
+    "retry": "Reîncearcă",
+    "close": "Închide"
+  },
+  "errors": {
+    "crypto": "Eroare criptografică",
+    "wrongPassword": "Parolă greșită",
+    "machineNotFound": "Dispozitiv negăsit",
+    "connectionDenied": "Conexiune refuzată de dispozitivul de la distanță",
+    "remoteDisconnected": "Dispozitivul de la distanță s-a deconectat",
+    "signalingUnreachable": "Serverul de semnalizare nu poate fi contactat",
+    "remoteUnreachable": "Dispozitivul de la distanță nu poate fi contactat"
+  },
+  "toolbar": {
+    "fullscreen": "Ecran complet",
+    "clipboard": "Clipboard",
+    "clipboardTitle": "Sincronizează clipboard-ul local cu dispozitivul de la distanță",
+    "files": "Fișiere",
+    "filesTitle": "Transfer de fișiere",
+    "quality": "Calitate",
+    "stats": "Statistici",
+    "statsTitle": "Statistici conexiune",
+    "cursor": "Cursor",
+    "cursorTitle": "Arată cursorul de la distanță",
+    "disconnect": "Deconectare"
+  },
+  "stats": {
+    "speed": "Viteză",
+    "target": "Țintă",
+    "delay": "Întârziere",
+    "res": "Rez.",
+    "loss": "Pierderi"
+  },
+  "display": {
+    "monitorLabel": "Monitor {{n}} ({{width}}×{{height}})",
+    "default": "Implicit"
+  },
+  "quality": {
+    "presets": {
+      "good": "Calitate bună a imaginii",
+      "balanced": "Echilibrat",
+      "reaction": "Optimizează timpul de reacție",
+      "custom": "Personalizat"
+    }
+  },
+  "fileTransfer": {
+    "title": "Transfer de fișiere",
+    "send": "Trimite",
+    "receive": "Primește",
+    "pickFile": "Apasă pentru a alege un fișier",
+    "waiting": "În așteptare…",
+    "done": "Finalizat",
+    "error": "Eroare",
+    "channelClosed": "Canalul s-a închis",
+    "noIncoming": "Niciun fișier primit încă",
+    "download": "Descarcă"
+  },
+  "approval": {
+    "title": "Conexiune primită",
+    "message": "Cineva vrea să controleze acest calculator.",
+    "fromIp": "De la IP",
+    "reject": "Refuză",
+    "accept": "Acceptă ({{secs}}s)"
+  },
+  "securityCode": {
+    "label": "Cod de securitate — verifică verbal cu cealaltă parte",
+    "note": "Codurile trebuie să coincidă pe ambele părți. Dacă diferă, deconectează-te imediat."
+  },
+  "mode": {
+    "full": { "label": "Acces complet", "desc": "Utilizatorii de la distanță pot controla dispozitivul tău" },
+    "viewOnly": { "label": "Doar vizualizare / Cast", "desc": "Partajare ecran fără control" },
+    "noIncoming": { "label": "Fără conexiuni primite", "desc": "Refuză toate conexiunile" }
+  },
+  "log": {
+    "title": "Jurnal de activitate",
+    "empty": "Nicio activitate încă."
+  }
+}

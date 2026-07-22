@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -11,6 +12,7 @@ interface ApprovalReq {
  *  incoming connection; the host must accept or reject. Auto-rejects after
  *  60s (matching the agent-side timeout) so a stale prompt can't hang. */
 export function ApprovalDialog() {
+  const { t } = useTranslation('viewer');
   const [req, setReq] = useState<ApprovalReq | null>(null);
   const [secs, setSecs] = useState(60);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -79,24 +81,24 @@ export function ApprovalDialog() {
         }}
       >
         <div style={{ fontSize: 15, fontWeight: 700, color: '#e6edf3', marginBottom: 6 }}>
-          Incoming connection
+          {t('viewer:approval.title')}
         </div>
         <div style={{ fontSize: 12, color: '#b3bdca', marginBottom: 16, lineHeight: 1.5 }}>
-          Someone wants to control this computer.
-          <br />From IP <span style={{ color: '#26c6da', fontFamily: 'monospace' }}>{req.remote_ip}</span>
+          {t('viewer:approval.message')}
+          <br />{t('viewer:approval.fromIp')} <span style={{ color: '#26c6da', fontFamily: 'monospace' }}>{req.remote_ip}</span>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
             onClick={() => respond(false)}
             style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: '1px solid #30363d', background: 'transparent', color: '#f0a0a0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
           >
-            Reject
+            {t('viewer:approval.reject')}
           </button>
           <button
             onClick={() => respond(true)}
             style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: 'none', background: '#26c6da', color: '#0d1117', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
           >
-            Accept ({secs}s)
+            {t('viewer:approval.accept', { secs })}
           </button>
         </div>
       </div>

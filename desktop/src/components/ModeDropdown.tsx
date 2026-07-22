@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type AccessMode = 'full' | 'view_only' | 'no_incoming';
 
@@ -7,14 +8,14 @@ interface ModeDropdownProps {
   onChange: (m: AccessMode) => void;
 }
 
-const MODES: { value: AccessMode; label: string; desc: string }[] = [
-  { value: 'full', label: 'Full Access', desc: 'Remote users can control your device' },
-  { value: 'view_only', label: 'View Only / Cast', desc: 'Screen sharing without control' },
-  { value: 'no_incoming', label: 'No Incoming', desc: 'Reject all connections' },
-];
-
 export function ModeDropdown({ value, onChange }: ModeDropdownProps) {
+  const { t } = useTranslation('viewer');
   const [open, setOpen] = useState(false);
+  const MODES: { value: AccessMode; label: string; desc: string }[] = [
+    { value: 'full', label: t('viewer:mode.full.label'), desc: t('viewer:mode.full.desc') },
+    { value: 'view_only', label: t('viewer:mode.viewOnly.label'), desc: t('viewer:mode.viewOnly.desc') },
+    { value: 'no_incoming', label: t('viewer:mode.noIncoming.label'), desc: t('viewer:mode.noIncoming.desc') },
+  ];
   const current = MODES.find((m) => m.value === value) ?? MODES[0];
 
   return (

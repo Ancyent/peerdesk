@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface OutgoingFile {
   id: string;
@@ -29,6 +30,7 @@ function genId(): string {
 }
 
 export function FileTransferModal({ ftChannel, onClose }: Props) {
+  const { t } = useTranslation('viewer');
   const [tab, setTab] = useState<'send' | 'receive'>('send');
   const [outgoing, setOutgoing] = useState<OutgoingFile[]>([]);
   const [incoming, setIncoming] = useState<IncomingFile[]>([]);
@@ -105,7 +107,7 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
     reader.onload = () => {
       if (aborted || !(reader.result instanceof ArrayBuffer)) return;
       if (ftChannel.readyState !== 'open') {
-        setOutgoing(prev => prev.map(f => f.id === id ? { ...f, status: 'error', errorNote: 'Channel closed' } : f));
+        setOutgoing(prev => prev.map(f => f.id === id ? { ...f, status: 'error', errorNote: t('viewer:fileTransfer.channelClosed') } : f));
         return;
       }
       ftChannel.send(reader.result);
@@ -146,13 +148,13 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
         onClick={e => e.stopPropagation()}
       >
         <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #21262d' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3', flex: 1 }}>File Transfer</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3', flex: 1 }}>{t('viewer:fileTransfer.title')}</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#93a0b2', cursor: 'pointer', fontSize: 18 }}>×</button>
         </div>
 
         <div style={{ display: 'flex', borderBottom: '1px solid #21262d' }}>
-          <button style={tabBtn('send')} onClick={() => setTab('send')}>Send</button>
-          <button style={tabBtn('receive')} onClick={() => setTab('receive')}>Receive</button>
+          <button style={tabBtn('send')} onClick={() => setTab('send')}>{t('viewer:fileTransfer.send')}</button>
+          <button style={tabBtn('receive')} onClick={() => setTab('receive')}>{t('viewer:fileTransfer.receive')}</button>
         </div>
 
         <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
@@ -160,16 +162,16 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
             <>
               <label style={{ display: 'block', border: '2px dashed #30363d', borderRadius: 8, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', color: '#93a0b2', fontSize: 12, marginBottom: 12 }}>
                 <input type="file" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handlePickFile(e.target.files[0])} />
-                📁 Click to pick a file
+                📁 {t('viewer:fileTransfer.pickFile')}
               </label>
               {outgoing.map(f => (
                 <div key={f.id} style={{ background: '#0d1117', borderRadius: 6, padding: '8px 12px', marginBottom: 6 }}>
                   <div style={{ fontSize: 11, color: '#e6ebf1', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{f.name}</span>
                     <span style={{ color: f.status === 'done' ? '#56d364' : f.status === 'error' ? '#f85149' : '#b3bdca', flexShrink: 0 }}>
-                      {f.status === 'done' ? '✓ Done'
-                        : f.status === 'error' ? `✗ ${f.errorNote ?? 'Error'}`
-                        : f.status === 'pending' ? 'Waiting…'
+                      {f.status === 'done' ? `✓ ${t('viewer:fileTransfer.done')}`
+                        : f.status === 'error' ? `✗ ${f.errorNote ?? t('viewer:fileTransfer.error')}`
+                        : f.status === 'pending' ? t('viewer:fileTransfer.waiting')
                         : `${Math.round((f.sent / f.size) * 100)}%`}
                     </span>
                   </div>
@@ -185,14 +187,14 @@ export function FileTransferModal({ ftChannel, onClose }: Props) {
           {tab === 'receive' && (
             <>
               {incoming.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#93a0b2', fontSize: 12, paddingTop: 20 }}>No incoming files yet</div>
+                <div style={{ textAlign: 'center', color: '#93a0b2', fontSize: 12, paddingTop: 20 }}>{t('viewer:fileTransfer.noIncoming')}</div>
               )}
               {incoming.map(f => (
                 <div key={f.id} style={{ background: '#0d1117', borderRadius: 6, padding: '8px 12px', marginBottom: 6 }}>
                   <div style={{ fontSize: 11, color: '#e6ebf1', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{f.name}</span>
                     {f.status === 'done' && f.url ? (
-                      <a href={f.url} download={f.name} style={{ color: '#26c6da', fontSize: 11, textDecoration: 'none', flexShrink: 0 }}>⬇ Download</a>
+                      <a href={f.url} download={f.name} style={{ color: '#26c6da', fontSize: 11, textDecoration: 'none', flexShrink: 0 }}>⬇ {t('viewer:fileTransfer.download')}</a>
                     ) : (
                       <span style={{ color: '#b3bdca', flexShrink: 0 }}>{Math.round((f.received / f.size) * 100)}%</span>
                     )}

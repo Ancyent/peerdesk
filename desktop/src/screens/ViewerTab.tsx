@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSignaling } from '../hooks/useSignaling';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { ViewerToolbar } from '../components/ViewerToolbar';
@@ -46,6 +47,7 @@ interface Props {
 }
 
 export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Props) {
+  const { t } = useTranslation(['viewer', 'common']);
   const [password, setPassword] = useState('');
   const [viewState, setViewState] = useState<'connecting' | 'pending_approval' | 'negotiating' | 'connected' | 'error'>('connecting');
   const [errMsg, setErrMsg] = useState('');
@@ -78,9 +80,9 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
           sendRef.current?.({ type: 'auth_response', peer_id: session.id, response });
         })
       ).catch(() => {
-        setErrMsg('Crypto error');
+        setErrMsg(t('viewer:errors.crypto'));
         setViewState('error');
-        onStateChange(session.id, 'error', 'Crypto error');
+        onStateChange(session.id, 'error', t('viewer:errors.crypto'));
       });
     } else if (msg.type === 'answer') {
       await webrtc.handleAnswer(msg.sdp);
@@ -88,13 +90,13 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
       await webrtc.handleIceCandidate(msg.candidate);
     } else if (msg.type === 'error') {
       if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
-      const m = msg.code === 'unauthorized' ? 'Wrong password' : 'Machine not found';
+      const m = msg.code === 'unauthorized' ? t('viewer:errors.wrongPassword') : t('viewer:errors.machineNotFound');
       setErrMsg(m);
       setViewState('error');
       onStateChange(session.id, 'error', m);
     } else if (msg.type === 'denied') {
       if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
-      const m = msg.reason || 'Connection denied by remote machine';
+      const m = msg.reason || t('viewer:errors.connectionDenied');
       setErrMsg(m);
       setViewState('error');
       onStateChange(session.id, 'error', m);
@@ -103,20 +105,20 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     } else if (msg.type === 'agent_disconnected') {
       if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
       webrtc.disconnect();
-      onStateChange(session.id, 'error', 'Remote machine disconnected');
+      onStateChange(session.id, 'error', t('viewer:errors.remoteDisconnected'));
       onClose();
     }
-  }, [webrtc, session.id, onStateChange, onClose, password]),
+  }, [webrtc, session.id, onStateChange, onClose, password, t]),
   useCallback(() => {
     // WebSocket failed to open / closed abnormally — don't hang on "Establishing connection".
     setViewState(prev => {
       if (prev === 'connected') return prev;
-      const m = 'Could not reach signaling server';
+      const m = t('viewer:errors.signalingUnreachable');
       setErrMsg(m);
       onStateChange(session.id, 'error', m);
       return 'error';
     });
-  }, [session.id, onStateChange]));
+  }, [session.id, onStateChange, t]));
 
   sendRef.current = send;
 
@@ -135,7 +137,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   useEffect(() => {
     if (viewState !== 'negotiating') return;
     iceTimeoutRef.current = setTimeout(() => {
-      const m = 'Could not reach remote machine';
+      const m = t('viewer:errors.remoteUnreachable');
       setErrMsg(m);
       setViewState('error');
       onStateChange(session.id, 'error', m);
@@ -184,21 +186,21 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     return (
       <div style={center}>
         <div style={card}>
-          <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, fontWeight: 700, marginBottom: 16, textTransform: 'uppercase' }}>Connect to Remote</div>
+          <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, fontWeight: 700, marginBottom: 16, textTransform: 'uppercase' }}>{t('viewer:connecting.eyebrow')}</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#26c6da', letterSpacing: 4, fontFamily: 'monospace', marginBottom: 16 }}>{fmt(session.id)}</div>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && password && handleJoin()}
-            placeholder="Password"
+            placeholder={t('viewer:connecting.passwordPlaceholder')}
             autoFocus
             style={inp}
           />
           <button onClick={handleJoin} disabled={!password} style={{ ...btnPrimary, opacity: !password ? 0.5 : 1 }}>
-            Connect
+            {t('viewer:connecting.connect')}
           </button>
-          <button onClick={onClose} style={btnGhost}>Cancel</button>
+          <button onClick={onClose} style={btnGhost}>{t('common:cancel')}</button>
         </div>
       </div>
     );
@@ -209,8 +211,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
       <div style={center}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#26c6da', margin: '0 auto 16px', animation: 'pulsedot 1s infinite' }} />
-          <div style={{ color: '#b3bdca', fontSize: 13 }}>Establishing connection...</div>
-          <button onClick={() => { webrtc.disconnect(); onClose(); }} style={{ ...btnGhost, marginTop: 16 }}>Cancel</button>
+          <div style={{ color: '#b3bdca', fontSize: 13 }}>{t('viewer:negotiating.establishing')}</div>
+          <button onClick={() => { webrtc.disconnect(); onClose(); }} style={{ ...btnGhost, marginTop: 16 }}>{t('common:cancel')}</button>
         </div>
         <style>{`@keyframes pulsedot{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
       </div>
@@ -223,10 +225,10 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         <div style={{ ...card, border: '1px solid #f85149', background: '#1a0a0a', textAlign: 'center' }}>
           <div style={{ color: '#f85149', fontSize: 13, marginBottom: 16 }}>{errMsg}</div>
           <button onClick={() => { setViewState('connecting'); setErrMsg(''); }} style={{ ...btnPrimary, width: 'auto', padding: '8px 20px', marginRight: 8 }}>
-            Retry
+            {t('viewer:error.retry')}
           </button>
           <button onClick={onClose} style={{ background: 'none', border: '1px solid #30363d', color: '#b3bdca', borderRadius: 6, padding: '8px 20px', fontSize: 12, cursor: 'pointer' }}>
-            Close
+            {t('viewer:error.close')}
           </button>
         </div>
       </div>

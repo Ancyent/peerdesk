@@ -1,0 +1,87 @@
+{
+  "connecting": {
+    "eyebrow": "Connect to Remote",
+    "passwordPlaceholder": "Password",
+    "connect": "Connect"
+  },
+  "negotiating": {
+    "establishing": "Establishing connection..."
+  },
+  "error": {
+    "retry": "Retry",
+    "close": "Close"
+  },
+  "errors": {
+    "crypto": "Crypto error",
+    "wrongPassword": "Wrong password",
+    "machineNotFound": "Machine not found",
+    "connectionDenied": "Connection denied by remote machine",
+    "remoteDisconnected": "Remote machine disconnected",
+    "signalingUnreachable": "Could not reach signaling server",
+    "remoteUnreachable": "Could not reach remote machine"
+  },
+  "toolbar": {
+    "fullscreen": "Fullscreen",
+    "clipboard": "Clipboard",
+    "clipboardTitle": "Sync local clipboard to remote",
+    "files": "Files",
+    "filesTitle": "File transfer",
+    "quality": "Quality",
+    "stats": "Stats",
+    "statsTitle": "Connection stats",
+    "cursor": "Cursor",
+    "cursorTitle": "Show remote cursor",
+    "disconnect": "Disconnect"
+  },
+  "stats": {
+    "speed": "Speed",
+    "target": "Target",
+    "delay": "Delay",
+    "res": "Res",
+    "loss": "Loss"
+  },
+  "display": {
+    "monitorLabel": "Monitor {{n}} ({{width}}×{{height}})",
+    "default": "Default"
+  },
+  "quality": {
+    "presets": {
+      "good": "Good image quality",
+      "balanced": "Balanced",
+      "reaction": "Optimize reaction time",
+      "custom": "Custom"
+    }
+  },
+  "fileTransfer": {
+    "title": "File Transfer",
+    "send": "Send",
+    "receive": "Receive",
+    "pickFile": "Click to pick a file",
+    "waiting": "Waiting…",
+    "done": "Done",
+    "error": "Error",
+    "channelClosed": "Channel closed",
+    "noIncoming": "No incoming files yet",
+    "download": "Download"
+  },
+  "approval": {
+    "title": "Incoming connection",
+    "message": "Someone wants to control this computer.",
+    "fromIp": "From IP",
+    "reject": "Reject",
+    "accept": "Accept ({{secs}}s)"
+  },
+  "securityCode": {
+    "label": "Security code — verify verbally with the remote party",
+    "note": "Codes must match on both sides. If they differ, disconnect immediately."
+  },
+  "mode": {
+    "full": { "label": "Full Access", "desc": "Remote users can control your device" },
+    "viewOnly": { "label": "View Only / Cast", "desc": "Screen sharing without control" },
+    "noIncoming": { "label": "No Incoming", "desc": "Reject all connections" }
+  },
+  "log": {
+    "title": "Activity log",
+    "empty": "No activity yet."
+  }
+}

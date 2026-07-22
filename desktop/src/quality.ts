@@ -13,13 +13,6 @@ export const PRESETS: Record<Exclude<PresetId, 'custom'>, QualitySettings> = {
   reaction: { bitrate_kbps: 800,  fps: 30, max_height: 720 },
 };
 
-export const PRESET_LABELS: Record<PresetId, string> = {
-  good: 'Good image quality',
-  balanced: 'Balanced',
-  reaction: 'Optimize reaction time',
-  custom: 'Custom',
-};
-
 export const DEFAULT_PRESET: PresetId = 'balanced';
 
 export function clampCustom(fps: number, bitrate_kbps: number): QualitySettings {
