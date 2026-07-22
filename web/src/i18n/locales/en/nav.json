@@ -1,0 +1,11 @@
+{
+  "machines": "Machines",
+  "organization": "Organization",
+  "apiKeys": "API Keys",
+  "downloads": "Download & Deploy",
+  "settings": "Settings",
+  "branding": "Branding",
+  "team": "Team",
+  "expandSidebar": "Expand sidebar",
+  "collapseSidebar": "Collapse sidebar"
+}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
 import { AccountSwitcher } from './AccountSwitcher';
@@ -12,20 +13,21 @@ interface Props {
   children: ReactNode;
 }
 
-const NAV: { page: AppPage; icon: string; label: string }[] = [
-  { page: 'machines',      icon: '💻', label: 'Mașini' },
-  { page: 'organization',  icon: '🏢', label: 'Organizare' },
-  { page: 'api-keys',      icon: '🔑', label: 'API Keys' },
-  { page: 'downloads',     icon: '📦', label: 'Download & Deploy' },
-  { page: 'settings',      icon: '⚙️', label: 'Setări' },
+const NAV: { page: AppPage; icon: string; labelKey: string }[] = [
+  { page: 'machines',      icon: '💻', labelKey: 'nav.machines' },
+  { page: 'organization',  icon: '🏢', labelKey: 'nav.organization' },
+  { page: 'api-keys',      icon: '🔑', labelKey: 'nav.apiKeys' },
+  { page: 'downloads',     icon: '📦', labelKey: 'nav.downloads' },
+  { page: 'settings',      icon: '⚙️', labelKey: 'nav.settings' },
 ];
 
-const ADMIN: { page: AppPage; icon: string; label: string }[] = [
-  { page: 'branding', icon: '🎨', label: 'Branding' },
-  { page: 'team',     icon: '👥', label: 'Echipă' },
+const ADMIN: { page: AppPage; icon: string; labelKey: string }[] = [
+  { page: 'branding', icon: '🎨', labelKey: 'nav.branding' },
+  { page: 'team',     icon: '👥', labelKey: 'nav.team' },
 ];
 
 export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
+  const { t } = useTranslation('nav');
   const { user, logout, role } = useAuth();
   const isAdmin = role === 'admin';
   const { brand_name, logo_data_url } = useBrandingContext();
@@ -79,7 +81,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
       {/* Sidebar wrapper — overflow:visible so toggle isn't clipped */}
       <div style={{ width: collapsed ? 64 : 220, flexShrink: 0, position: 'relative', transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)' }}>
         {/* Toggle button outside overflow:hidden */}
-        <button onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Extinde bara laterală' : 'Restrânge bara laterală'} aria-label={collapsed ? 'Extinde bara laterală' : 'Restrânge bara laterală'} style={{
+        <button onClick={() => setCollapsed(c => !c)} title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')} aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')} style={{
           position: 'absolute', top: 19, right: -13, zIndex: 30,
           width: 26, height: 26, borderRadius: '50%',
           background: 'var(--bg-surface)', border: '1px solid var(--border)',
@@ -124,9 +126,9 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {NAV.map(n => navItem(n.page, n.icon, n.label))}
+          {NAV.map(n => navItem(n.page, n.icon, t(n.labelKey)))}
           {isAdmin && <div style={{ height: 1, background: 'var(--border-dim)', margin: '8px 0' }} />}
-          {isAdmin && ADMIN.map(n => navItem(n.page, n.icon, n.label))}
+          {isAdmin && ADMIN.map(n => navItem(n.page, n.icon, t(n.labelKey)))}
         </nav>
 
         {/* Avatar */}
@@ -162,7 +164,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{user?.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{user?.email}</div>
                 </div>
-                <button onClick={() => { setDropdownOpen(false); onNavigate('settings'); }} style={{ width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-2)' }}>⚙️ Setări</button>
+                <button onClick={() => { setDropdownOpen(false); onNavigate('settings'); }} style={{ width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-2)' }}>⚙️ {t('nav.settings')}</button>
                 <button onClick={logout} style={{ width: '100%', textAlign: 'left', padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--red)', borderTop: '1px solid var(--border-dim)' }}>Logout</button>
               </div>
             )}
