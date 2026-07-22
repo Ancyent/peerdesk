@@ -73,7 +73,7 @@ ASYNCPG_DSN = f"postgresql://{PG_USER}:{PG_PASSWORD}@localhost:{HOST_PORT}/{PG_D
 SCOPED_TABLES = ["machines", "companies", "api_keys", "registration_tokens", "branding"]
 
 # The expected Alembic head. Bump this in the task that adds a migration.
-HEAD_REVISION = "0019"
+HEAD_REVISION = "0020"
 
 
 def _docker_available() -> bool:
@@ -679,6 +679,22 @@ def test_access_grant_rejects_zero_targets(pg):
             "INSERT INTO access_grants (id, membership_id, created_by_id, created_at) "
             "VALUES ('g-empty', 'mem-user-4', 'user-4', NOW())"
         ))
+
+
+# --- 0020: users.language ---------------------------------------------------
+
+def test_users_language_column_is_nullable_at_head(pg):
+    """0020 adds users.language for the i18n preference. It must be nullable
+    -- every user that existed before this migration has no value, and
+    nothing backfills one -- and it must actually exist at head, or the
+    server's language read/write in routers/users.py has no column to hit."""
+    _upgrade("head")
+
+    row = _run(_fetchval(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_name = 'users' AND column_name = 'language'"
+    ))
+    assert row == "YES"
 
 
 def test_access_grant_created_at_is_not_nullable(pg):

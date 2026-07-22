@@ -21,6 +21,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     totp_secret: Mapped[str | None] = mapped_column(String, nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     def __init__(self, **kwargs):
@@ -32,6 +33,8 @@ class User(Base):
             kwargs["totp_secret"] = None
         if "totp_enabled" not in kwargs:
             kwargs["totp_enabled"] = False
+        if "language" not in kwargs:
+            kwargs["language"] = None
         if "created_at" not in kwargs:
             kwargs["created_at"] = utcnow()
         super().__init__(**kwargs)

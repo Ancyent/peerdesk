@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_current_user, get_db
 from models import User
-from schemas import UserOut, UserUpdate, PasswordChange
+from schemas import UserOut, UserUpdate, PasswordChange, SUPPORTED_LANGUAGES
 from auth import hash_password, verify_password
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -29,6 +29,10 @@ async def update_me(
         if existing.scalar_one_or_none():
             raise HTTPException(409, "Email already in use")
         current_user.email = body.email
+    if body.language is not None:
+        if body.language not in SUPPORTED_LANGUAGES:
+            raise HTTPException(400, "Unsupported language")
+        current_user.language = body.language
     await db.commit()
     await db.refresh(current_user)
     return current_user

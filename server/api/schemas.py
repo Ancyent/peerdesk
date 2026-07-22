@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
+SUPPORTED_LANGUAGES = {"en", "ro"}
+
 
 class UserRegister(BaseModel):
     email: EmailStr
@@ -29,6 +31,7 @@ class UserOut(BaseModel):
     email: str
     name: str
     created_at: datetime
+    language: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -186,6 +189,7 @@ class TokenRedeemRequest(BaseModel):
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
+    language: Optional[str] = None
 
 
 class PasswordChange(BaseModel):
