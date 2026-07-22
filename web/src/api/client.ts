@@ -1,6 +1,7 @@
 import { getConfig } from '../config';
 import { singleFlight } from '../lib/singleFlight';
 import { getTokens, setTokens as storeSetTokens, clear as clearStore, getStorageKind } from '../auth/tokenStore';
+import i18n from '../i18n';
 
 export { storeSetTokens as setTokens };
 
@@ -17,12 +18,12 @@ export function setOnAuthFailure(cb: () => void) { onAuthFailure = cb; }
 
 export const refreshAccessToken = singleFlight(async (): Promise<void> => {
   const tokens = getTokens();
-  if (!tokens) throw new ApiError(401, 'No session');
+  if (!tokens) throw new ApiError(401, i18n.t('errors:noSession'));
   const res = await fetch(`${getConfig().apiUrl}/auth/refresh`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: tokens.refresh }),
   });
-  if (!res.ok) throw new ApiError(res.status, 'Refresh failed');
+  if (!res.ok) throw new ApiError(res.status, i18n.t('errors:refreshFailed'));
   const data = await res.json();
   const persist = getStorageKind() === 'local';
   storeSetTokens({ access: data.access_token, refresh: data.refresh_token }, persist);
@@ -39,7 +40,7 @@ async function request<T>(path: string, options: RequestInit = {}, retried = fal
     } catch {
       clearStore();
       onAuthFailure?.();
-      throw new ApiError(401, 'Session expired');
+      throw new ApiError(401, i18n.t('errors:sessionExpired'));
     }
     const fresh = getTokens();
     const headers = { ...options.headers } as Record<string, string>;
