@@ -15,9 +15,6 @@
       "hint": "Pornește agentul PeerDesk pe o mașină cu tokenul tău API pentru a o înregistra aici."
     }
   },
-  "errors": {
-    "loadFailed": "Nu am putut încărca mașinile"
-  },
   "viewer": {
     "connecting": "Conectare în curs...",
     "sessionEnded": "Sesiunea s-a încheiat",

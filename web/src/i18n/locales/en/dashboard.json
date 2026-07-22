@@ -15,9 +15,6 @@
       "hint": "Start the PeerDesk agent on a machine with your API token to register it here."
     }
   },
-  "errors": {
-    "loadFailed": "Failed to load machines"
-  },
   "viewer": {
     "connecting": "Connecting...",
     "sessionEnded": "Session ended",
