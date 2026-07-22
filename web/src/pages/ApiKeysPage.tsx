@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, type ApiKeyListOut } from '../api/client';
 import { copyText } from '../lib/clipboard';
+import { formatDate } from '../i18n/format';
 
 export function ApiKeysPage() {
   const { t } = useTranslation(['apikeys', 'common']);
@@ -123,7 +124,7 @@ export function ApiKeysPage() {
                 <code style={{ background: 'var(--bg-hover)', padding: '1px 4px', borderRadius: 3, color: 'var(--text-1)' }}>
                   {k.key_preview}
                 </code>
-                {k.last_used_at && <span style={{ marginLeft: 8 }}>{t('apikeys:lastUsed', { date: new Date(k.last_used_at).toLocaleDateString() })}</span>}
+                {k.last_used_at && <span style={{ marginLeft: 8 }}>{t('apikeys:lastUsed', { date: formatDate(k.last_used_at) })}</span>}
               </div>
             </div>
             <span title={t('apikeys:copyHint')} style={{ padding: '5px 10px', fontSize: 12, color: 'var(--text-3)', cursor: 'default', userSelect: 'none' }}>••••</span>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, type MachineOut } from '../api/client';
 import { MachineCard } from '../components/MachineCard';
+import { formatDate } from '../i18n/format';
 
 interface Props {
   onConnect: (machine: MachineOut) => void;
@@ -137,7 +138,7 @@ export function MachinesPage({ onConnect }: Props) {
                     )}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
-                    {t('machines:page.idLine', { peerId: m.peer_id, os: m.os ?? t('machines:page.unknownOs'), date: new Date(m.created_at).toLocaleDateString() })}
+                    {t('machines:page.idLine', { peerId: m.peer_id, os: m.os ?? t('machines:page.unknownOs'), date: formatDate(m.created_at) })}
                   </div>
                 </div>
                 <button onClick={() => handleApprove(m.id)} style={{ padding: '6px 14px', fontSize: 13, fontWeight: 600, background: 'var(--green)', color: 'var(--text-1)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>

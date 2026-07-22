@@ -6,6 +6,7 @@ import {
 } from '../api/client';
 import { copyText } from '../lib/clipboard';
 import { MemberAccessEditor } from '../components/MemberAccessEditor';
+import { formatDate } from '../i18n/format';
 
 const rowStyle = {
   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
@@ -208,7 +209,7 @@ export function TeamPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{m.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                      {m.email} · {t('team:members.memberSince', { date: new Date(m.created_at).toLocaleDateString() })}
+                      {m.email} · {t('team:members.memberSince', { date: formatDate(m.created_at) })}
                     </div>
                   </div>
                   <select value={m.role} onChange={e => handleRoleChange(m.membership_id, e.target.value)} style={selectStyle}>
@@ -262,7 +263,7 @@ export function TeamPage() {
                       {inv.email ?? t('team:invitations.openLink')}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                      {inv.role === 'admin' ? t('team:role.admin') : t('team:role.member')} · {t('team:invitations.expires', { date: new Date(inv.expires_at).toLocaleDateString() })}
+                      {inv.role === 'admin' ? t('team:role.admin') : t('team:role.member')} · {t('team:invitations.expires', { date: formatDate(inv.expires_at) })}
                     </div>
                   </div>
                   <button onClick={() => handleRevoke(inv.id)} style={smallBtn('var(--red-bg)', 'var(--red)')}>
