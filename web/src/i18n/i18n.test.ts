@@ -24,6 +24,7 @@ for (const path in modules) {
 
 describe('locale catalog parity', () => {
   it('every namespace has identical keys in en and ro', () => {
+    expect(Object.keys(byNs).length, 'at least one namespace must exist').toBeGreaterThan(0);
     for (const ns in byNs) {
       const langs = byNs[ns];
       expect(Object.keys(langs).sort(), `${ns}: both locales present`).toEqual(['en', 'ro']);

@@ -9,8 +9,8 @@
       "pending": "În așteptare"
     },
     "loading": "Se încarcă...",
-    "emptySearch": "Nicio mașinărie găsită.",
-    "emptyNone": "Nicio mașinărie înregistrată. Folosește secțiunea Download.",
+    "emptySearch": "Nicio mașină găsită.",
+    "emptyNone": "Nicio mașină înregistrată. Folosește secțiunea Download.",
     "noPending": "Nicio mașină în așteptarea aprobării.",
     "pendingBadge": "în așteptarea aprobării",
     "unknownOs": "SO necunoscut",

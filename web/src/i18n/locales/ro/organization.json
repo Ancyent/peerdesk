@@ -2,7 +2,7 @@
   "page": {
     "allMachines": "Toate mașinile",
     "machinesCount": "Mașini ({{count}})",
-    "empty": "Nicio mașinărie în această secțiune."
+    "empty": "Nicio mașină în această secțiune."
   },
   "tree": {
     "title": "Organizare",
@@ -17,7 +17,7 @@
     "delete": "Șterge",
     "confirm": "Confirmă",
     "accessTo": "Acces la {{name}}",
-    "via": "via {{name}}",
+    "via": "prin {{name}}",
     "companyNamePlaceholder": "Nume companie",
     "locationNamePlaceholder": "Nume locație",
     "groupNamePlaceholder": "Nume grup"

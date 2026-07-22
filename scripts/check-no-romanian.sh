@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 # Fails if Romanian diacritics appear in tracked source outside still-Romanian
-# areas. Desktop (desktop/) is excluded until i18n phase P3 translates its
-# strings; remove that exclusion when the phase lands. Web (web/) is now
-# scanned, except its Romanian translation catalog and the native-language-names
-# file (autonyms, i.e. each language's own name for itself, are shown
-# untranslated).
-# docs/superpowers is gitignored (local-only) and never scanned.
+# areas. docs/superpowers is gitignored (local-only) and never scanned.
 #
 # The diacritic set is expressed as PCRE unicode escapes (not literal glyphs) so
 # this script does not match itself and has no blind spot. It covers modern
