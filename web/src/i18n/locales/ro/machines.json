@@ -3,20 +3,20 @@
     "title": "Mașini",
     "search": "Caută...",
     "onlineCount": "{{count}} online",
-    "pendingApproval": "{{count}} pending approval",
+    "pendingApproval": "{{count}} în așteptarea aprobării",
     "tabs": {
       "active": "Active",
-      "pending": "Pending"
+      "pending": "În așteptare"
     },
     "loading": "Se încarcă...",
     "emptySearch": "Nicio mașinărie găsită.",
     "emptyNone": "Nicio mașinărie înregistrată. Folosește secțiunea Download.",
-    "noPending": "No machines pending approval.",
+    "noPending": "Nicio mașină în așteptarea aprobării.",
     "pendingBadge": "în așteptarea aprobării",
-    "unknownOs": "Unknown OS",
+    "unknownOs": "SO necunoscut",
     "idLine": "ID: {{peerId}} · {{os}} · {{date}}",
-    "approve": "Approve",
-    "deny": "Deny",
+    "approve": "Aprobă",
+    "deny": "Refuză",
     "deleteConfirm": "Ștergi mașina {{name}} ({{peerId}})? Va trebui reînregistrată."
   },
   "card": {
