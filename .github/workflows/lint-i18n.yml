@@ -1,0 +1,12 @@
+name: i18n Lint
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  no-romanian:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Romanian in cleaned areas
+        run: bash scripts/check-no-romanian.sh
