@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { api, ApiError, type RegistrationTokenOut, type CompanyOut, type Release, type ReleaseAsset } from '../api/client';
+import { api, ApiError, type RegistrationTokenOut, type Release, type ReleaseAsset } from '../api/client';
 import { getConfig } from '../config';
 import { CodeBlock } from '../components/CodeBlock';
+import { TreePicker } from '../components/TreePicker';
+import { placementFor, type PickerNode } from '../components/treePicker';
 import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, AGENT_UNINSTALL_LINUX, AGENT_UNINSTALL_WINDOWS, formatSize, type OsId } from './downloads/osData';
 import { buildCommand, type InstallMode } from './downloads/commands';
 
@@ -18,8 +20,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   const [release, setRelease] = useState<Release | null>(null);
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
-  const [companies, setCompanies] = useState<CompanyOut[]>([]);
-  const [placementCompany, setPlacementCompany] = useState('');
+  const [placement, setPlacement] = useState<PickerNode | null>(null);
   const [token, setToken] = useState<RegistrationTokenOut | null>(null);
   const [generating, setGenerating] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -42,11 +43,6 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   }, []);
 
   useEffect(() => {
-    if (!accessToken) return;
-    api.companies.list(accessToken).then(setCompanies).catch(console.error);
-  }, [accessToken]);
-
-  useEffect(() => {
     if (!token) return;
     const expiry = new Date(token.expires_at).getTime();
     const tick = () => setSecondsLeft(Math.max(0, Math.floor((expiry - Date.now()) / 1000)));
@@ -60,7 +56,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
     setGenerating(true);
     try {
       const t = await api.tokens.create(accessToken, {
-        ...(placementCompany ? { company_id: placementCompany } : {}),
+        ...(placement ? placementFor(placement) : {}),
         ...(machineName.trim() ? { name: machineName.trim() } : {}),
       });
       setToken(t);
@@ -103,11 +99,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
               placeholder="Nume mașină (opțional — altfel hostname-ul)"
               style={{ width: '100%', boxSizing: 'border-box', marginBottom: 8, padding: '8px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-surface)', color: 'var(--text-1)', outline: 'none' }} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <select value={placementCompany} onChange={e => setPlacementCompany(e.target.value)}
-                style={{ flex: 1, minWidth: 180, padding: '8px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-surface)', color: 'var(--text-1)' }}>
-                <option value="">Fără organizare</option>
-                {companies.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
-              </select>
+              <TreePicker value={placement} onChange={setPlacement} disabled={!accessToken} />
               <button onClick={generate} disabled={generating || !accessToken}
                 style={{ padding: '8px 18px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: accessToken ? 'pointer' : 'not-allowed', opacity: accessToken ? 1 : 0.5 }}>
                 {generating ? 'Generez...' : 'Generează token'}
