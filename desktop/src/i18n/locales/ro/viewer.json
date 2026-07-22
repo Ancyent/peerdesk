@@ -50,7 +50,8 @@
       "balanced": "Echilibrat",
       "reaction": "Optimizează timpul de reacție",
       "custom": "Personalizat"
-    }
+    },
+    "bitrateLabel": "Rată de biți (kbps)"
   },
   "fileTransfer": {
     "title": "Transfer de fișiere",

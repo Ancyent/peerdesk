@@ -50,7 +50,8 @@
       "balanced": "Balanced",
       "reaction": "Optimize reaction time",
       "custom": "Custom"
-    }
+    },
+    "bitrateLabel": "Bitrate (kbps)"
   },
   "fileTransfer": {
     "title": "File Transfer",

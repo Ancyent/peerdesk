@@ -90,7 +90,7 @@ export function QualitySelector({ onChange }: { onChange: (q: QualitySettings) =
             />
           </label>
           <label style={lbl}>
-            Bitrate (kbps)
+            {t('viewer:quality.bitrateLabel')}
             <input
               type="number"
               min={100}
