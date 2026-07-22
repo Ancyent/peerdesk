@@ -1,0 +1,141 @@
+{
+  "nav": {
+    "groups": {
+      "application": "APPLICATION",
+      "security": "SECURITY",
+      "session": "SESSION",
+      "account": "ACCOUNT"
+    },
+    "items": {
+      "general": "General",
+      "network": "Network",
+      "access": "Access",
+      "permissions": "Permissions",
+      "display": "Display",
+      "audio": "Audio",
+      "account": "My Device"
+    }
+  },
+  "chrome": {
+    "title": "PeerDesk · Settings"
+  },
+  "general": {
+    "title": "General",
+    "sectionStartup": "Startup",
+    "startOnBoot": {
+      "label": "Start on system boot",
+      "desc": "Launch PeerDesk automatically when your computer starts"
+    },
+    "minimizeToTray": {
+      "label": "Minimize to tray on close",
+      "desc": "Keep running in the background when window is closed"
+    },
+    "language": "Language"
+  },
+  "network": {
+    "title": "Network",
+    "sectionServer": "PeerDesk Server",
+    "serverUrlLabel": "SERVER URL",
+    "apiKeyLabel": "API KEY",
+    "apiKeyPlaceholderSaved": "••• key saved — enter new key to replace",
+    "showKey": "Show",
+    "hideKey": "Hide",
+    "pasteConfigLink": "Paste config link",
+    "applyReconnect": "Apply & Reconnect",
+    "toastApplied": "✓ Config applied — reconnecting...",
+    "toastNoConfigLink": "✗ No valid config link found in clipboard",
+    "toastError": "✗ {{message}}",
+    "sectionConnectionStatus": "Connection Status",
+    "statusLabel": "Status",
+    "statusConnectedStandalone": "Connected (standalone)",
+    "peerIdLabel": "Peer ID"
+  },
+  "access": {
+    "title": "Access",
+    "sectionAccessMode": "Access Mode",
+    "modes": {
+      "full": {
+        "label": "Full Access",
+        "desc": "Remote users can control your device completely"
+      },
+      "viewOnly": {
+        "label": "View Only / Cast",
+        "desc": "Remote users see your screen but cannot control it"
+      },
+      "noIncoming": {
+        "label": "No Incoming",
+        "desc": "Reject all incoming session requests"
+      }
+    },
+    "sectionIncomingRequests": "Incoming Requests",
+    "showApprovalDialog": {
+      "label": "Show approval dialog",
+      "desc": "Ask before accepting each connection"
+    },
+    "lockScreenAfterSession": {
+      "label": "Lock screen after session ends"
+    },
+    "autoDisconnect": {
+      "label": "Auto-disconnect on inactivity",
+      "desc": "Close session after idle",
+      "minutes": "{{n}} min"
+    },
+    "sectionUnattendedAccess": "Unattended Access",
+    "permanentPasswordLabel": "PERMANENT PASSWORD",
+    "permanentPasswordPlaceholder": "Set a permanent password for unattended access...",
+    "permanentPasswordNote": "Unattended access is not available yet."
+  },
+  "permissions": {
+    "title": "Permissions",
+    "sectionTitle": "What remote users can do",
+    "items": {
+      "keyboardMouse": { "label": "Keyboard & Mouse control" },
+      "clipboard": { "label": "Clipboard sync" },
+      "fileTransfer": { "label": "File transfer" },
+      "audio": { "label": "Audio transmission" },
+      "terminal": { "label": "Terminal access" },
+      "remoteRestart": { "label": "Remote restart" },
+      "blockUserInput": {
+        "label": "Block user's input during session",
+        "desc": "Host cannot interact while connected"
+      }
+    }
+  },
+  "display": {
+    "title": "Display",
+    "imageQuality": {
+      "label": "Image Quality",
+      "best": "Best quality",
+      "balanced": "Balanced",
+      "performance": "Best performance"
+    },
+    "codec": {
+      "label": "Default Codec",
+      "auto": "Auto",
+      "h264": "H264",
+      "vp9": "VP9",
+      "av1": "AV1"
+    },
+    "viewMode": {
+      "label": "View Mode",
+      "fit": "Scale to fit",
+      "original": "Original size",
+      "stretch": "Stretch"
+    },
+    "showRemoteCursor": "Show my cursor to the viewer",
+    "hardwareAcceleration": "Hardware acceleration"
+  },
+  "account": {
+    "title": "My Device",
+    "sectionDeviceInfo": "Device Info",
+    "peerIdLabel": "Peer ID",
+    "copy": "Copy",
+    "platformLabel": "Platform",
+    "platformUnknown": "Unknown",
+    "agentVersionLabel": "Agent version",
+    "sectionPassword": "Password",
+    "generatePassword": "Generate new password",
+    "newPasswordHint": "New password — copy it now:",
+    "copyAndClose": "Copy & Close"
+  }
+}

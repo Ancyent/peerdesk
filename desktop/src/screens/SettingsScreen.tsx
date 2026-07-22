@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSettingsContext } from '../context/AppContext';
 import { AccessSettings } from '../settings/AccessSettings';
 import { NetworkSettings } from '../settings/NetworkSettings';
@@ -10,18 +11,30 @@ import { AccountSettings } from '../settings/AccountSettings';
 type Page = 'general' | 'network' | 'access' | 'permissions' | 'display' | 'audio' | 'account';
 interface Props { onBack: () => void; }
 
-const NAV = [
-  { group: 'APPLICATION', items: [{ id: 'general' as Page, icon: '⚙', label: 'General' }, { id: 'network' as Page, icon: '🌐', label: 'Network' }] },
-  { group: 'SECURITY', items: [{ id: 'access' as Page, icon: '🔒', label: 'Access' }, { id: 'permissions' as Page, icon: '🛡', label: 'Permissions' }] },
-  { group: 'SESSION', items: [{ id: 'display' as Page, icon: '🖥', label: 'Display' }, { id: 'audio' as Page, icon: '🔊', label: 'Audio' }] },
-  { group: 'ACCOUNT', items: [{ id: 'account' as Page, icon: '👤', label: 'My Device' }] },
-];
-
 export function SettingsScreen({ onBack }: Props) {
   const [active, setActive] = useState<Page>('access');
   const { settings, loaded, updateSetting } = useSettingsContext();
+  const { t } = useTranslation(['settings', 'common']);
 
   if (!loaded) return null;
+
+  const NAV = [
+    { group: t('settings:nav.groups.application'), items: [
+      { id: 'general' as Page, icon: '⚙', label: t('settings:nav.items.general') },
+      { id: 'network' as Page, icon: '🌐', label: t('settings:nav.items.network') },
+    ] },
+    { group: t('settings:nav.groups.security'), items: [
+      { id: 'access' as Page, icon: '🔒', label: t('settings:nav.items.access') },
+      { id: 'permissions' as Page, icon: '🛡', label: t('settings:nav.items.permissions') },
+    ] },
+    { group: t('settings:nav.groups.session'), items: [
+      { id: 'display' as Page, icon: '🖥', label: t('settings:nav.items.display') },
+      { id: 'audio' as Page, icon: '🔊', label: t('settings:nav.items.audio') },
+    ] },
+    { group: t('settings:nav.groups.account'), items: [
+      { id: 'account' as Page, icon: '👤', label: t('settings:nav.items.account') },
+    ] },
+  ];
 
   const content = () => {
     switch (active) {
@@ -31,15 +44,15 @@ export function SettingsScreen({ onBack }: Props) {
       case 'display': return <DisplaySettings settings={settings} updateSetting={updateSetting} />;
       case 'general': return <GeneralSettings settings={settings} updateSetting={updateSetting} />;
       case 'account': return <AccountSettings />;
-      default: return <div style={{ padding: 20, color: '#b3bdca', fontSize: 13 }}>Coming soon</div>;
+      default: return <div style={{ padding: 20, color: '#b3bdca', fontSize: 13 }}>{t('common:comingSoon')}</div>;
     }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0d1117', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', color: '#e6edf3' }}>
       <div style={{ background: '#161b22', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 7, borderBottom: '1px solid #21262d' }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#b3bdca', cursor: 'pointer', fontSize: 13, marginLeft: 4 }}>← Back</button>
-        <div style={{ flex: 1, textAlign: 'center', fontSize: 12, color: '#b3bdca', fontWeight: 500 }}>PeerDesk · Settings</div>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#b3bdca', cursor: 'pointer', fontSize: 13, marginLeft: 4 }}>← {t('common:back')}</button>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: 12, color: '#b3bdca', fontWeight: 500 }}>{t('settings:chrome.title')}</div>
       </div>
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ width: 158, background: '#161b22', borderRight: '1px solid #21262d', padding: '10px 0', overflowY: 'auto', flexShrink: 0 }}>

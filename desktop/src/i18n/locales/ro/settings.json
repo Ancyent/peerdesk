@@ -1,0 +1,141 @@
+{
+  "nav": {
+    "groups": {
+      "application": "APLICAȚIE",
+      "security": "SECURITATE",
+      "session": "SESIUNE",
+      "account": "CONT"
+    },
+    "items": {
+      "general": "General",
+      "network": "Rețea",
+      "access": "Acces",
+      "permissions": "Permisiuni",
+      "display": "Afișare",
+      "audio": "Audio",
+      "account": "Dispozitivul meu"
+    }
+  },
+  "chrome": {
+    "title": "PeerDesk · Setări"
+  },
+  "general": {
+    "title": "General",
+    "sectionStartup": "Pornire",
+    "startOnBoot": {
+      "label": "Pornește la pornirea sistemului",
+      "desc": "Lansează PeerDesk automat când pornește calculatorul"
+    },
+    "minimizeToTray": {
+      "label": "Minimizează în tray la închidere",
+      "desc": "Continuă să ruleze în fundal când fereastra este închisă"
+    },
+    "language": "Limbă"
+  },
+  "network": {
+    "title": "Rețea",
+    "sectionServer": "Server PeerDesk",
+    "serverUrlLabel": "URL SERVER",
+    "apiKeyLabel": "CHEIE API",
+    "apiKeyPlaceholderSaved": "••• cheie salvată — introdu o cheie nouă pentru a o înlocui",
+    "showKey": "Arată",
+    "hideKey": "Ascunde",
+    "pasteConfigLink": "Lipește linkul de configurare",
+    "applyReconnect": "Aplică și reconectează",
+    "toastApplied": "✓ Configurație aplicată — se reconectează...",
+    "toastNoConfigLink": "✗ Niciun link de configurare valid găsit în clipboard",
+    "toastError": "✗ {{message}}",
+    "sectionConnectionStatus": "Stare conexiune",
+    "statusLabel": "Stare",
+    "statusConnectedStandalone": "Conectat (independent)",
+    "peerIdLabel": "ID Peer"
+  },
+  "access": {
+    "title": "Acces",
+    "sectionAccessMode": "Mod de acces",
+    "modes": {
+      "full": {
+        "label": "Acces complet",
+        "desc": "Utilizatorii de la distanță pot controla complet dispozitivul tău"
+      },
+      "viewOnly": {
+        "label": "Doar vizualizare / Cast",
+        "desc": "Utilizatorii de la distanță văd ecranul tău, dar nu îl pot controla"
+      },
+      "noIncoming": {
+        "label": "Fără conexiuni primite",
+        "desc": "Respinge toate cererile de sesiune primite"
+      }
+    },
+    "sectionIncomingRequests": "Cereri primite",
+    "showApprovalDialog": {
+      "label": "Afișează dialogul de aprobare",
+      "desc": "Cere confirmare înainte de a accepta fiecare conexiune"
+    },
+    "lockScreenAfterSession": {
+      "label": "Blochează ecranul după încheierea sesiunii"
+    },
+    "autoDisconnect": {
+      "label": "Deconectare automată la inactivitate",
+      "desc": "Închide sesiunea după inactivitate",
+      "minutes": "{{n}} min"
+    },
+    "sectionUnattendedAccess": "Acces neasistat",
+    "permanentPasswordLabel": "PAROLĂ PERMANENTĂ",
+    "permanentPasswordPlaceholder": "Setează o parolă permanentă pentru acces neasistat...",
+    "permanentPasswordNote": "Accesul neasistat nu este încă disponibil."
+  },
+  "permissions": {
+    "title": "Permisiuni",
+    "sectionTitle": "Ce pot face utilizatorii de la distanță",
+    "items": {
+      "keyboardMouse": { "label": "Control tastatură și mouse" },
+      "clipboard": { "label": "Sincronizare clipboard" },
+      "fileTransfer": { "label": "Transfer de fișiere" },
+      "audio": { "label": "Transmisie audio" },
+      "terminal": { "label": "Acces terminal" },
+      "remoteRestart": { "label": "Repornire la distanță" },
+      "blockUserInput": {
+        "label": "Blochează intrările utilizatorului în timpul sesiunii",
+        "desc": "Gazda nu poate interacționa cât timp este conectată"
+      }
+    }
+  },
+  "display": {
+    "title": "Afișare",
+    "imageQuality": {
+      "label": "Calitatea imaginii",
+      "best": "Calitate maximă",
+      "balanced": "Echilibrat",
+      "performance": "Performanță maximă"
+    },
+    "codec": {
+      "label": "Codec implicit",
+      "auto": "Automat",
+      "h264": "H264",
+      "vp9": "VP9",
+      "av1": "AV1"
+    },
+    "viewMode": {
+      "label": "Mod de vizualizare",
+      "fit": "Scalează pentru încadrare",
+      "original": "Dimensiune originală",
+      "stretch": "Întinde"
+    },
+    "showRemoteCursor": "Arată cursorul meu vizualizatorului",
+    "hardwareAcceleration": "Accelerare hardware"
+  },
+  "account": {
+    "title": "Dispozitivul meu",
+    "sectionDeviceInfo": "Informații dispozitiv",
+    "peerIdLabel": "ID Peer",
+    "copy": "Copiază",
+    "platformLabel": "Platformă",
+    "platformUnknown": "Necunoscut",
+    "agentVersionLabel": "Versiune agent",
+    "sectionPassword": "Parolă",
+    "generatePassword": "Generează parolă nouă",
+    "newPasswordHint": "Parolă nouă — copiaz-o acum:",
+    "copyAndClose": "Copiază și închide"
+  }
+}
