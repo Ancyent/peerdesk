@@ -7,7 +7,7 @@ use std::io::{Read, Write};
 /// Appended to the viewer's stream when the shell ends, so a finished session
 /// reads as finished instead of frozen. The viewer renders these bytes verbatim.
 pub const SESSION_ENDED_NOTICE: &str =
-    "\r\n\x1b[33m[sesiunea s-a încheiat — reconectează-te pentru un shell nou]\x1b[0m\r\n";
+    "\r\n\x1b[33m[session ended — reconnect for a new shell]\x1b[0m\r\n";
 
 /// A message from the viewer's `terminal` data channel is either a resize control
 /// (JSON `{"type":"resize","cols":..,"rows":..}`) or raw keystroke bytes.
