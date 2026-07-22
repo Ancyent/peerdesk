@@ -285,6 +285,8 @@ pub struct AppSettings {
     pub start_on_boot: bool,
     #[serde(default = "default_true")]
     pub minimize_to_tray: bool,
+    #[serde(default = "default_true")]
+    pub auto_update: bool,
     /// Desktop UI language ("" = unset, resolved from OS locale; "en"/"ro" once
     /// chosen). The agent itself is headless and never sets this; it exists on
     /// the shared struct only so the desktop can persist it via save_settings.
@@ -326,6 +328,7 @@ impl Default for AppSettings {
             hardware_acceleration: true,
             start_on_boot: false,
             minimize_to_tray: true,
+            auto_update: true,
             language: String::new(),
         }
     }
@@ -615,5 +618,16 @@ mod tests {
         assert_eq!(dc.server.as_deref(), Some("https://api.example.com"));
         assert_eq!(dc.api_key.as_deref(), Some("pd_abc123"));
         assert!(dc.password.is_none());
+    }
+
+    #[test]
+    fn auto_update_defaults_on_and_round_trips() {
+        let dir = std::env::temp_dir().join("pd_auto_update_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("settings.json");
+        assert!(AppSettings::default().auto_update);
+        let s = AppSettings { auto_update: false, ..AppSettings::default() };
+        s.save(&path).unwrap();
+        assert!(!AppSettings::load(&path).unwrap().auto_update);
     }
 }

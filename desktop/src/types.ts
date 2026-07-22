@@ -26,6 +26,7 @@ export interface AppSettings {
   hardware_acceleration: boolean;
   start_on_boot: boolean;
   minimize_to_tray: boolean;
+  auto_update: boolean;
   language: string;
 }
 
@@ -48,6 +49,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hardware_acceleration: true,
   start_on_boot: false,
   minimize_to_tray: true,
+  auto_update: true,
   language: '',
 };
 
