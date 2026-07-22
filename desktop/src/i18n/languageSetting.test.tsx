@@ -6,6 +6,12 @@ import i18n, { resolveLanguage } from './index';
 import { DEFAULT_SETTINGS } from '../types';
 import { GeneralSettings } from '../settings/GeneralSettings';
 
+// GeneralSettings now renders an Updates section via useUpdate(); this suite only
+// exercises the language switcher, so stub the hook rather than wiring a full UpdateProvider.
+vi.mock('../update/UpdateManager', () => ({
+  useUpdate: () => ({ status: 'idle', available: false, latest: null, check: vi.fn() }),
+}));
+
 // react-dom's act() requires this flag when @testing-library isn't in play.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

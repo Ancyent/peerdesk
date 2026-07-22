@@ -31,7 +31,13 @@
       "desc": "Continuă să ruleze în fundal când fereastra este închisă"
     },
     "sectionLocalization": "Localizare",
-    "language": "Limbă"
+    "language": "Limbă",
+    "sectionUpdates": "ACTUALIZĂRI",
+    "autoUpdate": { "label": "Actualizări automate", "desc": "Verifică versiuni noi și propune instalarea" },
+    "checkNow": "Verifică actualizări",
+    "checking": "Se verifică…",
+    "upToDateNow": "Ești pe cea mai recentă versiune",
+    "updateReady": "v{{version}} este disponibilă"
   },
   "network": {
     "title": "Rețea",
