@@ -1,9 +1,9 @@
-# PeerDesk — production fără nginx proxy extern
-# Folosește asta când rulezi în spatele unui alt reverse proxy (Traefik, Caddy, nginx extern etc.)
-# sau direct pe porturi publice fără proxy.
+# PeerDesk — production without an external nginx proxy
+# Use this when running behind another reverse proxy (Traefik, Caddy, external nginx, etc.)
+# or directly on public ports without a proxy.
 #
-# config.json pentru acest mod:
-#   { "apiUrl": "http://IP-sau-domeniu:8000", "signalingUrl": "ws://IP-sau-domeniu:8001/ws" }
+# config.json for this mode:
+#   { "apiUrl": "http://IP-or-domain:8000", "signalingUrl": "ws://IP-or-domain:8001/ws" }
 #
 # Usage:
 #   docker compose -f docker-compose.no-nginx.yml up -d
