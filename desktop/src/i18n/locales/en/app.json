@@ -18,9 +18,20 @@
     "standalone": "Running in standalone mode"
   },
   "updateBadge": {
-    "updateTooltip": "Update available: v{{version}} — click to download",
+    "updateTooltip": "Update available: v{{version}} — click to update",
     "linkCopied": "Link copied — open in browser",
     "updateAvailable": "Update available · v{{version}}",
-    "upToDate": "up to date"
+    "upToDate": "up to date",
+    "checking": "checking…"
+  },
+  "updateDialog": {
+    "title": "Update available",
+    "body": "You are on v{{current}}. v{{latest}} is available.",
+    "yes": "Update now",
+    "no": "Not now",
+    "later": "Remind me later",
+    "skip": "Skip this version",
+    "downloading": "Downloading update… {{percent}}%",
+    "installing": "Installing — the app will restart"
   }
 }
