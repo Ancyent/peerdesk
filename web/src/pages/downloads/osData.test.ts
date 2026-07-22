@@ -37,9 +37,9 @@ describe('assetLabel', () => {
     expect(assetLabel('x.apk')).toBe('.apk');
   });
   it('labels the portable windows viewer distinctly from setup and agent', () => {
-    expect(assetLabel('peerdesk-viewer-windows-0.4.28-portable.exe')).toBe('portabil (.exe)');
-    expect(assetLabel('peerdesk-viewer-windows-0.4.28-x64-setup.exe')).toBe('installer (.exe)');
-    expect(assetLabel('peerdesk-agent-windows-x86_64-v0.4.28.exe')).toBe('agent .exe');
+    expect(assetLabel('peerdesk-viewer-windows-0.4.28-portable.exe')).toBe('downloads:assetLabel.portableExe');
+    expect(assetLabel('peerdesk-viewer-windows-0.4.28-x64-setup.exe')).toBe('downloads:assetLabel.installerExe');
+    expect(assetLabel('peerdesk-agent-windows-x86_64-v0.4.28.exe')).toBe('downloads:assetLabel.agentExe');
   });
 });
 

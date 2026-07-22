@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError, type RegistrationTokenOut, type Release, type ReleaseAsset } from '../api/client';
 import { getConfig } from '../config';
@@ -14,6 +15,7 @@ const card: React.CSSProperties = { border: '1px solid var(--border-dim)', borde
 const h: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 };
 
 export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: OsId) => void }) {
+  const { t } = useTranslation('downloads');
   const { accessToken } = useAuth();
   const releasesUrl = getConfig().releasesUrl;
 
@@ -55,11 +57,11 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
     if (!accessToken) return;
     setGenerating(true);
     try {
-      const t = await api.tokens.create(accessToken, {
+      const tok = await api.tokens.create(accessToken, {
         ...(placement ? placementFor(placement) : {}),
         ...(machineName.trim() ? { name: machineName.trim() } : {}),
       });
-      setToken(t);
+      setToken(tok);
     } catch (e) { console.error(e); }
     finally { setGenerating(false); }
   };
@@ -68,17 +70,25 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   const fmt = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
   const assetsFor = (m: (n: string) => boolean) => (release?.assets ?? []).filter((a) => m(a.name));
 
+  // assetLabel() returns either a `downloads:assetLabel.*` key or a plain
+  // string (technical extension label or, as a last resort, the raw
+  // filename) — only resolve the former through t().
+  const assetDisplayLabel = (name: string) => {
+    const raw = assetLabel(name);
+    return raw.startsWith('downloads:') ? t(raw) : raw;
+  };
+
   const dl = (a: Asset) => (
     <a key={a.name} href={a.browser_download_url}
       style={{ padding: '5px 14px', fontSize: 12, border: '1px solid var(--border-dim)', borderRadius: 5, textDecoration: 'none', color: 'var(--text-1)', background: 'var(--bg-hover)' }}>
-      ⬇ {assetLabel(a.name)}{a.size ? ` · ${formatSize(a.size)}` : ''}
+      ⬇ {assetDisplayLabel(a.name)}{a.size ? ` · ${formatSize(a.size)}` : ''}
     </a>
   );
 
   return (
     <div style={{ padding: '24px', maxWidth: 760, background: 'var(--bg-base)', minHeight: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>Download &amp; Deploy</h2>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('downloads:page.title')}</h2>
         {release && (
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', background: 'var(--green-bg)', border: '1px solid var(--green-glow)', borderRadius: 20, padding: '2px 10px' }}>
             {release.tag_name}
@@ -87,46 +97,46 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
       </div>
       <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
         <a href={release?.html_url ?? releasesUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
-          Toate versiunile pe GitHub →
+          {t('downloads:page.allReleasesLink')}
         </a>
       </p>
 
       <div style={{ ...card, marginBottom: 16 }}>
         {!token ? (
           <>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-2)' }}>Token de înregistrare</label>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-2)' }}>{t('downloads:page.tokenLabel')}</label>
             <input value={machineName} onChange={e => setMachineName(e.target.value)}
-              placeholder="Nume mașină (opțional — altfel hostname-ul)"
+              placeholder={t('downloads:page.machineNamePlaceholder')}
               style={{ width: '100%', boxSizing: 'border-box', marginBottom: 8, padding: '8px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-surface)', color: 'var(--text-1)', outline: 'none' }} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <TreePicker value={placement} onChange={setPlacement} disabled={!accessToken} />
               <button onClick={generate} disabled={generating || !accessToken}
                 style={{ padding: '8px 18px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: accessToken ? 'pointer' : 'not-allowed', opacity: accessToken ? 1 : 0.5 }}>
-                {generating ? 'Generez...' : 'Generează token'}
+                {generating ? t('downloads:page.generating') : t('downloads:page.generateToken')}
               </button>
             </div>
-            <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--text-3)' }}>Comenzile de mai jos se completează automat cu token-ul + adresa serverului.</p>
+            <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--text-3)' }}>{t('downloads:page.tokenHint')}</p>
           </>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontFamily: 'monospace', fontSize: 22, fontWeight: 700, letterSpacing: 3, color: 'var(--green)' }}>{token.token}</div>
-              <div style={{ fontSize: 12, color: 'var(--green)' }}>{secondsLeft > 0 ? `Expiră în ${fmt(secondsLeft)}` : 'EXPIRAT'} · folosit o singură dată</div>
+              <div style={{ fontSize: 12, color: 'var(--green)' }}>{secondsLeft > 0 ? t('downloads:page.expiresIn', { time: fmt(secondsLeft) }) : t('downloads:page.expired')} · {t('downloads:page.usedOnce')}</div>
             </div>
             <button onClick={() => setToken(null)} style={{ padding: '6px 14px', fontSize: 12, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-hover)', cursor: 'pointer', color: 'var(--text-2)' }}>
-              Alt token
+              {t('downloads:page.anotherToken')}
             </button>
           </div>
         )}
       </div>
 
-      {state === 'loading' && <p style={{ color: 'var(--text-2)', fontSize: 13 }}>Se încarcă ultima versiune…</p>}
+      {state === 'loading' && <p style={{ color: 'var(--text-2)', fontSize: 13 }}>{t('downloads:page.loadingRelease')}</p>}
       {state === 'error' && (
         <div style={card}>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
-            Nu am putut încărca lista de fișiere automat.{' '}
+            {t('downloads:page.loadError')}{' '}
             {errorMessage && <span>({errorMessage}){' '}</span>}
-            <a href={releasesUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Deschide releases →</a>
+            <a href={releasesUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>{t('downloads:page.openReleases')}</a>
           </p>
         </div>
       )}
@@ -134,28 +144,28 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
       {state === 'ok' && release && (
         <>
           <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-            {OS_TABS.map(t => (
-              <button key={t.id} disabled={!t.enabled} onClick={() => t.enabled && onOsChange(t.id)}
+            {OS_TABS.map(tab => (
+              <button key={tab.id} disabled={!tab.enabled} onClick={() => tab.enabled && onOsChange(tab.id)}
                 style={{
-                  padding: '6px 16px', fontSize: 13, borderRadius: 6, cursor: t.enabled ? 'pointer' : 'not-allowed',
-                  background: os === t.id ? 'var(--bg-base)' : 'var(--bg-hover)',
-                  color: os === t.id ? '#fff' : 'var(--text-2)',
-                  border: os === t.id ? 'none' : '1px solid var(--border-dim)',
-                  opacity: t.enabled ? 1 : 0.5,
+                  padding: '6px 16px', fontSize: 13, borderRadius: 6, cursor: tab.enabled ? 'pointer' : 'not-allowed',
+                  background: os === tab.id ? 'var(--bg-base)' : 'var(--bg-hover)',
+                  color: os === tab.id ? '#fff' : 'var(--text-2)',
+                  border: os === tab.id ? 'none' : '1px solid var(--border-dim)',
+                  opacity: tab.enabled ? 1 : 0.5,
                 }}>
-                {t.label}
+                {t(tab.label)}
               </button>
             ))}
           </div>
 
-          {OS_TABS.filter(t => t.id === os).map(t => {
-            const assets = assetsFor(t.match);
-            const isLinux = t.id === 'linux';
+          {OS_TABS.filter(tab => tab.id === os).map(tab => {
+            const assets = assetsFor(tab.match);
+            const isLinux = tab.id === 'linux';
             const d = LINUX_DISTROS.find(x => x.id === distro) ?? LINUX_DISTROS[0];
             const viewerAsset = isLinux ? assets.find(a => d.match(a.name)) : undefined;
             const agentAssets = assets.filter(a => /peerdesk-agent-linux/i.test(a.name));
             return (
-              <div key={t.id} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div key={tab.id} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {isLinux && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {LINUX_DISTROS.map(x => (
@@ -166,14 +176,14 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
                           color: distro === x.id ? '#fff' : 'var(--text-2)',
                           border: distro === x.id ? 'none' : '1px solid var(--border-dim)',
                         }}>
-                        {x.label}
+                        {t(x.label)}
                       </button>
                     ))}
                   </div>
                 )}
 
                 <div>
-                  <div style={h}>Descarcă</div>
+                  <div style={h}>{t('downloads:page.download')}</div>
                   {isLinux ? (
                     viewerAsset ? (
                       <>
@@ -181,10 +191,10 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
                         <CodeBlock code={d.installHint.replace(/<file>/g, viewerAsset.name)} />
                       </>
                     ) : (
-                      <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Pachet indisponibil pentru {d.label} în {release.tag_name}.</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('downloads:page.noPackageForDistro', { distro: t(d.label), tag: release.tag_name })}</div>
                     )
                   ) : assets.length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Niciun fișier pentru {t.label} în {release.tag_name}.</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('downloads:page.noFileForOs', { os: t(tab.label), tag: release.tag_name })}</div>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{assets.map(dl)}</div>
                   )}
@@ -192,86 +202,95 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
 
                 {isLinux && agentAssets.length > 0 && (
                   <div>
-                    <div style={h}>Agent (binar)</div>
+                    <div style={h}>{t('downloads:page.agentBinary')}</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{agentAssets.map(dl)}</div>
                   </div>
                 )}
 
-                {t.hasDeploy && (
+                {tab.hasDeploy && (
                   <div>
-                    <div style={h}>Deploy</div>
+                    <div style={h}>{t('downloads:page.deploy')}</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                       <input
                         value={pw}
                         onChange={(e) => setPw(e.target.value)}
-                        placeholder="Parolă (gol = auto-generată)"
+                        placeholder={t('downloads:page.passwordPlaceholder')}
                         style={{ flex: '1 1 200px', minWidth: 160, padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border-dim)', background: 'var(--bg-hover)', color: 'var(--text-1)', outline: 'none' }}
                       />
                       {isLinux && (
                         <div style={{ display: 'flex', gap: 4 }}>
                           {(['auto', 'headless', 'gui'] as const).map((mo) => (
                             <button key={mo} type="button" onClick={() => setMode(mo)}
-                              title={mo === 'auto' ? 'Detectează automat (recomandat)' : mo === 'headless' ? 'Fără GUI — server/terminal' : 'Forțează captură GUI'}
+                              title={mo === 'auto' ? t('downloads:page.modeAutoTitle') : mo === 'headless' ? t('downloads:page.modeHeadlessTitle') : t('downloads:page.modeGuiTitle')}
                               style={{
                                 padding: '6px 12px', fontSize: 12, borderRadius: 5, cursor: 'pointer',
                                 background: mode === mo ? 'var(--accent)' : 'var(--bg-hover)',
                                 color: mode === mo ? '#fff' : 'var(--text-2)',
                                 border: mode === mo ? 'none' : '1px solid var(--border-dim)',
                               }}>
-                              {mo === 'auto' ? 'Auto' : mo === 'headless' ? 'Headless' : 'GUI'}
+                              {mo === 'auto' ? t('downloads:page.modeAuto') : mo === 'headless' ? t('downloads:page.modeHeadless') : t('downloads:page.modeGui')}
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
-                    <CodeBlock code={buildCommand(t.id, { origin, token: token?.token ?? null, password: pw.trim() || undefined, mode: isLinux ? mode : undefined })} empty="Generează un token mai întâi ↑" />
+                    <CodeBlock code={buildCommand(tab.id, { origin, token: token?.token ?? null, password: pw.trim() || undefined, mode: isLinux ? mode : undefined })} empty={t('downloads:page.generateTokenFirst')} />
                   </div>
                 )}
 
                 <div>
-                  <div style={h}>Dezinstalare (terminal)</div>
+                  <div style={h}>{t('downloads:page.uninstallTerminal')}</div>
                   {isLinux ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ fontSize: 11, color: 'var(--text-2)', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 6, padding: '8px 10px', lineHeight: 1.5 }}>
-                        ℹ️ Sunt două lucruri diferite: <b>Agentul</b> (instalat cu <code>curl … | bash</code>) este un binar + serviciu systemd, <b>NU un pachet apt/dnf</b> — se dezinstalează cu comanda de la „Agent" de mai jos. Comanda „Client / viewer" (<code>apt/dnf/zypper remove peer-desk</code>) e doar pentru aplicația desktop instalată din <code>.deb/.rpm</code>.
+                        ℹ️ <Trans
+                          i18nKey="downloads:page.uninstallInfo"
+                          components={{
+                            agentBold: <b />,
+                            notPackageBold: <b />,
+                            installCmd: <code>curl … | bash</code>,
+                            uninstallCmd: <code>apt/dnf/zypper remove peer-desk</code>,
+                            extCmd: <code>.deb/.rpm</code>,
+                          }}
+                        />
                       </div>
                       {viewerAsset && (
                         <div>
-                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Client / viewer ({d.label}) — doar dacă ai instalat app-ul desktop</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{t('downloads:page.clientViewerLabel', { distro: t(d.label) })}</div>
                           <CodeBlock code={d.uninstallHint.replace(/<file>/g, viewerAsset.name)} />
                         </div>
                       )}
                       <div>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Agent (serviciu + binar + config) — instalat cu curl … | bash</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{t('downloads:page.agentUninstallLabel')}</div>
                         <CodeBlock code={AGENT_UNINSTALL_LINUX} />
                       </div>
                     </div>
-                  ) : t.id === 'windows' ? (
+                  ) : tab.id === 'windows' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Agent (PowerShell ca Administrator)</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{t('downloads:page.agentUninstallLabelWindows')}</div>
                         <CodeBlock code={AGENT_UNINSTALL_WINDOWS} />
                       </div>
-                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>Viewer-ul desktop se dezinstalează din Setări → Aplicații.</p>
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>{t('downloads:page.viewerUninstallWindows')}</p>
                     </div>
                   ) : (
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>Dezinstalează aplicația din launcher-ul Android.</p>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>{t('downloads:page.uninstallAndroid')}</p>
                   )}
                 </div>
 
-                {t.note && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>{t.note}</p>}
+                {tab.note && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>{t(tab.note)}</p>}
               </div>
             );
           })}
 
           <div style={{ ...card, marginTop: 16 }}>
-            <div style={h}>Argumente (agent)</div>
-            <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--text-2)' }}>Aceleași pe Linux și Windows. Le folosești dacă rulezi binarul manual sau în mod portabil.</p>
+            <div style={h}>{t('downloads:page.agentArgsTitle')}</div>
+            <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--text-2)' }}>{t('downloads:page.agentArgsSubtitle')}</p>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {AGENT_ARGS.map(a => (
                 <div key={a.flag} style={{ display: 'flex', gap: 12, fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--border-dim)' }}>
                   <code style={{ minWidth: 170, fontFamily: 'monospace', color: 'var(--green)' }}>{a.flag}</code>
-                  <span style={{ color: 'var(--text-2)' }}>{a.meaning}</span>
+                  <span style={{ color: 'var(--text-2)' }}>{t(a.meaning)}</span>
                 </div>
               ))}
             </div>
@@ -281,8 +300,8 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 22 }}>🌐</span>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>Viewer Web</div>
-                <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Rulează direct în browser — ești deja pe el.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('downloads:page.webViewerTitle')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{t('downloads:page.webViewerSubtitle')}</div>
               </div>
             </div>
           </div>
