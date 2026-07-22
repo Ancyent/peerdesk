@@ -2,8 +2,8 @@
 
 **Purpose:** Full verification of the platform, from installation to remote control, from the perspective of a new user who has never used PeerDesk before.
 
-**Who runs it:** QA / developer / end user
-**Estimated duration:** 60–90 minutes (with 2 monitors available)
+**Who runs it:** QA / developer / end user  
+**Estimated duration:** 60–90 minutes (with 2 monitors available)  
 **Minimum requirements:** A Linux server + a Windows or Linux machine to control + a device for the viewer (browser / Android)
 
 ---
@@ -387,7 +387,7 @@ chmod +x peerdesk-viewer-linux-vX.Y.Z.AppImage && ./peerdesk-viewer-linux-vX.Y.Z
 | 14. Branding | ☐ | |
 | 15. Error scenarios | ☐ | |
 
-**Tested by:** _______________
-**Date:** _______________
-**Version:** _______________
+**Tested by:** _______________  
+**Date:** _______________  
+**Version:** _______________  
 **Issues found:** _______________
