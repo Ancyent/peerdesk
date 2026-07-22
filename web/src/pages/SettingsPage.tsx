@@ -3,12 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError } from '../api/client';
-import { SUPPORTED_LANGUAGES } from '../i18n';
-
-const LANGUAGE_NAMES: Record<(typeof SUPPORTED_LANGUAGES)[number], string> = {
-  en: 'English',
-  ro: 'Română',
-};
+import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES } from '../i18n/languages';
 
 // Defined at module level — NOT inside SettingsPage — to avoid focus loss on re-render
 const inp: CSSProperties = {
