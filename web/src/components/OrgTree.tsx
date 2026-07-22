@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, type CompanyOut, type LocationOut, type GroupOut, type GrantOut } from '../api/client';
 import {
@@ -41,6 +42,7 @@ const inputStyle: CSSProperties = { flex: 1, padding: '3px 6px', fontSize: 11, b
 const confirmBtn: CSSProperties = { padding: '3px 6px', fontSize: 11, background: 'var(--accent)', color: 'var(--text-1)', border: 'none', borderRadius: 4, cursor: 'pointer' };
 
 export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props) {
+  const { t } = useTranslation('organization');
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [locations, setLocations] = useState<Record<string, LocationOut[]>>({});
@@ -177,9 +179,9 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
     if (confirmDelete && confirmDelete.type === type && confirmDelete.id === id) {
       return (
         <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 10 }} onClick={e => e.stopPropagation()}>
-          <span style={{ color: 'var(--text-3)' }}>Șterge?</span>
-          <button title="Confirmă ștergerea" aria-label="Confirmă ștergerea" style={{ ...iconBtn, color: 'var(--red)' }} onClick={() => doDelete(type, id)}>✓</button>
-          <button title="Anulează" aria-label="Anulează" style={iconBtn} onClick={() => setConfirmDelete(null)}>✕</button>
+          <span style={{ color: 'var(--text-3)' }}>{t('organization:tree.deleteConfirm')}</span>
+          <button title={t('organization:tree.confirmDelete')} aria-label={t('organization:tree.confirmDelete')} style={{ ...iconBtn, color: 'var(--red)' }} onClick={() => doDelete(type, id)}>✓</button>
+          <button title={t('organization:tree.cancel')} aria-label={t('organization:tree.cancel')} style={iconBtn} onClick={() => setConfirmDelete(null)}>✕</button>
         </span>
       );
     }
@@ -188,11 +190,11 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
       return (
         <span style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto' }} onClick={e => e.stopPropagation()}>
           {child && (
-            <button title={child === 'location' ? 'Adaugă locație' : 'Adaugă grup'} aria-label={child === 'location' ? 'Adaugă locație' : 'Adaugă grup'}
+            <button title={child === 'location' ? t('organization:tree.addLocation') : t('organization:tree.addGroup')} aria-label={child === 'location' ? t('organization:tree.addLocation') : t('organization:tree.addGroup')}
               style={iconBtn} onClick={() => startAddChild(type as 'company' | 'location', id)}>＋</button>
           )}
-          <button title="Redenumește" aria-label="Redenumește" style={iconBtn} onClick={() => startEdit(type, id, name)}>✏️</button>
-          <button title="Șterge" aria-label="Șterge" style={iconBtn} onClick={() => setConfirmDelete({ type, id })}>🗑️</button>
+          <button title={t('organization:tree.rename')} aria-label={t('organization:tree.rename')} style={iconBtn} onClick={() => startEdit(type, id, name)}>✏️</button>
+          <button title={t('organization:tree.delete')} aria-label={t('organization:tree.delete')} style={iconBtn} onClick={() => setConfirmDelete({ type, id })}>🗑️</button>
         </span>
       );
     }
@@ -202,12 +204,12 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-dim)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>Organizare</span>
-        <button onClick={() => setAdding(true)} title="Adaugă companie" aria-label="Adaugă companie" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>+</button>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>{t('organization:tree.title')}</span>
+        <button onClick={() => setAdding(true)} title={t('organization:tree.addCompany')} aria-label={t('organization:tree.addCompany')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>+</button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
         <div style={{ ...ns({ type: 'all' }), marginBottom: 4 }} onClick={() => onSelect({ type: 'all' })}>
-          <span>📋</span><span>Toate</span>
+          <span>📋</span><span>{t('organization:tree.all')}</span>
         </div>
         {companies.map(co => {
           const companyCov = selectable ? coveredBy(selectable.grants, { type: 'company', id: co.id }) : null;
@@ -218,7 +220,7 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
               onClick={() => { onSelect({ type: 'company', id: co.id }); toggle(co.id, 'company'); }}>
               {selectable && (
                 <input type="checkbox" checked={companyCov!.checked} disabled={companyCov!.via !== null}
-                  aria-label={`Acces la ${co.name}`}
+                  aria-label={t('organization:tree.accessTo', { name: co.name })}
                   onClick={e => e.stopPropagation()}
                   onChange={e => selectable.onToggle({ type: 'company', id: co.id }, e.target.checked)}
                   style={checkboxStyle} />
@@ -243,7 +245,7 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
                       onClick={() => { onSelect({ type: 'location', id: loc.id }); toggle(loc.id, 'location'); }}>
                       {selectable && (
                         <input type="checkbox" checked={locationCov!.checked} disabled={locationCov!.via !== null}
-                          aria-label={`Acces la ${loc.name}`}
+                          aria-label={t('organization:tree.accessTo', { name: loc.name })}
                           onClick={e => e.stopPropagation()}
                           onChange={e => selectable.onToggle({ type: 'location', id: loc.id, companyId: co.id }, e.target.checked)}
                           style={checkboxStyle} />
@@ -252,7 +254,7 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
                       <span>📍</span>
                       {nameCell('location', loc.id, loc.name)}
                       {/* The only possible ancestor of a location is its company, already in scope. */}
-                      {selectable && locationCov!.via !== null && <span style={viaLabel}>via {co.name}</span>}
+                      {selectable && locationCov!.via !== null && <span style={viaLabel}>{t('organization:tree.via', { name: co.name })}</span>}
                       {trailing('location', loc.id, loc.name)}
                     </div>
                     {expanded.has(loc.id) && (
@@ -267,7 +269,7 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
                             onClick={() => onSelect({ type: 'group', id: grp.id })}>
                             {selectable && (
                               <input type="checkbox" checked={groupCov!.checked} disabled={groupCov!.via !== null}
-                                aria-label={`Acces la ${grp.name}`}
+                                aria-label={t('organization:tree.accessTo', { name: grp.name })}
                                 onClick={e => e.stopPropagation()}
                                 onChange={e => selectable.onToggle(
                                   { type: 'group', id: grp.id, companyId: co.id, locationId: loc.id }, e.target.checked,
@@ -278,7 +280,7 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
                             {nameCell('group', grp.id, grp.name)}
                             {/* The only possible ancestors of a group are its location (nearest) and company. */}
                             {selectable && groupCov!.via !== null && (
-                              <span style={viaLabel}>via {groupCov!.via === loc.id ? loc.name : co.name}</span>
+                              <span style={viaLabel}>{t('organization:tree.via', { name: groupCov!.via === loc.id ? loc.name : co.name })}</span>
                             )}
                             {trailing('group', grp.id, grp.name)}
                           </div>
@@ -288,8 +290,8 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
                           <div style={{ display: 'flex', gap: 4, paddingLeft: 34, marginTop: 4 }}>
                             <input autoFocus value={childName} onChange={e => setChildName(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter') commitAddChild(); if (e.key === 'Escape') cancelAddChild(); }}
-                              placeholder="Nume grup" style={inputStyle} />
-                            <button title="Confirmă" aria-label="Confirmă" style={confirmBtn} onClick={commitAddChild}>✓</button>
+                              placeholder={t('organization:tree.groupNamePlaceholder')} style={inputStyle} />
+                            <button title={t('organization:tree.confirm')} aria-label={t('organization:tree.confirm')} style={confirmBtn} onClick={commitAddChild}>✓</button>
                           </div>
                         )}
                       </>
@@ -301,8 +303,8 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
                   <div style={{ display: 'flex', gap: 4, paddingLeft: 20, marginTop: 4 }}>
                     <input autoFocus value={childName} onChange={e => setChildName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') commitAddChild(); if (e.key === 'Escape') cancelAddChild(); }}
-                      placeholder="Nume locație" style={inputStyle} />
-                    <button title="Confirmă" aria-label="Confirmă" style={confirmBtn} onClick={commitAddChild}>✓</button>
+                      placeholder={t('organization:tree.locationNamePlaceholder')} style={inputStyle} />
+                    <button title={t('organization:tree.confirm')} aria-label={t('organization:tree.confirm')} style={confirmBtn} onClick={commitAddChild}>✓</button>
                   </div>
                 )}
               </>
@@ -314,8 +316,8 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
           <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
             <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') addCompany(); if (e.key === 'Escape') { setAdding(false); setNewName(''); } }}
-              placeholder="Nume companie" style={inputStyle} />
-            <button onClick={addCompany} title="Confirmă" aria-label="Confirmă" style={confirmBtn}>✓</button>
+              placeholder={t('organization:tree.companyNamePlaceholder')} style={inputStyle} />
+            <button onClick={addCompany} title={t('organization:tree.confirm')} aria-label={t('organization:tree.confirm')} style={confirmBtn}>✓</button>
           </div>
         )}
       </div>

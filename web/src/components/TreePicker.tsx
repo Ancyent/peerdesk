@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, type LocationOut, type GroupOut } from '../api/client';
 import { buildPickerNodes, filterNodes, type PickerNode } from './treePicker';
@@ -27,6 +28,7 @@ const searchInput: CSSProperties = {
 const icon: Record<PickerNode['type'], string> = { company: '🏢', location: '📍', group: '📁' };
 
 export function TreePicker({ value, onChange, disabled }: Props) {
+  const { t } = useTranslation('organization');
   const { accessToken } = useAuth();
   const [open, setOpen] = useState(false);
   const [nodes, setNodes] = useState<PickerNode[]>([]);
@@ -77,7 +79,7 @@ export function TreePicker({ value, onChange, disabled }: Props) {
   const pick = (node: PickerNode | null) => { onChange(node); setOpen(false); setQuery(''); };
 
   const shown = filterNodes(nodes, query);
-  const label = value ? value.path.join(' / ') : 'Fără organizare';
+  const label = value ? value.path.join(' / ') : t('organization:picker.noPlacement');
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', flex: 1, minWidth: 180 }}>
@@ -96,18 +98,18 @@ export function TreePicker({ value, onChange, disabled }: Props) {
         }}>
           <div style={{ padding: 8, borderBottom: '1px solid var(--border-dim)' }}>
             <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="🔍 Caută..." style={searchInput} />
+              placeholder={t('organization:picker.search')} style={searchInput} />
           </div>
           <div style={{ maxHeight: 260, overflow: 'auto', padding: 4 }}>
             <div onClick={() => pick(null)}
               style={{ padding: '6px 10px', fontSize: 12, borderRadius: 5, cursor: 'pointer',
                 color: value === null ? 'var(--accent)' : 'var(--text-2)',
                 background: value === null ? 'var(--bg-active)' : 'transparent' }}>
-              Fără organizare
+              {t('organization:picker.noPlacement')}
             </div>
-            {loading && <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-3)' }}>Se încarcă...</div>}
+            {loading && <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-3)' }}>{t('organization:picker.loading')}</div>}
             {!loading && loaded && nodes.length === 0 && (
-              <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-3)' }}>Nicio organizație.</div>
+              <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-3)' }}>{t('organization:picker.noOrganizations')}</div>
             )}
             {nodes.filter(n => shown.has(n.key)).map(n => {
               const selected = value?.key === n.key;
@@ -125,7 +127,7 @@ export function TreePicker({ value, onChange, disabled }: Props) {
               );
             })}
             {!loading && loaded && query.trim() && !nodes.some(n => shown.has(n.key)) && (
-              <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-3)' }}>Niciun rezultat.</div>
+              <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-3)' }}>{t('organization:picker.noResults')}</div>
             )}
           </div>
         </div>

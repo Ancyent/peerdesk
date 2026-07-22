@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, type MachineOut } from '../api/client';
 import { type OrgNode } from '../components/OrgTree';
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function OrganizationPage({ onConnect, orgNode }: Props) {
+  const { t } = useTranslation('organization');
   const { accessToken } = useAuth();
   const [machines, setMachines] = useState<MachineOut[]>([]);
 
@@ -43,11 +45,11 @@ export function OrganizationPage({ onConnect, orgNode }: Props) {
   return (
     <div style={{ padding: '20px 24px', maxWidth: 900, background: 'var(--bg-base)', minHeight: '100%' }}>
       <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>
-        {orgNode.type === 'all' ? 'Toate mașinile' : `Mașini (${filtered.length})`}
+        {orgNode.type === 'all' ? t('organization:page.allMachines') : t('organization:page.machinesCount', { count: filtered.length })}
       </h2>
       {filtered.length === 0 ? (
         <div style={{ padding: 32, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)' }}>
-          Nicio mașinărie în această secțiune.
+          {t('organization:page.empty')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

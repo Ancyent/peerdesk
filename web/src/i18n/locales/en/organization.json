@@ -1,0 +1,32 @@
+{
+  "page": {
+    "allMachines": "All machines",
+    "machinesCount": "Machines ({{count}})",
+    "empty": "No machines in this section."
+  },
+  "tree": {
+    "title": "Organization",
+    "addCompany": "Add company",
+    "all": "All",
+    "deleteConfirm": "Delete?",
+    "confirmDelete": "Confirm deletion",
+    "cancel": "Cancel",
+    "addLocation": "Add location",
+    "addGroup": "Add group",
+    "rename": "Rename",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "accessTo": "Access to {{name}}",
+    "via": "via {{name}}",
+    "companyNamePlaceholder": "Company name",
+    "locationNamePlaceholder": "Location name",
+    "groupNamePlaceholder": "Group name"
+  },
+  "picker": {
+    "noPlacement": "No organization",
+    "search": "🔍 Search...",
+    "loading": "Loading...",
+    "noOrganizations": "No organizations.",
+    "noResults": "No results."
+  }
+}

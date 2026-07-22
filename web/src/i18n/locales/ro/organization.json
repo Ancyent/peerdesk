@@ -1,0 +1,32 @@
+{
+  "page": {
+    "allMachines": "Toate mașinile",
+    "machinesCount": "Mașini ({{count}})",
+    "empty": "Nicio mașinărie în această secțiune."
+  },
+  "tree": {
+    "title": "Organizare",
+    "addCompany": "Adaugă companie",
+    "all": "Toate",
+    "deleteConfirm": "Șterge?",
+    "confirmDelete": "Confirmă ștergerea",
+    "cancel": "Anulează",
+    "addLocation": "Adaugă locație",
+    "addGroup": "Adaugă grup",
+    "rename": "Redenumește",
+    "delete": "Șterge",
+    "confirm": "Confirmă",
+    "accessTo": "Acces la {{name}}",
+    "via": "via {{name}}",
+    "companyNamePlaceholder": "Nume companie",
+    "locationNamePlaceholder": "Nume locație",
+    "groupNamePlaceholder": "Nume grup"
+  },
+  "picker": {
+    "noPlacement": "Fără organizare",
+    "search": "🔍 Caută...",
+    "loading": "Se încarcă...",
+    "noOrganizations": "Nicio organizație.",
+    "noResults": "Niciun rezultat."
+  }
+}

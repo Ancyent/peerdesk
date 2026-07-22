@@ -2,7 +2,7 @@ import type { CompanyOut, LocationOut, GroupOut } from '../api/client';
 
 /** A single pickable node in the flattened placement tree. `path` is the chain
  *  of names from the root company down to and including this node, so the closed
- *  field can render "Client A / Cluj / Producție". The placement triple
+ *  field can render "Client A / Cluj / Production". The placement triple
  *  (`company_id`/`location_id`/`group_id`) is precomputed as a consistent path
  *  down the tree, which is exactly what the server's assert_placement_consistent
  *  requires — the picker can never assemble an inconsistent triple. */
