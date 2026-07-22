@@ -1,46 +1,46 @@
-# PeerDesk — Ghid complet de deployment
+# PeerDesk — Complete Deployment Guide
 
-> Acoperă: **dev local**, **producție cu nginx**, **producție fără nginx** și **testare automată**.
+> Covers: **local dev**, **production with nginx**, **production without nginx**, and **automated testing**.
 
 ---
 
-## Moduri de deployment — alegere rapidă
+## Deployment modes — quick pick
 
-| Fișier | Când îl folosești |
+| File | When to use it |
 |---|---|
-| `docker-compose.dev.yml` | Dezvoltare locală — Vite dev server cu hot reload, toate serviciile în Docker |
-| `docker-compose.yml` | Producție cu nginx inclus — nginx proxy intern, SSL, singur punct de intrare pe port 80/443 |
-| `docker-compose.no-nginx.yml` | Producție fără nginx intern — când ai deja Traefik / Caddy / nginx extern care face proxy spre servicii |
+| `docker-compose.dev.yml` | Local development — Vite dev server with hot reload, all services in Docker |
+| `docker-compose.yml` | Production with nginx included — internal nginx proxy, SSL, single entry point on port 80/443 |
+| `docker-compose.no-nginx.yml` | Production without internal nginx — when you already have Traefik / Caddy / external nginx proxying to services |
 
 ---
 
-## Cuprins
+## Contents
 
-1. [Cerințe](#1-cerinte)
-2. [Dev — pornire rapidă (tot în Docker)](#2-dev--pornire-rapida)
-3. [Producție cu nginx inclus](#3-productie--deployment-complet)
-4. [Producție fără nginx intern](#4-productie-fara-nginx-intern-in-spatele-unui-proxy-extern)
-5. [Testare automată](#5-testare-automata)
-6. [Actualizare aplicație](#6-actualizare-aplicatie)
+1. [Requirements](#1-requirements)
+2. [Dev — quick start (everything in Docker)](#2-dev--quick-start)
+3. [Production with nginx included](#3-production--full-deployment)
+4. [Production without internal nginx](#4-production-without-internal-nginx-behind-an-external-proxy)
+5. [Automated testing](#5-automated-testing)
+6. [Updating the application](#6-updating-the-application)
 7. [Troubleshooting](#7-troubleshooting)
 
 ---
 
-## 1. Cerinte
+## 1. Requirements
 
-### Server (Linux — Ubuntu 22.04 / 24.04 recomandat)
+### Server (Linux — Ubuntu 22.04 / 24.04 recommended)
 
-| Componenta | Versiune minima | Instalare |
+| Component | Minimum version | Install |
 |---|---|---|
 | Docker Engine | 24+ | `curl -fsSL https://get.docker.com | sh` |
-| Docker Compose | v2 (plugin) | inclus în Docker Engine 24+ |
+| Docker Compose | v2 (plugin) | included in Docker Engine 24+ |
 | Rust / Cargo | 1.78+ | `curl https://sh.rustup.rs -sSf | sh` |
 | Node.js | 20 LTS | `nvm install 20` |
-| Git | orice | `apt install git` |
+| Git | any | `apt install git` |
 
-### Porturi necesare (deschide pe firewall)
+### Required ports (open on the firewall)
 
-| Port | Protocol | Serviciu |
+| Port | Protocol | Service |
 |---|---|---|
 | 80 | TCP | nginx (HTTP / redirect) |
 | 443 | TCP | nginx (HTTPS) |
@@ -49,41 +49,41 @@
 
 ---
 
-## 2. Dev — pornire rapida
+## 2. Dev — Quick Start
 
-Tot stack-ul rulează în Docker — inclusiv Vite dev server cu hot reload.
+The whole stack runs in Docker — including the Vite dev server with hot reload.
 
-### 2.1 Clonare
+### 2.1 Clone
 
 ```bash
 git clone <repo-url> peerdesk
 cd peerdesk
 ```
 
-### 2.2 Pornire stack complet
+### 2.2 Start the full stack
 
 ```bash
 cd deploy
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Prima pornire construiește imaginile (~2 min). La reporniri ulterioare e instant.
+The first start builds the images (~2 min). Subsequent starts are instant.
 
-Verifică:
+Check:
 
 ```bash
 docker compose -f docker-compose.dev.yml ps
-# Toate serviciile trebuie să fie Up: postgres, redis, signaling, api, web
+# All services must be Up: postgres, redis, signaling, api, web
 
 curl http://localhost:8001/health   # → {"status":"ok"}
 curl http://localhost:8000/health   # → {"status":"ok"}
 ```
 
-Deschide browser la **`http://localhost:5173`** (sau `http://<IP-SERVER>:5173` de pe altă mașinărie).
+Open a browser to **`http://localhost:5173`** (or `http://<IP-SERVER>:5173` from another machine).
 
-### 2.3 Display virtual (necesar pe server fără monitor)
+### 2.3 Virtual display (needed on a headless server)
 
-Necesar pentru agentul Rust care capturează ecranul:
+Needed for the Rust agent that captures the screen:
 
 ```bash
 pkill -f "Xvfb :99" 2>/dev/null; rm -f /tmp/.X99-lock
@@ -93,7 +93,7 @@ DISPLAY=:99 fluxbox &
 DISPLAY=:99 xterm &
 ```
 
-### 2.4 Pornire agent Rust
+### 2.4 Start the Rust agent
 
 ```bash
 source ~/.cargo/env
@@ -110,10 +110,10 @@ grep "peer_id=" /tmp/agent.log
 
 ### 2.5 Hot reload
 
-Modificările în `web/src/` sunt reflectate instant în browser fără restart.
-Modificările în `server/api/` sau `server/signaling/` sunt preluate automat de uvicorn `--reload`.
+Changes in `web/src/` show up instantly in the browser without a restart.
+Changes in `server/api/` or `server/signaling/` are picked up automatically by uvicorn `--reload`.
 
-### 2.6 Oprire dev
+### 2.6 Stop dev
 
 ```bash
 cd deploy
@@ -124,24 +124,24 @@ pkill -f "Xvfb :99" 2>/dev/null
 
 ---
 
-## 3. Productie — deployment complet
+## 3. Production — Full Deployment
 
-**Metoda recomandată** — `install.sh` face totul automat:
+**Recommended method** — `install.sh` does everything automatically:
 
 ```bash
 cd deploy
 bash install.sh
-# alege opțiunea 2 (Producție + nginx)
+# choose option 2 (Production + nginx)
 ```
 
-Sau non-interactiv:
+Or non-interactively:
 ```bash
 bash install.sh --domain peerdesk.example.com --tls --email admin@example.com
 ```
 
-Pașii manuali de mai jos sunt pentru cazuri speciale sau debugging.
+The manual steps below are for special cases or debugging.
 
-### 3.1 Configurare variabile de mediu (manual)
+### 3.1 Environment variable setup (manual)
 
 ```bash
 cd deploy
@@ -149,15 +149,15 @@ cp .env.example .env
 nano .env
 ```
 
-Completează:
+Fill in:
 
 ```env
-POSTGRES_PASSWORD=<parola-puternica>
+POSTGRES_PASSWORD=<strong-password>
 JWT_SECRET=<openssl rand -hex 32>
 TURN_SECRET=<openssl rand -hex 24>
 ```
 
-Generare secrete:
+Generate secrets:
 
 ```bash
 echo "JWT_SECRET=$(openssl rand -hex 32)"
@@ -165,7 +165,7 @@ echo "TURN_SECRET=$(openssl rand -hex 24)"
 echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
 ```
 
-### 3.2 Certificate SSL (Let's Encrypt recomandat)
+### 3.2 SSL certificates (Let's Encrypt recommended)
 
 ```bash
 apt install certbot
@@ -176,7 +176,7 @@ cp /etc/letsencrypt/live/domain.com/fullchain.pem deploy/nginx/certs/
 cp /etc/letsencrypt/live/domain.com/privkey.pem   deploy/nginx/certs/
 ```
 
-### 3.3 Build și pornire producție
+### 3.3 Build and start production
 
 ```bash
 cd deploy
@@ -187,25 +187,25 @@ docker compose ps
 docker compose logs -f --tail 50
 ```
 
-### 3.4 Migrări bază de date
+### 3.4 Database migrations
 
 ```bash
-# Rulează automat la startup; sau manual:
+# Runs automatically at startup; or manually:
 docker compose exec api alembic upgrade head
 ```
 
-### 3.5 Instalare agent ca serviciu systemd
+### 3.5 Install the agent as a systemd service
 
 ```bash
-# Pe mașina care va fi accesată remote:
+# On the machine that will be accessed remotely:
 cargo build -p peerdesk-agent --release
 sudo cp target/release/peerdesk-agent /usr/local/bin/
 sudo cp deploy/systemd/peerdesk-agent.service /etc/systemd/system/
 
-# Configurare (adaugă Environment= în override)
+# Configuration (add Environment= in the override)
 sudo systemctl edit peerdesk-agent
 # [Service]
-# Environment=PEERDESK_PASSWORD=parola_ta
+# Environment=PEERDESK_PASSWORD=your_password
 # Environment=SIGNALING_URL=wss://domain.com/ws
 
 sudo systemctl daemon-reload
@@ -213,61 +213,63 @@ sudo systemctl enable --now peerdesk-agent
 sudo systemctl status peerdesk-agent
 ```
 
-### 3.6 Checklist pre-launch producție
+### 3.6 Pre-launch production checklist
 
-- [ ] `.env` completat cu valori reale (fără CHANGE_ME)
-- [ ] Certificate SSL în `deploy/nginx/certs/`
-- [ ] Firewall: porturi 80, 443, 3478, 49152-65535 deschise
-- [ ] `docker compose ps` — toate containerele `healthy`
+- [ ] `.env` filled in with real values (no CHANGE_ME)
+- [ ] SSL certificates in `deploy/nginx/certs/`
+- [ ] Firewall: ports 80, 443, 3478, 49152-65535 open
+- [ ] `docker compose ps` — all containers `healthy`
 - [ ] `curl https://domain.com/api/health` → `{"status":"ok"}`
 - [ ] `curl https://domain.com/ws/health` → `{"status":"ok"}`
-- [ ] Agent pornit pe cel puțin o mașinărie de test
-- [ ] Test conexiune din browser la `https://domain.com`
-- [ ] Renewal automat: `certbot renew --dry-run`
+- [ ] Agent started on at least one test machine
+- [ ] Connection test from a browser at `https://domain.com`
+- [ ] Automatic renewal: `certbot renew --dry-run`
 
-### 3.7 Publicare printr-un proxy extern (Nginx Proxy Manager, Traefik, etc.)
+### 3.7 Publishing through an external proxy (Nginx Proxy Manager, Traefik, etc.)
 
-Varianta în care **păstrezi nginx-ul intern** și pui un proxy în fața lui — tipic
-când ai deja un reverse proxy care administrează certificatele pentru mai multe
-domenii. Diferă de secțiunea 4: acolo nginx-ul intern lipsește cu totul.
+The variant where you **keep the internal nginx** and put a proxy in front of it —
+typical when you already have a reverse proxy that manages certificates for
+multiple domains. This differs from section 4: there, the internal nginx is
+absent entirely.
 
-Notație: `<PUBLIC_DOMAIN>` = domeniul public (ex. `app.exemplu.com`),
-`<DDNS_HOST>` = numele DDNS care urmărește IP-ul tău public,
-`<PEERDESK_HOST_IP>` = mașina cu stack-ul PeerDesk, `<PROXY_IP>` = proxy-ul.
+Notation: `<PUBLIC_DOMAIN>` = the public domain (e.g. `app.example.com`),
+`<DDNS_HOST>` = the DDNS name that tracks your public IP,
+`<PEERDESK_HOST_IP>` = the machine with the PeerDesk stack, `<PROXY_IP>` = the proxy.
 
-#### Traseul traficului
+#### Traffic path
 
 ```
 browser / agent   <PUBLIC_DOMAIN> :443 → proxy → <PEERDESK_HOST_IP>:80
-releu TURN (UDP)  <DDNS_HOST> :3478   → direct → <PEERDESK_HOST_IP>:3478
+TURN relay (UDP)  <DDNS_HOST> :3478   → direct → <PEERDESK_HOST_IP>:3478
 ```
 
-TURN **nu poate** trece prin proxy: releul e UDP, iar un reverse proxy HTTP nu
-transportă UDP.
+TURN **cannot** go through the proxy: the relay is UDP, and an HTTP reverse
+proxy does not carry UDP.
 
-#### Port forwarding pe router
+#### Router port forwarding
 
-| Port | Protocol | Către | De ce |
+| Port | Protocol | To | Why |
 |---|---|---|---|
-| 80 | TCP | `<PROXY_IP>` | validare Let's Encrypt HTTP-01 |
-| 443 | TCP | `<PROXY_IP>` | aplicația web |
-| **3478** | **TCP + UDP** | **`<PEERDESK_HOST_IP>`** | control TURN |
-| **49160-49200** | **UDP** | **`<PEERDESK_HOST_IP>`** | media releată TURN |
+| 80 | TCP | `<PROXY_IP>` | Let's Encrypt HTTP-01 validation |
+| 443 | TCP | `<PROXY_IP>` | the web app |
+| **3478** | **TCP + UDP** | **`<PEERDESK_HOST_IP>`** | TURN control |
+| **49160-49200** | **UDP** | **`<PEERDESK_HOST_IP>`** | TURN relayed media |
 
-Ultimele două ocolesc proxy-ul. Dacă lipsesc, un viewer din altă rețea se
-conectează, se autentifică — și rămâne cu **ecran negru fără niciun mesaj de
-eroare**, cea mai greu de diagnosticat defecțiune din sistem.
+The last two bypass the proxy. If they are missing, a viewer on another
+network connects, authenticates — and is left with a **black screen and no
+error message**, the hardest failure in the system to diagnose.
 
-#### Configurarea proxy-ului
+#### Proxy configuration
 
-Ținta este portul **80**, nu 443: nginx-ul intern nu are bloc `listen 443`, deci
-443 ar refuza conexiunea. TLS se termină la proxy; saltul din LAN rămâne HTTP.
+The target is port **80**, not 443: the internal nginx has no `listen 443`
+block, so 443 would refuse the connection. TLS terminates at the proxy; the
+hop within the LAN stays HTTP.
 
-- **Websockets Support: ON.** Fiecare sesiune se negociază prin `/ws`; fără el
-  agentul nu se înregistrează și nu se conectează nimic.
-- Pentru descărcări de binare (20–85 MB), dezactivează bufferarea — altfel
-  proxy-ul scrie tot răspunsul într-un fișier temporar înainte ca utilizatorul să
-  vadă primul octet:
+- **Websockets Support: ON.** Every session is negotiated over `/ws`; without
+  it the agent cannot register and nothing connects.
+- For binary downloads (20–85 MB), disable buffering — otherwise the proxy
+  writes the entire response to a temp file before the user sees the first
+  byte:
 
 ```nginx
 location /api/releases/download/ {
@@ -277,106 +279,109 @@ location /api/releases/download/ {
 }
 ```
 
-#### Ajustări pe serverul PeerDesk
+#### Adjustments on the PeerDesk server
 
-| Setare | Valoare | De ce |
+| Setting | Value | Why |
 |---|---|---|
-| `TURN_HOST` | `<DDNS_HOST>` | o adresă privată aici înseamnă că viewerii externi primesc un releu inaccesibil |
-| `TURN_PRIVATE_IP` | `<PEERDESK_HOST_IP>` | permite coturn să mapeze privat → public în spatele NAT |
-| `set_real_ip_from` | `<PROXY_IP>` | fără el fiecare vizitator arată ca proxy-ul, iar limitatorul per-IP pune tot internetul într-o singură găleată |
+| `TURN_HOST` | `<DDNS_HOST>` | a private address here means external viewers get an unreachable relay |
+| `TURN_PRIVATE_IP` | `<PEERDESK_HOST_IP>` | lets coturn map private → public behind NAT |
+| `set_real_ip_from` | `<PROXY_IP>` | without it every visitor looks like the proxy, and the per-IP rate limiter puts the whole internet in one bucket |
 
-`deploy/nginx/default.conf` **suprascrie** `X-Forwarded-For` pe `/ws` — nu îl
-adaugă. Serverul de signaling se încrede în prima intrare, deci orice antet
-trimis de client trebuie eliminat acolo; altfel un client își poate falsifica
-IP-ul sursă, păcălind limitatorul și jurnalul de audit.
+`deploy/nginx/default.conf` **overwrites** `X-Forwarded-For` on `/ws` — it
+does not append to it. The signaling server trusts the first entry, so any
+header sent by the client must be stripped there; otherwise a client could
+spoof its source IP, fooling the rate limiter and the audit log.
 
-#### Verificare — în ordinea asta
+#### Verification — in this order
 
-Fiecare pas izolează un salt; primul eșec arată unde e ruptura.
+Each step isolates one hop; the first failure shows where the break is.
 
 ```bash
-# 1. aplicația răspunde prin TLS            → 200
+# 1. the app responds over TLS               → 200
 curl -sS -o /dev/null -w '%{http_code}\n' https://<PUBLIC_DOMAIN>/
 
-# 2. API-ul răspunde prin proxy             → JSON cu "tag_name"
+# 2. the API responds through the proxy       → JSON with "tag_name"
 curl -sS https://<PUBLIC_DOMAIN>/api/releases/latest | head -c 120
 
-# 3. WebSocket-urile supraviețuiesc         → 101 (pasul cel mai des sărit)
-#    --http1.1 este OBLIGATORIU, vezi nota de mai jos
+# 3. WebSockets survive                        → 101 (the step most often skipped)
+#    --http1.1 is REQUIRED, see the note below
 curl -sS --http1.1 -o /dev/null -w '%{http_code}\n' \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
   -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
   https://<PUBLIC_DOMAIN>/ws
 
-# 4. IP-ul real ajunge la signaling (nu cel al proxy-ului)
+# 4. the real IP reaches signaling (not the proxy's)
 cd deploy && docker compose logs --tail=20 signaling | grep connection_attempt
 
-# 5. TURN e accesibil din afara rețelei (de pe date mobile / un VPS)
+# 5. TURN is reachable from outside the network (from mobile data / a VPS)
 nc -zvu <DDNS_HOST> 3478
 ```
 
-Un `101` la pasul 3 confirmă suportul WebSocket; un `200` sau `400` înseamnă că
-opțiunea e dezactivată în proxy.
+A `101` at step 3 confirms WebSocket support; a `200` or `400` means the
+option is disabled in the proxy.
 
-> **Fără `--http1.1`, pasul 3 dă un rezultat fals.** Dacă proxy-ul oferă HTTP/2,
-> curl îl negociază automat — iar mecanismul `Connection: Upgrade` nu există în
-> HTTP/2, deci antetele sunt ignorate. Cererea ajunge la signaling ca un GET
-> obișnuit, care răspunde `404 {"detail":"Not Found"}`. Arată exact ca un
-> WebSocket rupt, deși totul funcționează. Browserele nu au problema asta:
-> deschid handshake-ul peste HTTP/1.1.
+> **Without `--http1.1`, step 3 gives a false result.** If the proxy offers
+> HTTP/2, curl negotiates it automatically — and the `Connection: Upgrade`
+> mechanism does not exist in HTTP/2, so the headers are ignored. The request
+> reaches signaling as a plain GET, which responds `404 {"detail":"Not
+> Found"}`. It looks exactly like a broken WebSocket, even though everything
+> works. Browsers do not have this problem: they open the handshake over
+> HTTP/1.1.
 
-Un `101` urmat de un timeout al lui curl este **rezultatul corect** — conexiunea
-s-a promovat, iar curl așteaptă date pe care nimeni nu i le trimite.
+A `101` followed by a curl timeout is the **correct result** — the
+connection has been upgraded, and curl is waiting for data nobody is
+sending it.
 
-La pasul 5, testează cu <https://icetest.info> și așteaptă cel puțin un candidat
-`relay` — lipsa lui înseamnă că forward-urile UDP lipsesc.
+At step 5, test with <https://icetest.info> and expect at least one `relay`
+candidate — its absence means the UDP forwards are missing.
 
-#### Capcane
+#### Pitfalls
 
-**Nu activa proxy-ul Cloudflare (norul portocaliu)** pe domeniul folosit de TURN.
-Domeniul ar rezolva către Cloudflare, care nu transportă UDP 3478, și releul
-moare silențios. De aceea `TURN_HOST` folosește DDNS-ul, nu domeniul public.
+**Do not enable the Cloudflare proxy (orange cloud)** on the domain used for
+TURN. The domain would resolve to Cloudflare, which does not carry UDP 3478,
+and the relay dies silently. This is why `TURN_HOST` uses the DDNS name, not
+the public domain.
 
-**Dacă IP-ul public e dinamic**, coturn îl rezolvă **o singură dată, la pornire**.
-Când se schimbă, releul continuă să anunțe adresa veche:
+**If the public IP is dynamic**, coturn resolves it **once, at startup**.
+When it changes, the relay keeps announcing the old address:
 
 ```bash
 cd deploy && docker compose restart coturn
 ```
 
-**Editarea lui `deploy/nginx/default.conf` cere recreare, nu reload.** Fișierul e
-bind-mount și Docker leagă *inode-ul*: o editare care rescrie fișierul lasă
-containerul citind versiunea veche, iar `nginx -t` validează fericit copia
-învechită.
+**Editing `deploy/nginx/default.conf` requires a recreate, not a reload.**
+The file is a bind mount and Docker tracks the *inode*: an edit that
+rewrites the file leaves the container reading the old version, and
+`nginx -t` happily validates the stale copy.
 
 ```bash
 docker compose up -d --force-recreate --no-deps nginx
 ```
 
-**Agenții existenți nu migrează singuri.** Sunt configurați cu URL-ul vechi;
-doar instalările noi folosesc domeniul. Pentru a muta unul, reinstalează-l cu
-`--server=https://<PUBLIC_DOMAIN>` și un token nou.
+**Existing agents do not migrate on their own.** They are configured with
+the old URL; only new installs use the domain. To move one, reinstall it
+with `--server=https://<PUBLIC_DOMAIN>` and a new token.
 
 ---
 
-## 4. Productie fără nginx intern (în spatele unui proxy extern)
+## 4. Production without Internal nginx (Behind an External Proxy)
 
-Folosește `docker-compose.no-nginx.yml` când:
-- Ai deja **Traefik**, **Caddy**, **nginx extern** sau alt reverse proxy care gestionează SSL și routing
-- Vrei să expui serviciile direct pe porturi și tu controlezi proxy-ul
+Use `docker-compose.no-nginx.yml` when:
+- You already have **Traefik**, **Caddy**, **external nginx**, or another reverse proxy that handles SSL and routing
+- You want to expose the services directly on ports and control the proxy yourself
 
-### 4.1 Servicii și porturi expuse
+### 4.1 Exposed services and ports
 
-| Serviciu | Port | Descriere |
+| Service | Port | Description |
 |---|---|---|
-| `web` | 80 | React app (nginx intern în container) |
-| `api` | 8000 | REST API FastAPI |
+| `web` | 80 | React app (internal nginx in the container) |
+| `api` | 8000 | FastAPI REST API |
 | `signaling` | 8001 | WebSocket signaling |
 | `coturn` | 3478 | TURN server (host network) |
 
-### 4.2 config.json pentru acest mod
+### 4.2 config.json for this mode
 
-URL-urile trebuie să fie absolute — browserul clientului le folosește direct:
+The URLs must be absolute — the client's browser uses them directly:
 
 ```json
 {
@@ -385,7 +390,7 @@ URL-urile trebuie să fie absolute — browserul clientului le folosește direct
 }
 ```
 
-Sau cu HTTPS dacă proxy-ul extern termină SSL:
+Or with HTTPS if the external proxy terminates SSL:
 
 ```json
 {
@@ -394,17 +399,17 @@ Sau cu HTTPS dacă proxy-ul extern termină SSL:
 }
 ```
 
-### 4.3 Pornire
+### 4.3 Start
 
 ```bash
 cd deploy
-cp .env.example .env && nano .env   # completează POSTGRES_PASSWORD, JWT_SECRET, TURN_SECRET
+cp .env.example .env && nano .env   # fill in POSTGRES_PASSWORD, JWT_SECRET, TURN_SECRET
 docker compose -f docker-compose.no-nginx.yml up -d
 ```
 
-### 4.4 Configurare proxy extern (exemple)
+### 4.4 External proxy configuration (examples)
 
-**Nginx extern** — adaugă în site config:
+**External Nginx** — add to the site config:
 
 ```nginx
 # React app
@@ -428,55 +433,55 @@ location /ws {
 }
 ```
 
-Dacă nginx extern termină SSL pe aceeași mașinărie, `config.json` poate folosi căi relative (`/api`, `/ws`) exact ca în modul cu nginx intern.
+If the external nginx terminates SSL on the same machine, `config.json` can use relative paths (`/api`, `/ws`) exactly as in the internal-nginx mode.
 
-**Traefik / Caddy** — rutează după port; consultă documentația respectivă pentru WebSocket upgrade headers.
+**Traefik / Caddy** — route by port; consult the respective documentation for WebSocket upgrade headers.
 
 ---
 
-## 5. Testare automata
+## 5. Automated Testing
 
-### Script principal
+### Main script
 
 ```bash
-# Dev (pornește stack-ul dacă nu rulează)
+# Dev (starts the stack if it is not running)
 bash docs/test-all.sh
 
-# Sare compilarea Rust/Node (mai rapid dacă ai deja binarele)
+# Skip the Rust/Node build (faster if you already have the binaries)
 bash docs/test-all.sh --skip-build
 
-# Testează stack-ul de prod pe portul 80
+# Test the prod stack on port 80
 bash docs/test-all.sh --prod
 ```
 
-### Ce testează `test-all.sh`
+### What `test-all.sh` tests
 
-| # | Secțiune | Ce verifică |
+| # | Section | What it checks |
 |---|---|---|
-| 1 | Cerințe sistem | docker, curl, cargo, node, websocat |
-| 2 | Docker services | containere pornite, health |
-| 3 | Health HTTP | signaling /health, API /health, OpenAPI docs |
-| 4 | Auth API | register, duplicate email, login, parola greșită, refresh |
+| 1 | System requirements | docker, curl, cargo, node, websocat |
+| 2 | Docker services | containers started, health |
+| 3 | HTTP health | signaling /health, API /health, OpenAPI docs |
+| 4 | Auth API | register, duplicate email, login, wrong password, refresh |
 | 5 | Machines & Sessions | CRUD, heartbeat, create/end session |
-| 6 | WebSocket signaling | register agent, join invalid, JSON malformat |
-| 7 | Agent Rust | `cargo build --release`, `cargo test` |
-| 8 | Frontend web | `npm run build`, `tsc --noEmit` |
+| 6 | WebSocket signaling | register agent, join invalid, malformed JSON |
+| 7 | Rust agent | `cargo build --release`, `cargo test` |
+| 8 | Web frontend | `npm run build`, `tsc --noEmit` |
 
-### Testare WebSocket manual
+### Manual WebSocket testing
 
-Necesită `websocat` (`cargo install websocat`):
+Requires `websocat` (`cargo install websocat`):
 
 ```bash
 # Register agent
 echo '{"type":"register","peer_id":"123456789","password_hash":"<sha256>"}' \
   | websocat ws://localhost:8001/ws
 
-# Join ca viewer
+# Join as viewer
 echo '{"type":"join","peer_id":"123456789","password":"testpass123"}' \
   | websocat ws://localhost:8001/ws
 ```
 
-### Testare API curl rapid
+### Quick curl API testing
 
 ```bash
 # Health
@@ -492,13 +497,13 @@ TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
   -d '{"email":"admin@test.com","password":"Admin123!"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
-# Listare mașini
+# List machines
 curl http://localhost:8000/machines -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
 
-## 6. Actualizare aplicatie
+## 6. Updating the Application
 
 ```bash
 git pull
@@ -507,10 +512,10 @@ cd deploy
 docker compose build --no-cache api signaling web
 docker compose up -d --no-deps api signaling web
 
-# Migrări noi (dacă există)
+# New migrations (if any)
 docker compose exec api alembic upgrade head
 
-# Agent pe mașinile remote
+# Agent on remote machines
 cargo build -p peerdesk-agent --release
 sudo cp target/release/peerdesk-agent /usr/local/bin/
 sudo systemctl restart peerdesk-agent
@@ -520,50 +525,50 @@ sudo systemctl restart peerdesk-agent
 
 ## 7. Troubleshooting
 
-### Stack Docker nu pornește
+### Docker stack does not start
 
 ```bash
 docker compose -f deploy/docker-compose.dev.yml logs
 docker compose -f deploy/docker-compose.dev.yml logs api
 ```
 
-### Agentul nu apare online
+### Agent does not show online
 
 ```bash
 journalctl -u peerdesk-agent -f
-# sau:
+# or:
 tail -f /tmp/agent.log
 
-# Cauze comune:
-# - SIGNALING_URL greșit (wss:// prod, ws:// dev)
-# - Port 8001 blocat de firewall sau nginx
-# - DISPLAY nesetat / Xvfb nu rulează
+# Common causes:
+# - Wrong SIGNALING_URL (wss:// prod, ws:// dev)
+# - Port 8001 blocked by firewall or nginx
+# - DISPLAY not set / Xvfb not running
 ```
 
-### „Machine not found" în browser
+### "Machine not found" in the browser
 
 ```bash
 grep "peer_id=" /tmp/agent.log
 grep "Registered with signaling" /tmp/agent.log
 ```
 
-### ICE / WebRTC nu se conectează
+### ICE / WebRTC does not connect
 
 ```bash
 docker compose logs coturn | tail -20
-nc -u -z -v <IP-SERVER> 3478   # verifică portul TURN
-# Pe LXC: ICE pe IPv6 poate eșua (normal) — IPv4 trebuie să funcționeze
+nc -u -z -v <IP-SERVER> 3478   # check the TURN port
+# On LXC: ICE over IPv6 can fail (normal) — IPv4 must work
 ```
 
-### Postgres nu e healthy
+### Postgres is not healthy
 
 ```bash
 docker compose exec postgres pg_isready -U peerdesk
-# Date vechi incompatibile:
+# Old incompatible data:
 docker compose down -v && docker compose up -d
 ```
 
-### Certificat SSL expirat
+### SSL certificate expired
 
 ```bash
 certbot renew
