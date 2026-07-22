@@ -146,6 +146,8 @@ async def refresh() -> bool:
         manifest = {
             "tag_name": rel["tag_name"],
             "html_url": rel.get("html_url", ""),
+            "body": rel.get("body") or "",
+            "published_at": rel.get("published_at") or "",
             "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "assets": assets,
         }

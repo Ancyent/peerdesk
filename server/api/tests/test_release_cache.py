@@ -79,6 +79,8 @@ def _github_release(tag="v0.4.32", assets=(("agent-linux", b"BINARY"),)):
     return {
         "tag_name": tag,
         "html_url": f"https://github.com/OWNER/REPO/releases/tag/{tag}",
+        "body": "## What's new\n- stuff",
+        "published_at": "2026-07-01T00:00:00Z",
         "assets": [
             {"name": n, "size": len(b), "browser_download_url": f"https://dl.test/{n}"}
             for n, b in assets
@@ -120,6 +122,8 @@ async def test_refresh_downloads_assets_and_writes_manifest(cache, fake_github):
     assert m["tag_name"] == "v0.4.32"
     assert m["assets"] == [{"name": "agent-linux", "size": 6}]
     assert m["fetched_at"].endswith("Z")
+    assert m["body"] == "## What's new\n- stuff"
+    assert m["published_at"] == "2026-07-01T00:00:00Z"
 
 
 async def test_refresh_is_noop_when_tag_unchanged(cache, fake_github):

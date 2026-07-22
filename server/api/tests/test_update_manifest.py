@@ -82,16 +82,21 @@ def cache(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _write_manifest(cache, assets):
-    (cache / "manifest.json").write_text(json.dumps({
+def _write_manifest(cache, assets, body=None, published_at=None):
+    manifest = {
         "tag_name": "v0.5.0",
         "html_url": "https://github.com/OWNER/REPO/releases/tag/v0.5.0",
         "fetched_at": "2026-07-15T08:00:00Z",
         "assets": assets,
-    }))
+    }
+    if body is not None:
+        manifest["body"] = body
+    if published_at is not None:
+        manifest["published_at"] = published_at
+    (cache / "manifest.json").write_text(json.dumps(manifest))
 
 
-def _seed_full_release(cache):
+def _seed_full_release(cache, body=None, published_at=None):
     """A manifest with both updater bundles and their .sig on disk."""
     (cache / WIN_NAME).write_bytes(b"WINBIN")
     (cache / f"{WIN_NAME}.sig").write_text("SIG_WIN\n")
@@ -102,16 +107,20 @@ def _seed_full_release(cache):
         {"name": f"{WIN_NAME}.sig", "size": 8},
         {"name": LINUX_NAME, "size": 8},
         {"name": f"{LINUX_NAME}.sig", "size": 10},
-    ])
+    ], body=body, published_at=published_at)
 
 
 async def test_update_endpoint_returns_tauri_manifest(client, cache):
+    # No body/published_at cached (e.g. an old manifest written before that
+    # was persisted) -- notes falls back to "" and pub_date falls back to
+    # fetched_at.
     _seed_full_release(cache)
     r = await client.get("/releases/update/windows/x86_64/0.4.0")
     assert r.status_code == 200
     body = r.json()
     assert body["version"] == "0.5.0"  # no leading "v"
-    assert body["pub_date"] == "2026-07-15T08:00:00Z"
+    assert body["notes"] == ""
+    assert body["pub_date"] == "2026-07-15T08:00:00Z"  # fetched_at fallback
 
     win = body["platforms"]["windows-x86_64"]
     assert win["url"] == f"/api/releases/download/{WIN_NAME}"
@@ -120,6 +129,21 @@ async def test_update_endpoint_returns_tauri_manifest(client, cache):
     linux = body["platforms"]["linux-x86_64"]
     assert linux["url"] == f"/api/releases/download/{LINUX_NAME}"
     assert linux["signature"] == "SIG_LINUX"
+
+
+async def test_update_endpoint_returns_notes_and_pub_date_from_release_body(client, cache):
+    # When the cache carries the GitHub release's body/published_at, the
+    # endpoint must surface those verbatim instead of falling back.
+    _seed_full_release(
+        cache,
+        body="## What's new\n- stuff",
+        published_at="2026-07-01T00:00:00Z",
+    )
+    r = await client.get("/releases/update/windows/x86_64/0.4.0")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["notes"] == "## What's new\n- stuff"
+    assert body["pub_date"] == "2026-07-01T00:00:00Z"
 
 
 async def test_update_endpoint_204_when_no_release_cached(client, cache):
