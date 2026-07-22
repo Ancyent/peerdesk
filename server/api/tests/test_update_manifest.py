@@ -122,13 +122,38 @@ async def test_update_endpoint_returns_tauri_manifest(client, cache):
     assert body["notes"] == ""
     assert body["pub_date"] == "2026-07-15T08:00:00Z"  # fetched_at fallback
 
+    # Tauri's updater deserializes each platform `url` into a `url::Url`,
+    # which requires an ABSOLUTE url (Url::parse fails on a bare path with
+    # RelativeUrlWithoutBase) -- so the endpoint must prefix it with the
+    # scheme+host the request actually arrived on. httpx's ASGITransport
+    # test client talks to base_url="http://test", so that's what a
+    # request with no forwarding headers resolves to.
     win = body["platforms"]["windows-x86_64"]
-    assert win["url"] == f"/api/releases/download/{WIN_NAME}"
+    assert win["url"] == f"http://test/api/releases/download/{WIN_NAME}"
     assert win["signature"] == "SIG_WIN"  # stripped of trailing whitespace
 
     linux = body["platforms"]["linux-x86_64"]
-    assert linux["url"] == f"/api/releases/download/{LINUX_NAME}"
+    assert linux["url"] == f"http://test/api/releases/download/{LINUX_NAME}"
     assert linux["signature"] == "SIG_LINUX"
+
+
+async def test_update_endpoint_url_is_absolute_and_honors_forwarded_headers(client, cache):
+    # Behind nginx the request's own scheme/host is the proxy's internal one;
+    # the manifest must reflect the PUBLIC scheme/host the client actually
+    # connected to, carried via X-Forwarded-Proto/X-Forwarded-Host.
+    _seed_full_release(cache)
+    r = await client.get(
+        "/releases/update/windows/x86_64/0.4.0",
+        headers={
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-Host": "updates.example.com",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    win = body["platforms"]["windows-x86_64"]
+    assert win["url"] == f"https://updates.example.com/api/releases/download/{WIN_NAME}"
+    assert win["url"].startswith(("http://", "https://"))
 
 
 async def test_update_endpoint_returns_notes_and_pub_date_from_release_body(client, cache):

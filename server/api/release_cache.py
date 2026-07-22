@@ -170,13 +170,20 @@ async def refresh() -> bool:
         return False
 
 
-def updater_platforms(manifest: dict, sig_reader) -> dict:
+def updater_platforms(manifest: dict, sig_reader, base_url: str = "") -> dict:
     """Map cached release assets to Tauri updater platform keys.
 
     `sig_reader(name) -> str | None` supplies the `.sig` contents for an asset
     name (the caller owns any filesystem access — this stays pure). A bundle
     is only included once its `.sig` is found; anything else (including the
     non-updater `.deb`/`.rpm` packages) is ignored.
+
+    `base_url`, if given, is prefixed onto each platform's download `url`
+    (e.g. `"https://example.com"`) so the manifest can carry an ABSOLUTE url —
+    tauri-plugin-updater deserializes `url` as a `url::Url`, which rejects a
+    bare path (`ParseError::RelativeUrlWithoutBase`). Defaults to `""` so
+    callers that don't pass it (or tests exercising this pure helper in
+    isolation) keep getting the old relative path unchanged.
 
     Every real Windows release ships both an NSIS `-setup.exe` and a `.msi`
     for the same `windows-x86_64` platform key. Tauri's updater consumes the
@@ -220,7 +227,7 @@ def updater_platforms(manifest: dict, sig_reader) -> dict:
             continue
         platforms[key] = {
             "signature": sig,
-            "url": f"/api/releases/download/{name}",
+            "url": f"{base_url}/api/releases/download/{name}",
         }
         ranks[key] = rank
     return platforms
