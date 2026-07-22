@@ -38,5 +38,13 @@
   "codeBlock": {
     "copy": "Copiază comanda",
     "copied": "Copiat"
+  },
+  "quality": {
+    "presets": {
+      "good": "Calitate bună a imaginii",
+      "balanced": "Echilibrat",
+      "reaction": "Optimizează timpul de reacție",
+      "custom": "Personalizat"
+    }
   }
 }

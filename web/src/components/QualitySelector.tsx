@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
-import { PRESETS, PRESET_LABELS, clampCustom, type PresetId, type QualitySettings } from '../quality';
+import { useTranslation } from 'react-i18next';
+import { PRESETS, clampCustom, type PresetId, type QualitySettings } from '../quality';
 
 const IDS: PresetId[] = ['good', 'balanced', 'reaction', 'custom'];
 
@@ -7,6 +8,7 @@ const IDS: PresetId[] = ['good', 'balanced', 'reaction', 'custom'];
  *  match the app's dark theme with explicit colors so it also works in the
  *  desktop client, which doesn't define the web CSS variables. */
 export function QualitySelector({ onChange }: { onChange: (q: QualitySettings) => void }) {
+  const { t } = useTranslation('viewer');
   const [preset, setPreset] = useState<PresetId>('balanced');
   const [fps, setFps] = useState(30);
   const [kbps, setKbps] = useState(2000);
@@ -58,7 +60,7 @@ export function QualitySelector({ onChange }: { onChange: (q: QualitySettings) =
             apply(id);
           }}
         >
-          {PRESET_LABELS[id]}
+          {t('viewer:quality.presets.' + id)}
         </button>
       ))}
       {preset === 'custom' && (

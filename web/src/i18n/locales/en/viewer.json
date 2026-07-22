@@ -38,5 +38,13 @@
   "codeBlock": {
     "copy": "Copy command",
     "copied": "Copied"
+  },
+  "quality": {
+    "presets": {
+      "good": "Good image quality",
+      "balanced": "Balanced",
+      "reaction": "Optimize reaction time",
+      "custom": "Custom"
+    }
   }
 }
