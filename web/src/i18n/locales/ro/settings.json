@@ -1,4 +1,20 @@
 {
   "title": "Setări",
-  "language": { "title": "Limbă", "label": "Limba interfeței" }
+  "language": { "title": "Limbă", "label": "Limba interfeței" },
+  "profile": {
+    "title": "Profil",
+    "name": "Nume",
+    "email": "Email",
+    "saved": "Salvat!"
+  },
+  "password": {
+    "title": "Schimbă parola",
+    "current": "Parola curentă",
+    "new": "Parola nouă",
+    "confirm": "Confirmă",
+    "submit": "Schimbă parola",
+    "changed": "Parolă schimbată!",
+    "mismatch": "Parolele nu coincid",
+    "tooShort": "Minim 8 caractere"
+  }
 }

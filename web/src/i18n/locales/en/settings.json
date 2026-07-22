@@ -1,4 +1,20 @@
 {
   "title": "Settings",
-  "language": { "title": "Language", "label": "Interface language" }
+  "language": { "title": "Language", "label": "Interface language" },
+  "profile": {
+    "title": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "saved": "Saved!"
+  },
+  "password": {
+    "title": "Change password",
+    "current": "Current password",
+    "new": "New password",
+    "confirm": "Confirm",
+    "submit": "Change password",
+    "changed": "Password changed!",
+    "mismatch": "Passwords don't match",
+    "tooShort": "Minimum 8 characters"
+  }
 }

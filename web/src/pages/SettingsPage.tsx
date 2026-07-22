@@ -44,20 +44,20 @@ export function SettingsPage() {
     setProfileMsg(''); setProfileErr('');
     try {
       await api.users.update(accessToken, { name, email });
-      setProfileMsg('Salvat!'); setTimeout(() => setProfileMsg(''), 2500);
-    } catch (e) { setProfileErr(e instanceof ApiError ? e.message : 'Eroare'); }
+      setProfileMsg(t('settings:profile.saved')); setTimeout(() => setProfileMsg(''), 2500);
+    } catch (e) { setProfileErr(e instanceof ApiError ? e.message : t('common:error')); }
   };
 
   const changePw = async () => {
     if (!accessToken) return;
     setPwMsg(''); setPwErr('');
-    if (newPw !== confPw) { setPwErr('Parolele nu coincid'); return; }
-    if (newPw.length < 8) { setPwErr('Minim 8 caractere'); return; }
+    if (newPw !== confPw) { setPwErr(t('settings:password.mismatch')); return; }
+    if (newPw.length < 8) { setPwErr(t('settings:password.tooShort')); return; }
     try {
       await api.users.changePassword(accessToken, curPw, newPw);
-      setPwMsg('Parolă schimbată!'); setCurPw(''); setNewPw(''); setConfPw('');
+      setPwMsg(t('settings:password.changed')); setCurPw(''); setNewPw(''); setConfPw('');
       setTimeout(() => setPwMsg(''), 2500);
-    } catch (e) { setPwErr(e instanceof ApiError ? e.message : 'Eroare'); }
+    } catch (e) { setPwErr(e instanceof ApiError ? e.message : t('common:error')); }
   };
 
   return (
@@ -79,23 +79,23 @@ export function SettingsPage() {
           </div>
         </div>
       </Section>
-      <Section title="Profil">
+      <Section title={t('settings:profile.title')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Nume</label><input style={inp} value={name} onChange={e => setName(e.target.value)} /></div>
-          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Email</label><input style={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} /></div>
+          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{t('settings:profile.name')}</label><input style={inp} value={name} onChange={e => setName(e.target.value)} /></div>
+          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{t('settings:profile.email')}</label><input style={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} /></div>
           {profileErr && <p style={{ color: 'var(--red)', fontSize: 12, margin: 0 }}>{profileErr}</p>}
           {profileMsg && <p style={{ color: 'var(--green)', fontSize: 12, margin: 0 }}>{profileMsg}</p>}
-          <button onClick={saveProfile} style={{ padding: 8, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>Salvează</button>
+          <button onClick={saveProfile} style={{ padding: 8, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>{t('common:save')}</button>
         </div>
       </Section>
-      <Section title="Schimbă parola">
+      <Section title={t('settings:password.title')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Parola curentă</label><input style={inp} type="password" value={curPw} onChange={e => setCurPw(e.target.value)} /></div>
-          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Parola nouă</label><input style={inp} type="password" value={newPw} onChange={e => setNewPw(e.target.value)} /></div>
-          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Confirmă</label><input style={inp} type="password" value={confPw} onChange={e => setConfPw(e.target.value)} /></div>
+          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{t('settings:password.current')}</label><input style={inp} type="password" value={curPw} onChange={e => setCurPw(e.target.value)} /></div>
+          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{t('settings:password.new')}</label><input style={inp} type="password" value={newPw} onChange={e => setNewPw(e.target.value)} /></div>
+          <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{t('settings:password.confirm')}</label><input style={inp} type="password" value={confPw} onChange={e => setConfPw(e.target.value)} /></div>
           {pwErr && <p style={{ color: 'var(--red)', fontSize: 12, margin: 0 }}>{pwErr}</p>}
           {pwMsg && <p style={{ color: 'var(--green)', fontSize: 12, margin: 0 }}>{pwMsg}</p>}
-          <button onClick={changePw} style={{ padding: 8, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>Schimbă parola</button>
+          <button onClick={changePw} style={{ padding: 8, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>{t('settings:password.submit')}</button>
         </div>
       </Section>
     </div>

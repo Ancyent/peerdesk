@@ -1,0 +1,19 @@
+{
+  "title": "API Keys",
+  "subtitle": "Reusable keys for agent deployment. One key can register many machines.",
+  "namePlaceholder": "Key name (e.g. Production Deploy)",
+  "autoApprove": "Auto-approve",
+  "create": "Create Key",
+  "creating": "Creating…",
+  "created": {
+    "notice": "Key created — copy it now, it won't be shown again in full.",
+    "deployLabel": "Deploy:"
+  },
+  "copy": "Copy",
+  "copied": "Copied!",
+  "dismiss": "Dismiss",
+  "empty": "No API keys yet. Create one above to start deploying agents.",
+  "lastUsed": "Last used: {{date}}",
+  "copyHint": "Copy the key when first created",
+  "revoke": "Revoke"
+}

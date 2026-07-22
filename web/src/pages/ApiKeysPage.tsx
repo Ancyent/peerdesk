@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, type ApiKeyListOut } from '../api/client';
 import { copyText } from '../lib/clipboard';
 
 export function ApiKeysPage() {
+  const { t } = useTranslation(['apikeys', 'common']);
   const { accessToken } = useAuth();
   const [keys, setKeys] = useState<ApiKeyListOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,9 +49,9 @@ export function ApiKeysPage() {
 
   return (
     <div style={{ padding: '20px 24px', maxWidth: 700, background: 'var(--bg-base)', minHeight: '100%' }}>
-      <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>API Keys</h2>
+      <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('apikeys:title')}</h2>
       <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
-        Reusable keys for agent deployment. One key can register many machines.
+        {t('apikeys:subtitle')}
       </p>
 
       {/* Create form */}
@@ -57,20 +59,20 @@ export function ApiKeysPage() {
         <input
           value={newName}
           onChange={e => setNewName(e.target.value)}
-          placeholder="Key name (e.g. Production Deploy)"
+          placeholder={t('apikeys:namePlaceholder')}
           style={{ flex: 1, padding: '7px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-hover)', color: 'var(--text-1)' }}
           onKeyDown={e => e.key === 'Enter' && handleCreate()}
         />
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap', cursor: 'pointer' }}>
           <input type="checkbox" checked={autoApprove} onChange={e => setAutoApprove(e.target.checked)} />
-          Auto-approve
+          {t('apikeys:autoApprove')}
         </label>
         <button
           onClick={handleCreate}
           disabled={creating || !newName.trim()}
           style={{ padding: '7px 16px', fontSize: 13, fontWeight: 600, background: 'var(--accent-2)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: creating || !newName.trim() ? 0.5 : 1 }}
         >
-          {creating ? 'Creating...' : 'Create Key'}
+          {creating ? t('apikeys:creating') : t('apikeys:create')}
         </button>
       </div>
 
@@ -78,32 +80,32 @@ export function ApiKeysPage() {
       {newKey && (
         <div style={{ marginBottom: 20, padding: 16, background: 'var(--green-bg)', border: '1px solid var(--green-glow)', borderRadius: 8 }}>
           <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>
-            ✓ Key created — copy it now, it won't be shown again in full.
+            ✓ {t('apikeys:created.notice')}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <code style={{ flex: 1, padding: '6px 10px', background: 'rgba(0,229,160,0.15)', borderRadius: 4, fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-1)' }}>
               {newKey}
             </code>
             <button onClick={() => handleCopy(newKey)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? t('apikeys:copied') : t('apikeys:copy')}
             </button>
             <button onClick={() => setNewKey(null)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--bg-hover)', color: 'var(--text-2)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-              Dismiss
+              {t('apikeys:dismiss')}
             </button>
           </div>
           <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-2)' }}>
-            Deploy: <code style={{ background: 'rgba(0,229,160,0.15)', padding: '2px 4px', borderRadius: 3, fontSize: 11, color: 'var(--text-1)' }}>
+            {t('apikeys:created.deployLabel')} <code style={{ background: 'rgba(0,229,160,0.15)', padding: '2px 4px', borderRadius: 3, fontSize: 11, color: 'var(--text-1)' }}>
               peerdesk-agent --server=YOUR_SERVER --api-key={newKey}
             </code>
           </p>
         </div>
       )}
 
-      {loading && <p style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading...</p>}
+      {loading && <p style={{ color: 'var(--text-3)', fontSize: 13 }}>{t('common:loading')}</p>}
 
       {!loading && keys.length === 0 && (
         <div style={{ padding: 32, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
-          No API keys yet. Create one above to start deploying agents.
+          {t('apikeys:empty')}
         </div>
       )}
 
@@ -114,18 +116,18 @@ export function ApiKeysPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{k.name}</span>
                 {k.auto_approve && (
-                  <span style={{ fontSize: 11, padding: '2px 6px', background: 'rgba(0,168,255,0.12)', color: 'var(--accent-2)', borderRadius: 10, fontWeight: 500 }}>Auto-approve</span>
+                  <span style={{ fontSize: 11, padding: '2px 6px', background: 'rgba(0,168,255,0.12)', color: 'var(--accent-2)', borderRadius: 10, fontWeight: 500 }}>{t('apikeys:autoApprove')}</span>
                 )}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
                 <code style={{ background: 'var(--bg-hover)', padding: '1px 4px', borderRadius: 3, color: 'var(--text-1)' }}>
                   {k.key_preview}
                 </code>
-                {k.last_used_at && <span style={{ marginLeft: 8 }}>Last used: {new Date(k.last_used_at).toLocaleDateString()}</span>}
+                {k.last_used_at && <span style={{ marginLeft: 8 }}>{t('apikeys:lastUsed', { date: new Date(k.last_used_at).toLocaleDateString() })}</span>}
               </div>
             </div>
-            <span title="Copy the key when first created" style={{ padding: '5px 10px', fontSize: 12, color: 'var(--text-3)', cursor: 'default', userSelect: 'none' }}>••••</span>
-            <button onClick={() => handleRevoke(k.id)} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red)', borderRadius: 6, cursor: 'pointer' }}>Revoke</button>
+            <span title={t('apikeys:copyHint')} style={{ padding: '5px 10px', fontSize: 12, color: 'var(--text-3)', cursor: 'default', userSelect: 'none' }}>••••</span>
+            <button onClick={() => handleRevoke(k.id)} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red)', borderRadius: 6, cursor: 'pointer' }}>{t('apikeys:revoke')}</button>
           </div>
         ))}
       </div>

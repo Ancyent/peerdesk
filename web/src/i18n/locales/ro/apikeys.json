@@ -1,0 +1,19 @@
+{
+  "title": "Chei API",
+  "subtitle": "Chei reutilizabile pentru desfășurarea agenților. O cheie poate înregistra mai multe mașini.",
+  "namePlaceholder": "Nume cheie (ex. Production Deploy)",
+  "autoApprove": "Auto-aprobare",
+  "create": "Creează cheie",
+  "creating": "Se creează…",
+  "created": {
+    "notice": "Cheie creată — copiaz-o acum, nu va mai fi afișată integral din nou.",
+    "deployLabel": "Desfășurare:"
+  },
+  "copy": "Copiază",
+  "copied": "Copiat!",
+  "dismiss": "Renunță",
+  "empty": "Nicio cheie API încă. Creează una mai sus pentru a începe desfășurarea agenților.",
+  "lastUsed": "Ultima utilizare: {{date}}",
+  "copyHint": "Copiază cheia când este creată prima dată",
+  "revoke": "Revocă"
+}
