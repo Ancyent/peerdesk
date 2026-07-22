@@ -5,20 +5,25 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-shell": "^2",
+    "i18next": "^26.3.6",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-i18next": "^17.0.10"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4",
+    "happy-dom": "^20.11.0",
     "typescript": "~5.6.2",
-    "vite": "^6"
+    "vite": "^6",
+    "vitest": "^4.1.10"
   }
 }
