@@ -1,3 +1,5 @@
+mod update_state;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{Emitter, Manager, State};
@@ -408,6 +410,34 @@ async fn save_settings(settings: serde_json::Value) -> Result<(), String> {
     }
 }
 
+// ── update_state ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_update_state() -> Result<serde_json::Value, String> {
+    #[cfg(not(target_os = "android"))]
+    {
+        let st = update_state::UpdateState::load(&update_state::state_path());
+        serde_json::to_value(&st).map_err(|e| e.to_string())
+    }
+    #[cfg(target_os = "android")]
+    Ok(serde_json::json!({}))
+}
+
+#[tauri::command]
+async fn save_update_state(state: serde_json::Value) -> Result<(), String> {
+    #[cfg(not(target_os = "android"))]
+    {
+        let st: update_state::UpdateState =
+            serde_json::from_value(state).map_err(|e| e.to_string())?;
+        st.save(&update_state::state_path()).map_err(|e| e.to_string())
+    }
+    #[cfg(target_os = "android")]
+    {
+        let _ = state;
+        Ok(())
+    }
+}
+
 // ── apply_config_link ─────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -582,6 +612,8 @@ pub fn run() {
             stop_agent,
             get_settings,
             save_settings,
+            get_update_state,
+            save_update_state,
             apply_config_link,
             reset_password,
             get_security_code,
