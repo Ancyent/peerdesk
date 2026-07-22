@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PeerDesk installer — rulează din deploy/
+# PeerDesk installer — run from deploy/
 # Usage: bash install.sh [--dev] [--no-nginx] [--domain DOMAIN] [--tls] [--email EMAIL]
 set -euo pipefail
 
@@ -24,7 +24,7 @@ cat << 'BANNER'
 BANNER
 echo -e "${NC}"
 
-# ── Argumente CLI (opționale, pentru scripting/CI) ────────
+# ── CLI arguments (optional, for scripting/CI) ────────
 MODE=""
 DOMAIN=""
 USE_TLS="n"
@@ -45,33 +45,33 @@ done
 step "Docker"
 
 if ! command -v docker &>/dev/null; then
-  warn "Docker nu este instalat."
-  ask "Instalez automat? [Y/n]: "
+  warn "Docker is not installed."
+  ask "Install automatically? [Y/n]: "
   read -r ans
-  [[ "${ans:-Y}" =~ ^[Yy]$ ]] || error "Instalează Docker de la https://docs.docker.com/get-docker/"
-  info "Instalez Docker..."
+  [[ "${ans:-Y}" =~ ^[Yy]$ ]] || error "Install Docker from https://docs.docker.com/get-docker/"
+  info "Installing Docker..."
   curl -fsSL https://get.docker.com | sh
-  info "Docker instalat."
+  info "Docker installed."
 fi
-docker compose version &>/dev/null || error "Docker Compose v2 lipsă. Actualizează Docker."
+docker compose version &>/dev/null || error "Docker Compose v2 missing. Update Docker."
 info "Docker $(docker --version | grep -oP '\d+\.\d+\.\d+' | head -1) — OK"
 
-# ── Mod deployment ────────────────────────────────────────
-step "Mod de deployment"
+# ── Deployment mode ────────────────────────────────────────
+step "Deployment mode"
 
 if [[ -z "$MODE" ]]; then
   echo ""
-  echo "  1) Dev (local)         — hot reload, toate în Docker, port :5173"
-  echo "  2) Producție + nginx   — nginx intern, SSL opțional, port :80/:443"
-  echo "  3) Producție direct    — porturi directe, proxy extern (Traefik/Caddy)"
+  echo "  1) Dev (local)         — hot reload, everything in Docker, port :5173"
+  echo "  2) Production + nginx  — internal nginx, optional SSL, port :80/:443"
+  echo "  3) Production direct   — direct ports, external proxy (Traefik/Caddy)"
   echo ""
-  ask "Alege [1/2/3]: "
+  ask "Choose [1/2/3]: "
   read -r choice
   case "${choice:-1}" in
     1) MODE="dev" ;;
     2) MODE="prod-nginx" ;;
     3) MODE="prod-direct" ;;
-    *) error "Opțiune invalidă." ;;
+    *) error "Invalid option." ;;
   esac
 fi
 
@@ -79,11 +79,11 @@ fi
 # DEV MODE
 # ─────────────────────────────────────────────────────────
 if [[ "$MODE" == "dev" ]]; then
-  step "Pornire stack dev"
-  info "Construiesc imagini și pornesc (prima rulare ~2 min)..."
+  step "Starting dev stack"
+  info "Building images and starting (first run ~2 min)..."
   docker compose -f docker-compose.dev.yml up -d --build
 
-  info "Aștept serviciile..."
+  info "Waiting for services..."
   for i in $(seq 1 40); do
     code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:8000/health 2>/dev/null || echo "000")
     [[ "$code" == "200" ]] && break
@@ -92,54 +92,54 @@ if [[ "$MODE" == "dev" ]]; then
 
   echo ""
   echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "${GREEN}${BOLD}  Stack dev pornit!${NC}"
+  echo -e "${GREEN}${BOLD}  Dev stack started!${NC}"
   echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo ""
 
-  # Detectează IP-ul pentru acces de pe altă mașinărie
+  # Detect the IP for access from another machine
   LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[\d.]+' || echo "localhost")
   echo -e "  Browser  →  ${BLUE}${BOLD}http://localhost:5173${NC}"
   [[ "$LOCAL_IP" != "localhost" ]] && \
-    echo -e "  Rețea    →  ${BLUE}http://${LOCAL_IP}:5173${NC}"
+    echo -e "  Network  →  ${BLUE}http://${LOCAL_IP}:5173${NC}"
   echo ""
-  echo "  Modificările din cod sunt reîncărcate automat."
+  echo "  Code changes are reloaded automatically."
   echo ""
-  echo "  Log-uri:  docker compose -f docker-compose.dev.yml logs -f"
-  echo "  Oprire:   docker compose -f docker-compose.dev.yml down"
+  echo "  Logs:  docker compose -f docker-compose.dev.yml logs -f"
+  echo "  Stop:  docker compose -f docker-compose.dev.yml down"
   echo ""
   exit 0
 fi
 
 # ─────────────────────────────────────────────────────────
-# PROD MODE — colectare config
+# PROD MODE — collect config
 # ─────────────────────────────────────────────────────────
-step "Configurare"
+step "Configuration"
 
 if [[ -z "$DOMAIN" ]]; then
-  ask "Domeniu sau IP server (ex: peerdesk.example.com sau 192.168.1.10): "
+  ask "Server domain or IP (e.g. peerdesk.example.com or 192.168.1.10): "
   read -r DOMAIN
-  [[ -z "$DOMAIN" ]] && error "Domeniu/IP obligatoriu."
+  [[ -z "$DOMAIN" ]] && error "Domain/IP required."
 fi
 
 if [[ "$MODE" == "prod-nginx" && "$USE_TLS" == "n" ]]; then
-  ask "Activez HTTPS cu Let's Encrypt? (necesită DNS configurat) [y/N]: "
+  ask "Enable HTTPS with Let's Encrypt? (requires DNS configured) [y/N]: "
   read -r tls_ans
   USE_TLS="${tls_ans:-n}"
 fi
 
 if [[ "$USE_TLS" =~ ^[Yy]$ && -z "$ADMIN_EMAIL" ]]; then
-  ask "Email pentru certificat SSL: "
+  ask "Email for SSL certificate: "
   read -r ADMIN_EMAIL
-  [[ -z "$ADMIN_EMAIL" ]] && error "Email obligatoriu pentru Let's Encrypt."
+  [[ -z "$ADMIN_EMAIL" ]] && error "Email required for Let's Encrypt."
 fi
 
 [[ "$USE_TLS" =~ ^[Yy]$ ]] && SCHEME="https" && WS_SCHEME="wss" || SCHEME="http" && WS_SCHEME="ws"
 
 # ── .env ──────────────────────────────────────────────────
-step "Credențiale"
+step "Credentials"
 
 if [[ -f .env ]]; then
-  warn ".env există — păstrez secretele. Șterge .env pentru a regenera."
+  warn ".env exists — keeping the secrets. Delete .env to regenerate."
   set -a; source .env 2>/dev/null || true; set +a
 else
   PG_PASS=$(openssl rand -hex 24)
@@ -155,7 +155,7 @@ TURN_SECRET=${TURN_SEC}
 EOF
   chmod 600 .env
 
-  info "Creat .env cu secrete random:"
+  info "Created .env with random secrets:"
   info "  DB password:   ${PG_PASS:0:8}…"
   info "  JWT secret:    ${JWT_SEC:0:8}…"
   info "  TURN secret:   ${TURN_SEC:0:8}…"
@@ -166,34 +166,34 @@ fi
 step "config.json"
 
 if [[ "$MODE" == "prod-nginx" ]]; then
-  # nginx pe același domeniu → căi relative
+  # nginx on the same domain → relative paths
   cat > config.json << 'EOF'
 {
   "apiUrl": "/api",
   "signalingUrl": "/ws"
 }
 EOF
-  info "config.json: căi relative (nginx proxy intern)"
+  info "config.json: relative paths (internal nginx proxy)"
 else
-  # Fără nginx → URL-uri absolute cu port
+  # No nginx → absolute URLs with port
   cat > config.json << EOF
 {
   "apiUrl": "${SCHEME}://${DOMAIN}:8000",
   "signalingUrl": "${WS_SCHEME}://${DOMAIN}:8001/ws"
 }
 EOF
-  info "config.json: URL-uri directe (${SCHEME}://${DOMAIN}:8000)"
+  info "config.json: direct URLs (${SCHEME}://${DOMAIN}:8000)"
 fi
 
 # ── TLS ───────────────────────────────────────────────────
 if [[ "$USE_TLS" =~ ^[Yy]$ ]]; then
-  step "Certificate SSL"
+  step "SSL certificates"
 
   if ! command -v certbot &>/dev/null; then
-    info "Instalez certbot..."
+    info "Installing certbot..."
     if   command -v apt-get &>/dev/null; then apt-get install -y certbot
     elif command -v dnf     &>/dev/null; then dnf install -y certbot
-    else error "Instalează certbot manual și re-rulează."; fi
+    else error "Install certbot manually and re-run."; fi
   fi
 
   certbot certonly --standalone -d "$DOMAIN" \
@@ -203,7 +203,7 @@ if [[ "$USE_TLS" =~ ^[Yy]$ ]]; then
   cp /etc/letsencrypt/live/"$DOMAIN"/fullchain.pem nginx/certs/cert.pem
   cp /etc/letsencrypt/live/"$DOMAIN"/privkey.pem   nginx/certs/key.pem
   chmod 600 nginx/certs/key.pem
-  info "Certificate copiate în nginx/certs/"
+  info "Certificates copied to nginx/certs/"
 
   cat > nginx/default.conf << 'NGINXEOF'
 upstream api       { server api:8000; }
@@ -258,32 +258,32 @@ server {
     }
 }
 NGINXEOF
-  info "nginx configurat pentru HTTPS + redirect HTTP→HTTPS"
+  info "nginx configured for HTTPS + HTTP→HTTPS redirect"
 fi
 
-# ── Build și pornire ──────────────────────────────────────
-step "Build și pornire"
+# ── Build and start ──────────────────────────────────────
+step "Build and start"
 
 COMPOSE_FILE="docker-compose.yml"
 [[ "$MODE" == "prod-direct" ]] && COMPOSE_FILE="docker-compose.no-nginx.yml"
 
-info "Construiesc imagini (prima rulare ~3 min)..."
+info "Building images (first run ~3 min)..."
 docker compose -f "$COMPOSE_FILE" up -d --build
 
-info "Aștept API + migrări..."
+info "Waiting for API + migrations..."
 for i in $(seq 1 60); do
   code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://localhost:8000/health 2>/dev/null || echo "000")
   [[ "$code" == "200" ]] && break
   sleep 3
 done
-[[ "$code" != "200" ]] && warn "API nu a răspuns în 3 min — verifică: docker compose -f $COMPOSE_FILE logs api"
+[[ "$code" != "200" ]] && warn "API did not respond within 3 min — check: docker compose -f $COMPOSE_FILE logs api"
 
-# ── Succes ────────────────────────────────────────────────
+# ── Success ────────────────────────────────────────────────
 [[ "$MODE" == "prod-direct" ]] && DASHBOARD_URL="${SCHEME}://${DOMAIN}" || DASHBOARD_URL="${SCHEME}://${DOMAIN}"
 
 echo ""
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}${BOLD}  PeerDesk instalat cu succes!${NC}"
+echo -e "${GREEN}${BOLD}  PeerDesk installed successfully!${NC}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  Dashboard  →  ${BLUE}${BOLD}${DASHBOARD_URL}${NC}"
@@ -292,22 +292,22 @@ if [[ "$MODE" == "prod-direct" ]]; then
   echo -e "  Signaling  →  ${WS_SCHEME}://${DOMAIN}:8001/ws"
 fi
 echo ""
-echo "  Pași următori:"
-echo "    1. Deschide dashboard-ul și creează-ți contul"
-echo "    2. Instalează agentul pe mașinile de controlat:"
+echo "  Next steps:"
+echo "    1. Open the dashboard and create your account"
+echo "    2. Install the agent on the machines to control:"
 echo ""
-echo -e "       ${BOLD}PEERDESK_PASSWORD=<parola> \\"
+echo -e "       ${BOLD}PEERDESK_PASSWORD=<password> \\"
 echo -e "       SIGNALING_URL=${WS_SCHEME}://${DOMAIN}/ws \\"
 echo -e "       ./peerdesk-agent${NC}"
 echo ""
-echo "  Actualizare ulterioară:"
+echo "  Later updates:"
 echo "    cd ${SCRIPT_DIR} && bash install.sh"
 echo ""
-echo "  Gestiune:"
+echo "  Management:"
 echo "    docker compose -f ${SCRIPT_DIR}/${COMPOSE_FILE} ps"
 echo "    docker compose -f ${SCRIPT_DIR}/${COMPOSE_FILE} logs -f"
 echo "    docker compose -f ${SCRIPT_DIR}/${COMPOSE_FILE} down"
 echo ""
 echo "  Config:   ${SCRIPT_DIR}/config.json"
-echo "  Secrete:  ${SCRIPT_DIR}/.env"
+echo "  Secrets:  ${SCRIPT_DIR}/.env"
 echo ""
