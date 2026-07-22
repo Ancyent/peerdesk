@@ -96,7 +96,7 @@ export function NetworkSettings() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1c2128' }}>
           <div style={{ fontSize: 12, color: '#e6ebf1' }}>{t('settings:network.statusLabel')}</div>
           <div style={{ padding: '3px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600, background: '#1a3a1a', color: '#56d364' }}>
-            ● {status.approval_status === 'standalone' ? t('settings:network.statusConnectedStandalone') : status.approval_status}
+            ● {t('settings:network.status.' + status.approval_status)}
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>

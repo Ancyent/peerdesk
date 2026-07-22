@@ -28,7 +28,7 @@ export function GeneralSettings({ settings, updateSetting }: Props) {
           <Toggle value={settings[item.key]} onChange={v => updateSetting(item.key, v)} />
         </div>
       ))}
-      <div style={{ fontSize: 10, color: '#b3bdca', letterSpacing: 1, fontWeight: 600, marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #21262d', textTransform: 'uppercase', marginTop: 24 }}>{t('settings:general.language')}</div>
+      <div style={{ fontSize: 10, color: '#b3bdca', letterSpacing: 1, fontWeight: 600, marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #21262d', textTransform: 'uppercase', marginTop: 24 }}>{t('settings:general.sectionLocalization')}</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
         <div style={{ fontSize: 12, color: '#e6ebf1' }}>{t('settings:general.language')}</div>
         <select

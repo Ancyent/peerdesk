@@ -30,6 +30,7 @@
       "label": "Minimizează în tray la închidere",
       "desc": "Continuă să ruleze în fundal când fereastra este închisă"
     },
+    "sectionLocalization": "Localizare",
     "language": "Limbă"
   },
   "network": {
@@ -47,7 +48,12 @@
     "toastError": "✗ {{message}}",
     "sectionConnectionStatus": "Stare conexiune",
     "statusLabel": "Stare",
-    "statusConnectedStandalone": "Conectat (independent)",
+    "status": {
+      "pending": "În așteptare",
+      "approved": "Aprobat",
+      "denied": "Refuzat",
+      "standalone": "Conectat (independent)"
+    },
     "peerIdLabel": "ID Peer"
   },
   "access": {

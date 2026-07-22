@@ -30,6 +30,7 @@
       "label": "Minimize to tray on close",
       "desc": "Keep running in the background when window is closed"
     },
+    "sectionLocalization": "Localization",
     "language": "Language"
   },
   "network": {
@@ -47,7 +48,12 @@
     "toastError": "✗ {{message}}",
     "sectionConnectionStatus": "Connection Status",
     "statusLabel": "Status",
-    "statusConnectedStandalone": "Connected (standalone)",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "denied": "Denied",
+      "standalone": "Connected (standalone)"
+    },
     "peerIdLabel": "Peer ID"
   },
   "access": {
