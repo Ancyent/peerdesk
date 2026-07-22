@@ -1,0 +1,31 @@
+{
+  "thisDevice": {
+    "title": "This Device",
+    "password": "Password",
+    "passwordHidden": "•••••• — reset to set a visible password",
+    "show": "Show",
+    "hide": "Hide",
+    "copyPassword": "Copy password",
+    "resetPassword": "Reset password",
+    "newPassword": "New password — copy now:",
+    "copy": "Copy",
+    "status": {
+      "denied": "Denied",
+      "pending": "Pending",
+      "approved": "Approved"
+    },
+    "accessMode": "Access mode",
+    "agentNotRunning": "Agent not running",
+    "starting": "Starting…",
+    "startAgent": "Start Agent"
+  },
+  "connect": {
+    "title": "Connect to Remote",
+    "placeholder": "Enter Peer ID  (e.g. 987 654 321)",
+    "button": "Connect"
+  },
+  "recent": {
+    "title": "Recent",
+    "empty": "No recent connections"
+  }
+}

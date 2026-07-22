@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { useAgentContext, useSettingsContext } from '../context/AppContext';
 import { ModeDropdown } from '../components/ModeDropdown';
@@ -13,6 +14,7 @@ interface Props {
 const fmt = (id: string) => id.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
 
 export function HomeScreen({ onConnect }: Props) {
+  const { t } = useTranslation('home');
   const { status, loading, start } = useAgentContext();
   const { settings, updateSetting } = useSettingsContext();
   const [connectId, setConnectId] = useState('');
@@ -44,7 +46,7 @@ export function HomeScreen({ onConnect }: Props) {
       {/* Left: This Device */}
       <div style={{ flex: 1, background: '#161b22', borderRadius: 10, padding: 18, border: '1px solid #21262d', overflow: 'auto' }}>
         <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, fontWeight: 700, marginBottom: 14, textTransform: 'uppercase' }}>
-          This Device
+          {t('home:thisDevice.title')}
         </div>
 
         {status.peer_id ? (
@@ -53,19 +55,19 @@ export function HomeScreen({ onConnect }: Props) {
               {fmt(status.peer_id)}
             </div>
 
-            <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 5 }}>Password</div>
+            <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 5 }}>{t('home:thisDevice.password')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
               {status.password ? (
                 <div style={{ fontSize: 18, color: '#26c6da', letterSpacing: 2, flex: 1, fontFamily: 'monospace', fontWeight: 600 }}>
                   {showPwd ? status.password : '•'.repeat(status.password.length)}
                 </div>
               ) : (
-                <div style={{ fontSize: 13, color: '#b3bdca', flex: 1 }}>•••••• — reset to set a visible password</div>
+                <div style={{ fontSize: 13, color: '#b3bdca', flex: 1 }}>{t('home:thisDevice.passwordHidden')}</div>
               )}
               {status.password && (
                 <button
                   onClick={() => setShowPwd((v) => !v)}
-                  title={showPwd ? 'Hide' : 'Show'}
+                  title={showPwd ? t('home:thisDevice.hide') : t('home:thisDevice.show')}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'rgba(38,198,218,0.10)', border: '1px solid rgba(38,198,218,0.30)', borderRadius: 6, color: '#26c6da', cursor: 'pointer' }}
                 >
                   {showPwd ? (
@@ -78,7 +80,7 @@ export function HomeScreen({ onConnect }: Props) {
               {status.password && (
                 <button
                   onClick={() => navigator.clipboard.writeText(status.password!)}
-                  title="Copy password"
+                  title={t('home:thisDevice.copyPassword')}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'rgba(38,198,218,0.10)', border: '1px solid rgba(38,198,218,0.30)', borderRadius: 6, color: '#26c6da', cursor: 'pointer' }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
@@ -86,7 +88,7 @@ export function HomeScreen({ onConnect }: Props) {
               )}
               <button
                 onClick={handleResetPwd}
-                title="Reset password"
+                title={t('home:thisDevice.resetPassword')}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, background: 'rgba(38,198,218,0.10)', border: '1px solid rgba(38,198,218,0.30)', borderRadius: 6, color: '#26c6da', cursor: 'pointer' }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
@@ -95,10 +97,10 @@ export function HomeScreen({ onConnect }: Props) {
 
             {newPwd && (
               <div style={{ background: '#0a2a2e', border: '1px solid #26c6da', borderRadius: 6, padding: 10, marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: '#b3bdca', marginBottom: 4 }}>New password — copy now:</div>
+                <div style={{ fontSize: 10, color: '#b3bdca', marginBottom: 4 }}>{t('home:thisDevice.newPassword')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <code style={{ flex: 1, fontSize: 12, color: '#26c6da', fontFamily: 'monospace' }}>{newPwd}</code>
-                  <button onClick={() => { navigator.clipboard.writeText(newPwd!); setNewPwd(null); }} style={{ background: '#26c6da', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 10, color: '#0d1117', fontWeight: 700, cursor: 'pointer' }}>Copy</button>
+                  <button onClick={() => { navigator.clipboard.writeText(newPwd!); setNewPwd(null); }} style={{ background: '#26c6da', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 10, color: '#0d1117', fontWeight: 700, cursor: 'pointer' }}>{t('home:thisDevice.copy')}</button>
                 </div>
               </div>
             )}
@@ -110,7 +112,7 @@ export function HomeScreen({ onConnect }: Props) {
                   background: denied ? '#3a1a1a' : status.approval_status === 'pending' ? '#3a2a0a' : '#1a3a1a',
                   color: denied ? '#f85149' : status.approval_status === 'pending' ? '#e3b341' : '#56d364',
                 }}>
-                  ● {denied ? 'Denied' : status.approval_status === 'pending' ? 'Pending' : 'Approved'}
+                  ● {denied ? t('home:thisDevice.status.denied') : status.approval_status === 'pending' ? t('home:thisDevice.status.pending') : t('home:thisDevice.status.approved')}
                 </span>
               )}
               {status.server_url && (
@@ -124,14 +126,14 @@ export function HomeScreen({ onConnect }: Props) {
               <SecurityCodeBanner code={securityCode} onDismiss={() => setSecurityCode(null)} />
             )}
 
-            <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 5 }}>Access mode</div>
+            <div style={{ fontSize: 10, color: '#93a0b2', marginBottom: 5 }}>{t('home:thisDevice.accessMode')}</div>
             <ModeDropdown value={settings.access_mode} onChange={(m) => updateSetting('access_mode', m)} />
           </>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 12, color: '#b3bdca' }}>Agent not running</div>
+            <div style={{ fontSize: 12, color: '#b3bdca' }}>{t('home:thisDevice.agentNotRunning')}</div>
             <button onClick={start} disabled={loading} style={{ background: '#26c6da', color: '#0d1117', border: 'none', borderRadius: 6, padding: '8px 0', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
-              {loading ? 'Starting…' : 'Start Agent'}
+              {loading ? t('home:thisDevice.starting') : t('home:thisDevice.startAgent')}
             </button>
           </div>
         )}
@@ -140,14 +142,14 @@ export function HomeScreen({ onConnect }: Props) {
       {/* Right: Connect to Remote */}
       <div style={{ flex: 1, background: '#161b22', borderRadius: 10, padding: 18, border: '1px solid #21262d', overflow: 'auto' }}>
         <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, fontWeight: 700, marginBottom: 14, textTransform: 'uppercase' }}>
-          Connect to Remote
+          {t('home:connect.title')}
         </div>
 
         <input
           value={connectId}
           onChange={e => setConnectId(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && cleanId.length === 9 && handleConnect(cleanId)}
-          placeholder="Enter Peer ID  (e.g. 987 654 321)"
+          placeholder={t('home:connect.placeholder')}
           style={{ width: '100%', background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '9px 12px', fontSize: 12, color: '#e6ebf1', marginBottom: 8, boxSizing: 'border-box', outline: 'none' }}
         />
         <button
@@ -155,13 +157,13 @@ export function HomeScreen({ onConnect }: Props) {
           disabled={cleanId.length !== 9}
           style={{ width: '100%', background: '#26c6da', color: '#0d1117', border: 'none', borderRadius: 6, padding: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 16, opacity: cleanId.length !== 9 ? 0.5 : 1 }}
         >
-          Connect
+          {t('home:connect.button')}
         </button>
 
-        <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>Recent</div>
+        <div style={{ fontSize: 9, color: '#93a0b2', letterSpacing: 2, marginBottom: 8, textTransform: 'uppercase' }}>{t('home:recent.title')}</div>
         {recents.length === 0 ? (
           <div style={{ fontSize: 11, color: '#93a0b2', padding: '10px 0', textAlign: 'center' }}>
-            No recent connections
+            {t('home:recent.empty')}
           </div>
         ) : (
           recents.map(r => (

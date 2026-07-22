@@ -1,0 +1,31 @@
+{
+  "thisDevice": {
+    "title": "Acest dispozitiv",
+    "password": "Parolă",
+    "passwordHidden": "•••••• — resetează pentru a seta o parolă vizibilă",
+    "show": "Arată",
+    "hide": "Ascunde",
+    "copyPassword": "Copiază parola",
+    "resetPassword": "Resetează parola",
+    "newPassword": "Parolă nouă — copiaz-o acum:",
+    "copy": "Copiază",
+    "status": {
+      "denied": "Refuzat",
+      "pending": "În așteptare",
+      "approved": "Aprobat"
+    },
+    "accessMode": "Mod de acces",
+    "agentNotRunning": "Agentul nu rulează",
+    "starting": "Se pornește…",
+    "startAgent": "Pornește agentul"
+  },
+  "connect": {
+    "title": "Conectare la distanță",
+    "placeholder": "Introdu ID Peer  (ex. 987 654 321)",
+    "button": "Conectează"
+  },
+  "recent": {
+    "title": "Recente",
+    "empty": "Nicio conexiune recentă"
+  }
+}
