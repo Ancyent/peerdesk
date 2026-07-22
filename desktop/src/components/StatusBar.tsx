@@ -1,19 +1,22 @@
+import { useTranslation } from 'react-i18next';
+
 interface StatusBarProps {
   approvalStatus: 'pending' | 'approved' | 'denied' | 'standalone';
   serverUrl: string | null;
 }
 
 export function StatusBar({ approvalStatus, serverUrl }: StatusBarProps) {
+  const { t } = useTranslation('app');
   const isPending = approvalStatus === 'pending';
   const isDenied = approvalStatus === 'denied';
 
   const text = isDenied
-    ? '⛔ Access denied — your device was rejected by the admin'
+    ? t('app:statusbar.accessDenied')
     : isPending
-      ? '⏳ Pending admin approval — check your dashboard'
+      ? t('app:statusbar.pendingApproval')
       : serverUrl
-        ? `Connected to ${serverUrl.replace(/^https?:\/\//, '')}`
-        : 'Running in standalone mode';
+        ? t('app:statusbar.connectedTo', { host: serverUrl.replace(/^https?:\/\//, '') })
+        : t('app:statusbar.standalone');
 
   const background = isDenied
     ? '#5c1010'

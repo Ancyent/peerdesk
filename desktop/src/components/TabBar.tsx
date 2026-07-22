@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Session } from '../types';
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSettings }: Props) {
+  const { t } = useTranslation('app');
   const tabStyle = (id: string): CSSProperties => ({
     background: 'none',
     border: 'none',
@@ -29,7 +31,7 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
   return (
     <div style={{ background: '#161b22', padding: '0 8px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #21262d', flexShrink: 0, overflowX: 'auto' }}>
       <button style={tabStyle('home')} onClick={() => onTabSelect('home')}>
-        Home
+        {t('app:tabbar.home')}
       </button>
 
       {sessions.map(s => (
@@ -46,7 +48,7 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
             type="button"
             onClick={e => { e.stopPropagation(); onTabClose(s.id); }}
             style={{ background: 'none', border: 'none', opacity: 0.5, fontSize: 14, lineHeight: 1, cursor: 'pointer', padding: 0 }}
-            aria-label={`Close session ${s.id}`}
+            aria-label={t('app:tabbar.closeSession', { id: s.id })}
           >
             ×
           </button>
@@ -56,7 +58,7 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
       <button
         style={{ background: 'none', border: 'none', color: '#93a0b2', fontSize: 11, padding: '8px 10px', cursor: 'default', opacity: 0.3 }}
         disabled
-        title="Sessions open from Home only"
+        title={t('app:tabbar.sessionsHint')}
       >
         +
       </button>
@@ -66,7 +68,7 @@ export function TabBar({ sessions, activeTab, onTabSelect, onTabClose, onSetting
       <button
         onClick={onSettings}
         style={{ background: 'none', border: 'none', color: '#93a0b2', cursor: 'pointer', fontSize: 16, padding: '4px 8px', flexShrink: 0 }}
-        title="Settings"
+        title={t('app:tabbar.settings')}
       >
         ⚙
       </button>

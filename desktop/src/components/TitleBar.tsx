@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const appWindow = getCurrentWindow();
@@ -7,6 +8,7 @@ const appWindow = getCurrentWindow();
  *  PeerDesk dark theme. Window controls are wired to the Tauri window API;
  *  the bar background is a Tauri drag region so the window stays movable. */
 export function TitleBar() {
+  const { t } = useTranslation('app');
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -84,8 +86,8 @@ export function TitleBar() {
           onMouseEnter={(e) => hover(e, true)}
           onMouseLeave={(e) => hover(e, false)}
           onClick={() => appWindow.minimize()}
-          title="Minimize"
-          aria-label="Minimize"
+          title={t('app:titlebar.minimize')}
+          aria-label={t('app:titlebar.minimize')}
         >
           <svg width="11" height="11" viewBox="0 0 11 11"><rect x="1" y="5" width="9" height="1.2" fill="currentColor" /></svg>
         </button>
@@ -94,8 +96,8 @@ export function TitleBar() {
           onMouseEnter={(e) => hover(e, true)}
           onMouseLeave={(e) => hover(e, false)}
           onClick={() => appWindow.toggleMaximize()}
-          title={maximized ? 'Restore' : 'Maximize'}
-          aria-label={maximized ? 'Restore' : 'Maximize'}
+          title={maximized ? t('app:titlebar.restore') : t('app:titlebar.maximize')}
+          aria-label={maximized ? t('app:titlebar.restore') : t('app:titlebar.maximize')}
         >
           {maximized ? (
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.1">
@@ -112,8 +114,8 @@ export function TitleBar() {
           onMouseEnter={(e) => hover(e, true, true)}
           onMouseLeave={(e) => hover(e, false)}
           onClick={() => appWindow.close()}
-          title="Close"
-          aria-label="Close"
+          title={t('app:titlebar.close')}
+          aria-label={t('app:titlebar.close')}
         >
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.2">
             <path d="M1.5 1.5 L9.5 9.5 M9.5 1.5 L1.5 9.5" />

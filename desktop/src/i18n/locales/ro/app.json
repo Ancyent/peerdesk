@@ -1,0 +1,26 @@
+{
+  "titlebar": {
+    "minimize": "Minimizează",
+    "maximize": "Maximizează",
+    "restore": "Restaurează",
+    "close": "Închide"
+  },
+  "tabbar": {
+    "home": "Acasă",
+    "closeSession": "Închide sesiunea {{id}}",
+    "sessionsHint": "Sesiunile se deschid doar din Acasă",
+    "settings": "Setări"
+  },
+  "statusbar": {
+    "accessDenied": "⛔ Acces refuzat — dispozitivul tău a fost respins de administrator",
+    "pendingApproval": "⏳ În așteptarea aprobării administratorului — verifică panoul tău",
+    "connectedTo": "Conectat la {{host}}",
+    "standalone": "Rulează în mod independent"
+  },
+  "updateBadge": {
+    "updateTooltip": "Actualizare disponibilă: v{{version}} — apasă pentru descărcare",
+    "linkCopied": "Link copiat — deschide în browser",
+    "updateAvailable": "Actualizare disponibilă · v{{version}}",
+    "upToDate": "la zi"
+  }
+}

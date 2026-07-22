@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -21,6 +22,7 @@ function cmpVer(a: string, b: string): number {
 /** Bottom-right version badge; checks GitHub for a newer release and offers a
  *  one-click jump to the download page when one is available. */
 export function UpdateBadge() {
+  const { t } = useTranslation('app');
   const [current, setCurrent] = useState('');
   const [latest, setLatest] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -53,7 +55,7 @@ export function UpdateBadge() {
       {updateAvailable ? (
         <button
           onClick={goToRelease}
-          title={`Update available: v${latest} — click to download`}
+          title={t('app:updateBadge.updateTooltip', { version: latest })}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             background: 'rgba(38,198,218,0.12)', border: '1px solid rgba(38,198,218,0.45)',
@@ -62,11 +64,11 @@ export function UpdateBadge() {
           }}
         >
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#26c6da', boxShadow: '0 0 6px #26c6da', animation: 'pulsedot 2s infinite' }} />
-          {copied ? 'Link copied — open in browser' : `Update available · v${latest}`}
+          {copied ? t('app:updateBadge.linkCopied') : t('app:updateBadge.updateAvailable', { version: latest })}
         </button>
       ) : (
         <span style={{ fontSize: 10, color: '#5b6675', padding: '3px 8px' }}>
-          v{current || '—'}{latest && current ? ' · up to date' : ''}
+          v{current || '—'}{latest && current ? ` · ${t('app:updateBadge.upToDate')}` : ''}
         </span>
       )}
       <style>{`@keyframes pulsedot{0%,100%{opacity:1}50%{opacity:.35}}`}</style>

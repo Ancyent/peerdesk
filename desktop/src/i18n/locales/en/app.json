@@ -1,0 +1,26 @@
+{
+  "titlebar": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  },
+  "tabbar": {
+    "home": "Home",
+    "closeSession": "Close session {{id}}",
+    "sessionsHint": "Sessions open from Home only",
+    "settings": "Settings"
+  },
+  "statusbar": {
+    "accessDenied": "⛔ Access denied — your device was rejected by the admin",
+    "pendingApproval": "⏳ Pending admin approval — check your dashboard",
+    "connectedTo": "Connected to {{host}}",
+    "standalone": "Running in standalone mode"
+  },
+  "updateBadge": {
+    "updateTooltip": "Update available: v{{version}} — click to download",
+    "linkCopied": "Link copied — open in browser",
+    "updateAvailable": "Update available · v{{version}}",
+    "upToDate": "up to date"
+  }
+}
