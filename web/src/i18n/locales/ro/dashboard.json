@@ -1,0 +1,32 @@
+{
+  "branding": "Branding",
+  "logout": "Deconectare",
+  "machines": {
+    "heading": "Mașinile mele",
+    "idLabel": "ID:",
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "lastSeen": "ultima dată online {{date}}",
+    "connect": "Conectează",
+    "empty": {
+      "title": "Nicio mașină înregistrată încă",
+      "hint": "Pornește agentul PeerDesk pe o mașină cu tokenul tău API pentru a o înregistra aici."
+    }
+  },
+  "errors": {
+    "loadFailed": "Nu am putut încărca mașinile"
+  },
+  "viewer": {
+    "connecting": "Conectare în curs...",
+    "sessionEnded": "Sesiunea s-a încheiat",
+    "back": "Înapoi",
+    "errors": {
+      "wrongCredentials": "ID sau parolă greșită",
+      "machineNotFound": "Mașina nu a fost găsită",
+      "remoteDisconnected": "Mașina la distanță s-a deconectat",
+      "connectionDenied": "Conexiune refuzată"
+    }
+  }
+}

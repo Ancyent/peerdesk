@@ -1,0 +1,33 @@
+{
+  "title": "Branding",
+  "back": "Înapoi",
+  "logo": {
+    "label": "Logo",
+    "previewAlt": "previzualizare logo",
+    "alt": "logo",
+    "change": "Schimbă logo",
+    "upload": "Încarcă logo",
+    "remove": "Elimină",
+    "hint": "PNG, JPG sau SVG. Maximum 512 KB."
+  },
+  "brandName": {
+    "label": "Nume brand"
+  },
+  "accentColor": {
+    "label": "Culoare accent"
+  },
+  "preview": {
+    "label": "Previzualizare live",
+    "connect": "Conectează"
+  },
+  "actions": {
+    "save": "Salvează branding-ul",
+    "saving": "Se salvează…",
+    "saved": "✓ Salvat",
+    "reset": "Resetează la implicit"
+  },
+  "errors": {
+    "logoTooLarge": "Logo-ul trebuie să aibă sub 512 KB",
+    "saveFailed": "Salvarea a eșuat"
+  }
+}

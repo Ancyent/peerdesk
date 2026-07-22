@@ -1,0 +1,33 @@
+{
+  "title": "Branding",
+  "back": "Back",
+  "logo": {
+    "label": "Logo",
+    "previewAlt": "logo preview",
+    "alt": "logo",
+    "change": "Change Logo",
+    "upload": "Upload Logo",
+    "remove": "Remove",
+    "hint": "PNG, JPG, or SVG. Max 512 KB."
+  },
+  "brandName": {
+    "label": "Brand Name"
+  },
+  "accentColor": {
+    "label": "Accent Color"
+  },
+  "preview": {
+    "label": "Live Preview",
+    "connect": "Connect"
+  },
+  "actions": {
+    "save": "Save Branding",
+    "saving": "Saving…",
+    "saved": "✓ Saved",
+    "reset": "Reset to Default"
+  },
+  "errors": {
+    "logoTooLarge": "Logo must be under 512 KB",
+    "saveFailed": "Save failed"
+  }
+}

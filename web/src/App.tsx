@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from './auth/useAuth';
 import { api, type MachineOut } from './api/client';
 import { LoginPage } from './pages/LoginPage';
@@ -35,6 +36,7 @@ import { coerceOs, type OsId } from './pages/downloads/osData';
 type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer' | 'invite';
 
 export default function App() {
+  const { t } = useTranslation(['dashboard', 'common']);
   const { user, loading, setSessionActive, accessToken, role } = useAuth();
   const initialRoute = parsePath(window.location.pathname);
   const [page, setPage] = useState<FullPage>(initialRoute.page);
@@ -159,10 +161,10 @@ export default function App() {
       }
       autoSavedMachineRef.current = null;
       pendingSaveRef.current = null;
-      setErrMsg(msg.code === 'unauthorized' ? 'Wrong ID or password' : 'Machine not found'); setViewerState('error'); setPage('connect');
+      setErrMsg(msg.code === 'unauthorized' ? t('dashboard:viewer.errors.wrongCredentials') : t('dashboard:viewer.errors.machineNotFound')); setViewerState('error'); setPage('connect');
     }
-    else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg('Remote machine disconnected'); setViewerState('error'); go('machines'); }
-    else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? 'Connection denied'); setViewerState('error'); setPage('connect'); }
+    else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg(t('dashboard:viewer.errors.remoteDisconnected')); setViewerState('error'); go('machines'); }
+    else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? t('dashboard:viewer.errors.connectionDenied')); setViewerState('error'); setPage('connect'); }
     else if (msg.type === 'session_mode')  { setSessionMode(msg.mode); }
     else if (msg.type === 'display_list')  {
       setDisplays(msg.displays);
@@ -205,7 +207,7 @@ export default function App() {
   }, [send]);
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9ca3af', fontFamily: 'sans-serif' }}>Loading…</div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9ca3af', fontFamily: 'sans-serif' }}>{t('common:loading')}</div>
   );
 
   if (!user) {
@@ -237,7 +239,7 @@ export default function App() {
         }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-2)', fontSize: 14 }}>Conectare în curs...</div>
+          <div style={{ color: 'var(--text-2)', fontSize: 14 }}>{t('dashboard:viewer.connecting')}</div>
           <div style={{ color: 'var(--text-3)', fontSize: 12, fontFamily: 'monospace', marginTop: 6 }}>
             {connectPeerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1 · $2 · $3')}
           </div>
@@ -299,11 +301,11 @@ export default function App() {
         height: '100vh', background: 'var(--bg-base)', gap: 16,
         fontFamily: 'system-ui, sans-serif',
       }}>
-        <div style={{ color: 'var(--text-2)', fontSize: 14 }}>{errMsg || 'Sesiunea s-a încheiat'}</div>
+        <div style={{ color: 'var(--text-2)', fontSize: 14 }}>{errMsg || t('dashboard:viewer.sessionEnded')}</div>
         <button onClick={() => { setViewerState('idle'); setPage('connect'); }}
           style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--border-dim)',
             background: 'var(--bg-hover)', color: 'var(--text-1)', cursor: 'pointer', fontSize: 13 }}>
-          Înapoi
+          {t('dashboard:viewer.back')}
         </button>
       </div>
     );

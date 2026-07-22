@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api } from '../api/client';
 import { applyBranding } from '../hooks/useBranding';
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function BrandingPage({ onBack }: Props) {
+  const { t } = useTranslation('branding');
   const { accessToken } = useAuth();
   const [brandName, setBrandName] = useState('PeerDesk');
   const [accentColor, setAccentColor] = useState('#2563eb');
@@ -31,7 +33,7 @@ export function BrandingPage({ onBack }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 512 * 1024) {
-      setError('Logo must be under 512 KB');
+      setError(t('branding:errors.logoTooLarge'));
       return;
     }
     const reader = new FileReader();
@@ -55,7 +57,7 @@ export function BrandingPage({ onBack }: Props) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Save failed');
+      setError(err instanceof Error ? err.message : t('branding:errors.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -81,11 +83,11 @@ export function BrandingPage({ onBack }: Props) {
     <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 600, margin: '0 auto', padding: '24px 16px', background: 'var(--bg-base)', minHeight: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28, paddingBottom: 16, borderBottom: '1px solid var(--border-dim)' }}>
-        <button onClick={onBack} title="Înapoi" aria-label="Înapoi"
+        <button onClick={onBack} title={t('branding:back')} aria-label={t('branding:back')}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 20, lineHeight: 1, padding: '0 4px' }}>
           ←
         </button>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--text-1)' }}>Branding</h1>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--text-1)' }}>{t('branding:title')}</h1>
       </div>
 
       {error && (
@@ -98,33 +100,33 @@ export function BrandingPage({ onBack }: Props) {
         {/* Logo */}
         <div>
           <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 8, color: 'var(--text-2)' }}>
-            Logo
+            {t('branding:logo.label')}
           </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {logoDataUrl && (
               <div style={{ border: '1px solid var(--border-dim)', borderRadius: 6, padding: 6, background: 'var(--bg-surface)' }}>
-                <img src={logoDataUrl} alt="logo preview" style={{ height: 36, objectFit: 'contain', display: 'block' }} />
+                <img src={logoDataUrl} alt={t('branding:logo.previewAlt')} style={{ height: 36, objectFit: 'contain', display: 'block' }} />
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
             <button onClick={() => fileRef.current?.click()}
               style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border-dim)', background: 'var(--bg-hover)', cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>
-              {logoDataUrl ? 'Change Logo' : 'Upload Logo'}
+              {logoDataUrl ? t('branding:logo.change') : t('branding:logo.upload')}
             </button>
             {logoDataUrl && (
               <button onClick={() => setLogoDataUrl(null)}
                 style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid var(--red)', background: 'var(--red-bg)', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}>
-                Remove
+                {t('branding:logo.remove')}
               </button>
             )}
           </div>
-          <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-3)' }}>PNG, JPG, or SVG. Max 512 KB.</p>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-3)' }}>{t('branding:logo.hint')}</p>
         </div>
 
         {/* Brand name */}
         <div>
           <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 8, color: 'var(--text-2)' }}>
-            Brand Name
+            {t('branding:brandName.label')}
           </label>
           <input
             type="text"
@@ -139,7 +141,7 @@ export function BrandingPage({ onBack }: Props) {
         {/* Accent color */}
         <div>
           <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 8, color: 'var(--text-2)' }}>
-            Accent Color
+            {t('branding:accentColor.label')}
           </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <input
@@ -162,11 +164,11 @@ export function BrandingPage({ onBack }: Props) {
         {/* Live preview */}
         <div style={{ border: '1px solid var(--border-dim)', borderRadius: 8, overflow: 'hidden' }}>
           <div style={{ padding: '10px 14px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-dim)' }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>Live Preview</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>{t('branding:preview.label')}</span>
           </div>
           <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, background: 'var(--bg-hover)' }}>
             {logoDataUrl ? (
-              <img src={logoDataUrl} alt="logo" style={{ height: 44, objectFit: 'contain' }} />
+              <img src={logoDataUrl} alt={t('branding:logo.alt')} style={{ height: 44, objectFit: 'contain' }} />
             ) : (
               <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)' }}>{brandName || 'PeerDesk'}</span>
             )}
@@ -174,7 +176,7 @@ export function BrandingPage({ onBack }: Props) {
               padding: '10px 24px', background: accentColor, color: 'var(--text-1)',
               border: 'none', borderRadius: 6, fontSize: 15, cursor: 'default', fontWeight: 500,
             }}>
-              Connect
+              {t('branding:preview.connect')}
             </button>
           </div>
         </div>
@@ -190,7 +192,7 @@ export function BrandingPage({ onBack }: Props) {
               fontWeight: 500, opacity: saving ? 0.7 : 1,
             }}
           >
-            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Branding'}
+            {saving ? t('branding:actions.saving') : saved ? t('branding:actions.saved') : t('branding:actions.save')}
           </button>
           <button
             onClick={handleReset}
@@ -199,7 +201,7 @@ export function BrandingPage({ onBack }: Props) {
               border: '1px solid var(--border-dim)', borderRadius: 6, fontSize: 14, cursor: 'pointer',
             }}
           >
-            Reset to Default
+            {t('branding:actions.reset')}
           </button>
         </div>
       </div>

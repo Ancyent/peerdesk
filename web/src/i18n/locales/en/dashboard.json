@@ -1,0 +1,32 @@
+{
+  "branding": "Branding",
+  "logout": "Logout",
+  "machines": {
+    "heading": "My Machines",
+    "idLabel": "ID:",
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "lastSeen": "last seen {{date}}",
+    "connect": "Connect",
+    "empty": {
+      "title": "No machines registered yet",
+      "hint": "Start the PeerDesk agent on a machine with your API token to register it here."
+    }
+  },
+  "errors": {
+    "loadFailed": "Failed to load machines"
+  },
+  "viewer": {
+    "connecting": "Connecting...",
+    "sessionEnded": "Session ended",
+    "back": "Back",
+    "errors": {
+      "wrongCredentials": "Wrong ID or password",
+      "machineNotFound": "Machine not found",
+      "remoteDisconnected": "Remote machine disconnected",
+      "connectionDenied": "Connection denied"
+    }
+  }
+}
