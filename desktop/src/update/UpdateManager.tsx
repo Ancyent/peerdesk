@@ -69,7 +69,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const check = useCallback(async (manual = false) => {
-    if (manual) setForced(true);
+    setForced(manual);
     setStatus('checking');
     try {
       const info = await invoke<UpdateInfo | null>('check_for_update');

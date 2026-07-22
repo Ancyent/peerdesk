@@ -59,10 +59,10 @@ export function GeneralSettings({ settings, updateSetting }: Props) {
         <div style={{ fontSize: 11, color: '#b3bdca' }}>
           {update.status === 'checking'
             ? t('settings:general.checking')
-            : update.status === 'error'
-              ? t('settings:general.checkFailed')
-              : update.available
-                ? t('settings:general.updateReady', { version: update.latest })
+            : update.available
+              ? t('settings:general.updateReady', { version: update.latest })
+              : update.status === 'error'
+                ? t('settings:general.checkFailed')
                 : t('settings:general.upToDateNow')}
         </div>
         <button
