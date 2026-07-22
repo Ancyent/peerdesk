@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach } from 'vitest';
 import i18n from './index';
+import roCommon from './locales/ro/common.json';
+import enCommon from './locales/en/common.json';
 
 describe('language switching', () => {
   beforeEach(() => localStorage.clear());
@@ -16,8 +18,8 @@ describe('language switching', () => {
 
   it('common namespace resolves per language', async () => {
     await i18n.changeLanguage('ro');
-    expect(i18n.t('common:save')).toBe('Salvează');
+    expect(i18n.t('common:save')).toBe(roCommon.save);
     await i18n.changeLanguage('en');
-    expect(i18n.t('common:save')).toBe('Save');
+    expect(i18n.t('common:save')).toBe(enCommon.save);
   });
 });

@@ -6,10 +6,10 @@ const co = (id: string, name: string): CompanyOut => ({ id, name, created_at: ''
 const loc = (id: string, name: string, company_id: string): LocationOut => ({ id, name, company_id, created_at: '' });
 const grp = (id: string, name: string, location_id: string): GroupOut => ({ id, name, location_id, created_at: '' });
 
-// Company A [ Cluj [ Producție, Contabilitate ] ], Company B [ ]
+// Company A [ Cluj [ Production, Accounting ] ], Company B [ ]
 const companies = [co('a', 'Client A'), co('b', 'Client B')];
 const locsByCo = { a: [loc('a1', 'Cluj', 'a')] };
-const grpsByLoc = { a1: [grp('a1x', 'Producție', 'a1'), grp('a1y', 'Contabilitate', 'a1')] };
+const grpsByLoc = { a1: [grp('a1x', 'Production', 'a1'), grp('a1y', 'Accounting', 'a1')] };
 
 const build = () => buildPickerNodes(companies, locsByCo, grpsByLoc);
 const byKey = (nodes: PickerNode[], key: string) => nodes.find(n => n.key === key)!;
@@ -25,7 +25,7 @@ describe('buildPickerNodes', () => {
     const nodes = build();
     expect(byKey(nodes, 'company:a').path).toEqual(['Client A']);
     expect(byKey(nodes, 'location:a1').path).toEqual(['Client A', 'Cluj']);
-    expect(byKey(nodes, 'group:a1x').path).toEqual(['Client A', 'Cluj', 'Producție']);
+    expect(byKey(nodes, 'group:a1x').path).toEqual(['Client A', 'Cluj', 'Production']);
   });
 
   it('sets parentKey so ancestors are walkable for search', () => {
@@ -57,9 +57,9 @@ describe('filterNodes', () => {
   });
 
   it('a group match shows the group and its ancestors, and nothing else', () => {
-    // "Producție" is under Client A / Cluj. Its siblings (Contabilitate) and the
+    // "Production" is under Client A / Cluj. Its siblings (Accounting) and the
     // unrelated Client B must be absent, or the search leaks the rest of the tree.
-    expect(filterNodes(build(), 'producț')).toEqual(
+    expect(filterNodes(build(), 'produc')).toEqual(
       new Set(['group:a1x', 'location:a1', 'company:a']),
     );
   });
