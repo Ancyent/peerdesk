@@ -8,11 +8,10 @@
 # U+015E, U+015F).
 set -euo pipefail
 
-# web/ is now English-only (P1) except its Romanian translation catalog and the
-# native-language-names file (autonyms, i.e. each language's own name for
-# itself, are shown untranslated).
-# desktop/ stays fully excluded until P3.
-EXCLUDES=(':!desktop' ':!web/src/i18n/locales/ro' ':!web/src/i18n/languages.ts')
+# web/ and desktop/ are now English-only except their Romanian translation
+# catalogs and the native-language-names files (autonyms, i.e. each
+# language's own name for itself, are shown untranslated).
+EXCLUDES=(':!web/src/i18n/locales/ro' ':!web/src/i18n/languages.ts' ':!desktop/src/i18n/locales/ro' ':!desktop/src/i18n/languages.ts')
 PATTERN='[\x{0103}\x{00e2}\x{00ee}\x{0219}\x{021b}\x{0102}\x{00c2}\x{00ce}\x{0218}\x{021a}\x{015f}\x{015e}\x{0163}\x{0162}]'
 
 set +e
