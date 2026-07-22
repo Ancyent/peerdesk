@@ -1,5 +1,16 @@
 {
   "noSession": "Nicio sesiune",
   "refreshFailed": "Reînnoirea sesiunii a eșuat",
-  "sessionExpired": "Sesiune expirată"
+  "sessionExpired": "Sesiune expirată",
+  "server": {
+    "emailInUse": "Adresa de email este deja folosită",
+    "unsupportedLanguage": "Limbă neacceptată",
+    "currentPasswordIncorrect": "Parola actuală este incorectă",
+    "emailAlreadyRegistered": "Adresa de email este deja înregistrată",
+    "invalidCredentials": "Date de autentificare invalide",
+    "invalidOrExpiredInvitation": "Invitație invalidă sau expirată",
+    "nameAndPasswordRequired": "Numele și parola sunt obligatorii",
+    "accountNeedsOneAdmin": "Contul trebuie să păstreze cel puțin un administrator",
+    "grantTargetNotFound": "Ținta accesului nu a fost găsită"
+  }
 }

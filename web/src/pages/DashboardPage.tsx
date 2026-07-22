@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
-import { api, ApiError } from '../api/client';
+import { api } from '../api/client';
 import type { MachineOut } from '../api/client';
+import { localizeError } from '../api/errors';
 
 interface Props {
   onConnect: (peerId: string) => void;
@@ -20,7 +21,7 @@ export function DashboardPage({ onConnect, onBranding }: Props) {
     if (!accessToken) return;
     api.machines.list(accessToken)
       .then(setMachines)
-      .catch(err => setError(err instanceof ApiError ? err.message : t('dashboard:errors.loadFailed')))
+      .catch(err => setError(localizeError(err)))
       .finally(() => setLoading(false));
   }, [accessToken]);
 

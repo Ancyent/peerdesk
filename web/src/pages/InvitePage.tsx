@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError } from '../api/client';
+import { api } from '../api/client';
+import { localizeError } from '../api/errors';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
 
@@ -52,8 +53,10 @@ export function InvitePage({ token }: Props) {
     } catch (err) {
       // The server returns one message for expired, already-used, forged,
       // and email-mismatched invitations, so it is not an oracle for which
-      // invitations exist or who was invited -- shown as-is, untranslated.
-      setError(err instanceof ApiError ? err.message : t('invite:acceptError'));
+      // invitations exist or who was invited -- localized like any other
+      // known server message (translating it adds no information the raw
+      // English text didn't already carry).
+      setError(localizeError(err));
     } finally {
       setBusy(false);
     }

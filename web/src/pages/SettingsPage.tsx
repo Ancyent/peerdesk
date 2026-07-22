@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
-import { api, ApiError } from '../api/client';
+import { api } from '../api/client';
+import { localizeError } from '../api/errors';
 import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES } from '../i18n/languages';
 
 // Defined at module level — NOT inside SettingsPage — to avoid focus loss on re-render
@@ -40,7 +41,7 @@ export function SettingsPage() {
     try {
       await api.users.update(accessToken, { name, email });
       setProfileMsg(t('settings:profile.saved')); setTimeout(() => setProfileMsg(''), 2500);
-    } catch (e) { setProfileErr(e instanceof ApiError ? e.message : t('common:error')); }
+    } catch (e) { setProfileErr(localizeError(e)); }
   };
 
   const changePw = async () => {
@@ -52,7 +53,7 @@ export function SettingsPage() {
       await api.users.changePassword(accessToken, curPw, newPw);
       setPwMsg(t('settings:password.changed')); setCurPw(''); setNewPw(''); setConfPw('');
       setTimeout(() => setPwMsg(''), 2500);
-    } catch (e) { setPwErr(e instanceof ApiError ? e.message : t('common:error')); }
+    } catch (e) { setPwErr(localizeError(e)); }
   };
 
   return (

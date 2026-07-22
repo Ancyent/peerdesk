@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError, type RegistrationTokenOut, type Release, type ReleaseAsset } from '../api/client';
+import { localizeError } from '../api/errors';
 import { getConfig } from '../config';
 import { CodeBlock } from '../components/CodeBlock';
 import { TreePicker } from '../components/TreePicker';
@@ -39,7 +40,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
       .latest()
       .then((data) => { setRelease(data); setState('ok'); })
       .catch((e) => {
-        setErrorMessage(e instanceof ApiError ? e.message : '');
+        setErrorMessage(e instanceof ApiError ? localizeError(e) : '');
         setState('error');
       });
   }, []);

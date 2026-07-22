@@ -1,5 +1,16 @@
 {
   "noSession": "No session",
   "refreshFailed": "Refresh failed",
-  "sessionExpired": "Session expired"
+  "sessionExpired": "Session expired",
+  "server": {
+    "emailInUse": "Email already in use",
+    "unsupportedLanguage": "Unsupported language",
+    "currentPasswordIncorrect": "Current password is incorrect",
+    "emailAlreadyRegistered": "Email already registered",
+    "invalidCredentials": "Invalid credentials",
+    "invalidOrExpiredInvitation": "Invalid or expired invitation",
+    "nameAndPasswordRequired": "Name and password are required",
+    "accountNeedsOneAdmin": "An account must keep at least one admin",
+    "grantTargetNotFound": "Grant target not found"
+  }
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError, type GrantOut, type GrantIn } from '../api/client';
+import { localizeError } from '../api/errors';
 import { OrgTree, type OrgNode } from './OrgTree';
 import type { GrantNode } from './orgTreeOps';
 
@@ -30,7 +31,7 @@ export function MemberAccessEditor({ membershipId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<OrgNode>({ type: 'all' });
 
-  const errorMessage = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
+  const errorMessage = (e: unknown, fallback: string) => (e instanceof ApiError ? localizeError(e) : fallback);
 
   useEffect(() => {
     if (!accessToken) return;

@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth';
 import {
   api, ApiError, type TeamMemberOut, type InvitationOut, type InvitationCreatedOut,
 } from '../api/client';
+import { localizeError } from '../api/errors';
 import { copyText } from '../lib/clipboard';
 import { MemberAccessEditor } from '../components/MemberAccessEditor';
 import { formatDate } from '../i18n/format';
@@ -39,7 +40,7 @@ export function TeamPage() {
   const [newInvite, setNewInvite] = useState<InvitationCreatedOut | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const errorMessage = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
+  const errorMessage = (e: unknown, fallback: string) => (e instanceof ApiError ? localizeError(e) : fallback);
 
   const load = async () => {
     if (!accessToken) return;

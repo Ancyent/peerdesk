@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
-import { ApiError } from '../api/client';
+import { localizeError } from '../api/errors';
 import { useBrandingContext } from '../branding/BrandingContext';
 
 interface Props {
@@ -25,7 +25,7 @@ export function RegisterPage({ onGoLogin }: Props) {
     try {
       await register(email, name, password, true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('auth:register.error'));
+      setError(localizeError(err));
     } finally {
       setLoading(false);
     }
