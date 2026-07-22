@@ -4,6 +4,10 @@
 #   peerdesk-viewer-windows-{VERSION}-x64.msi        (MSI installer)
 #   peerdesk-viewer-linux-{VERSION}.AppImage
 # (.deb / .rpm are also produced but are not Tauri updater targets.)
+import json
+
+import pytest
+import release_cache
 from release_cache import updater_platforms
 
 
@@ -61,3 +65,74 @@ def test_windows_prefers_nsis_setup_exe_over_msi_regardless_of_order():
         plats = updater_platforms({"version": "0.5.0", "assets": assets}, lambda n: sigs.get(n))
         assert plats["windows-x86_64"]["url"] == "/api/releases/download/peerdesk-viewer-windows-0.5.0-x64-setup.exe"
         assert plats["windows-x86_64"]["signature"] == "SIG_EXE"
+
+
+# --- GET /releases/update/{target}/{arch}/{current_version} ---------------
+# Reuses test_release_cache.py's cache-seeding pattern: monkeypatch
+# release_cache.CACHE_DIR to a tmp_path and write manifest.json + assets by
+# hand (no real GitHub call involved).
+
+WIN_NAME = "peerdesk-viewer-windows-0.5.0-x64-setup.exe"
+LINUX_NAME = "peerdesk-viewer-linux-0.5.0.AppImage"
+
+
+@pytest.fixture
+def cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(release_cache, "CACHE_DIR", tmp_path)
+    return tmp_path
+
+
+def _write_manifest(cache, assets):
+    (cache / "manifest.json").write_text(json.dumps({
+        "tag_name": "v0.5.0",
+        "html_url": "https://github.com/OWNER/REPO/releases/tag/v0.5.0",
+        "fetched_at": "2026-07-15T08:00:00Z",
+        "assets": assets,
+    }))
+
+
+def _seed_full_release(cache):
+    """A manifest with both updater bundles and their .sig on disk."""
+    (cache / WIN_NAME).write_bytes(b"WINBIN")
+    (cache / f"{WIN_NAME}.sig").write_text("SIG_WIN\n")
+    (cache / LINUX_NAME).write_bytes(b"LINUXBIN")
+    (cache / f"{LINUX_NAME}.sig").write_text("SIG_LINUX\n")
+    _write_manifest(cache, [
+        {"name": WIN_NAME, "size": 6},
+        {"name": f"{WIN_NAME}.sig", "size": 8},
+        {"name": LINUX_NAME, "size": 8},
+        {"name": f"{LINUX_NAME}.sig", "size": 10},
+    ])
+
+
+async def test_update_endpoint_returns_tauri_manifest(client, cache):
+    _seed_full_release(cache)
+    r = await client.get("/releases/update/windows/x86_64/0.4.0")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["version"] == "0.5.0"  # no leading "v"
+    assert body["pub_date"] == "2026-07-15T08:00:00Z"
+
+    win = body["platforms"]["windows-x86_64"]
+    assert win["url"] == f"/api/releases/download/{WIN_NAME}"
+    assert win["signature"] == "SIG_WIN"  # stripped of trailing whitespace
+
+    linux = body["platforms"]["linux-x86_64"]
+    assert linux["url"] == f"/api/releases/download/{LINUX_NAME}"
+    assert linux["signature"] == "SIG_LINUX"
+
+
+async def test_update_endpoint_204_when_no_release_cached(client, cache):
+    r = await client.get("/releases/update/linux/x86_64/0.4.0")
+    assert r.status_code == 204
+    assert r.content == b""
+
+
+async def test_update_endpoint_204_when_no_platform_assemblable(client, cache):
+    # Manifest present and the bundle is on disk, but its .sig never got
+    # cached -- updater_platforms() can't assemble a platform without one, so
+    # there is nothing safe to serve.
+    (cache / LINUX_NAME).write_bytes(b"LINUXBIN")
+    _write_manifest(cache, [{"name": LINUX_NAME, "size": 8}])
+    r = await client.get("/releases/update/linux/x86_64/0.4.0")
+    assert r.status_code == 204

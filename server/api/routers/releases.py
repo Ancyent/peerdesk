@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import FileResponse
 
 import release_cache
@@ -38,3 +38,41 @@ async def download(name: str):
     if p is None:
         raise HTTPException(status_code=404, detail="Unknown release asset")
     return FileResponse(p, media_type="application/octet-stream", filename=name)
+
+
+@router.get("/update/{target}/{arch}/{current_version}")
+async def update_manifest(target: str, arch: str, current_version: str):
+    """Tauri updater manifest, built from the cached release.
+
+    `{target}`/`{arch}`/`{current_version}` are accepted for Tauri's URL
+    template but not filtered on: this static-manifest form always returns
+    every assemblable platform and lets the client itself decide whether
+    `current_version` is behind. 204 (not 404/503) whenever there is nothing
+    safe to serve -- no manifest cached yet, or no platform has both its
+    bundle and its `.sig` -- so an updater client sees "no update" rather
+    than an error.
+    """
+    m = release_cache.read_manifest()
+    if not m:
+        return Response(status_code=204)
+
+    def sig_reader(name: str):
+        p = release_cache.asset_path(name)
+        if p is None:
+            return None
+        try:
+            return p.read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+
+    platforms = release_cache.updater_platforms(m, sig_reader)
+    if not platforms:
+        return Response(status_code=204)
+
+    version = (m.get("version") or m.get("tag_name") or "").lstrip("v")
+    return {
+        "version": version,
+        "notes": m.get("body") or m.get("notes") or "",
+        "pub_date": m.get("published_at") or m.get("pub_date") or m.get("fetched_at") or "",
+        "platforms": platforms,
+    }
