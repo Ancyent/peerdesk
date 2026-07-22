@@ -36,6 +36,7 @@
     "autoUpdate": { "label": "Automatic updates", "desc": "Check for new versions and prompt to install" },
     "checkNow": "Check for updates",
     "checking": "Checking…",
+    "checkFailed": "Update check failed",
     "upToDateNow": "You are on the latest version",
     "updateReady": "v{{version}} is available"
   },

@@ -36,6 +36,7 @@
     "autoUpdate": { "label": "Actualizări automate", "desc": "Verifică versiuni noi și propune instalarea" },
     "checkNow": "Verifică actualizări",
     "checking": "Se verifică…",
+    "checkFailed": "Verificarea actualizărilor a eșuat",
     "upToDateNow": "Ești pe cea mai recentă versiune",
     "updateReady": "v{{version}} este disponibilă"
   },

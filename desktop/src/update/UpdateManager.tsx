@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
@@ -39,15 +39,22 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>('idle');
   const [progress, setProgress] = useState(0);
   const [dismissed, setDismissed] = useState(false);
-  const skipRef = useRef('');
-  const snoozeRef = useRef<number | null>(null);
+  const [skipVersion, setSkipVersion] = useState('');
+  const [snoozeUntil, setSnoozeUntil] = useState<number | null>(null);
+  // Set when check(true) (manual) runs; forces the dialog open for the current
+  // available update even if it was previously skipped/snoozed. Cleared by
+  // dismiss()/persist() (Skip, Later, No).
+  const [forced, setForced] = useState(false);
 
   useEffect(() => { getVersion().then(setCurrent).catch(() => {}); }, []);
 
-  // Load skip/snooze bookkeeping once.
+  // Load skip/snooze bookkeeping once. Uses state (not refs) so the initial
+  // load re-renders and promptOpen is recomputed once it resolves — otherwise
+  // a check() that resolves first can prompt for an already-skipped/snoozed
+  // version and the stale prompt won't clear (ref writes don't re-render).
   useEffect(() => {
     invoke<UpdateStateJson>('get_update_state')
-      .then((s) => { skipRef.current = s.skip_version ?? ''; snoozeRef.current = s.snooze_until ?? null; })
+      .then((s) => { setSkipVersion(s.skip_version ?? ''); setSnoozeUntil(s.snooze_until ?? null); })
       .catch(() => {});
   }, []);
 
@@ -62,6 +69,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const check = useCallback(async (manual = false) => {
+    if (manual) setForced(true);
     setStatus('checking');
     try {
       const info = await invoke<UpdateInfo | null>('check_for_update');
@@ -94,20 +102,21 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persist = useCallback(async (patch: UpdateStateJson) => {
-    const next = { skip_version: skipRef.current, snooze_until: snoozeRef.current, ...patch };
-    skipRef.current = next.skip_version ?? ''; snoozeRef.current = next.snooze_until ?? null;
+    const next = { skip_version: skipVersion, snooze_until: snoozeUntil, ...patch };
+    setSkipVersion(next.skip_version ?? ''); setSnoozeUntil(next.snooze_until ?? null);
     try { await invoke('save_update_state', { state: next }); } catch { /* ignore */ }
     setDismissed(true);
-  }, []);
+    setForced(false);
+  }, [skipVersion, snoozeUntil]);
 
   const snooze = useCallback(() => persist({ snooze_until: Date.now() + 24 * 60 * 60 * 1000 }), [persist]);
   const skip = useCallback(() => persist({ skip_version: latest ?? '' }), [persist, latest]);
-  const dismiss = useCallback(() => setDismissed(true), []);
+  const dismiss = useCallback(() => { setDismissed(true); setForced(false); }, []);
 
   const available = !!current && !!latest && cmpVer(latest, current) > 0;
-  const promptOpen = !dismissed && !isAndroid && shouldPrompt({
-    current, latest, skipVersion: skipRef.current, snoozeUntil: snoozeRef.current, now: Date.now(),
-  });
+  const promptOpen = !dismissed && !isAndroid && (forced ? available : shouldPrompt({
+    current, latest, skipVersion, snoozeUntil, now: Date.now(),
+  }));
 
   const value: UpdateValue = {
     current, latest, notes, status, progress, available, promptOpen, isAndroid,
