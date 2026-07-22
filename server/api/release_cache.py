@@ -175,17 +175,43 @@ def updater_platforms(manifest: dict, sig_reader) -> dict:
     name (the caller owns any filesystem access — this stays pure). A bundle
     is only included once its `.sig` is found; anything else (including the
     non-updater `.deb`/`.rpm` packages) is ignored.
+
+    Every real Windows release ships both an NSIS `-setup.exe` and a `.msi`
+    for the same `windows-x86_64` platform key. Tauri's updater consumes the
+    NSIS installer, so `-setup.exe` must always win over `.msi` regardless of
+    which order the two happen to appear in `manifest["assets"]` (that order
+    just reflects release-upload sequence, not preference). Each platform key
+    below has an ordered list of acceptable suffixes, most-preferred first; a
+    candidate only overwrites an existing entry if it is strictly more
+    preferred, so a later, lower-preference asset can never clobber an
+    earlier, higher-preference one -- and a higher-preference asset seen
+    later always replaces a lower-preference one already recorded.
     """
+    suffix_preference = {
+        "windows-x86_64": ("-setup.exe", ".msi"),
+        "linux-x86_64": (".AppImage",),
+    }
+
     platforms: dict = {}
+    ranks: dict = {}
     for asset in manifest.get("assets", []):
         name = asset["name"]
         if name.endswith(".sig"):
             continue
-        if name.endswith("-setup.exe") or name.endswith(".msi"):
-            key = "windows-x86_64"
-        elif name.endswith(".AppImage"):
-            key = "linux-x86_64"
-        else:
+        key = None
+        rank = None
+        for candidate_key, suffixes in suffix_preference.items():
+            for i, suffix in enumerate(suffixes):
+                if name.endswith(suffix):
+                    key, rank = candidate_key, i
+                    break
+            if key is not None:
+                break
+        if key is None:
+            continue
+        if key in ranks and rank >= ranks[key]:
+            # Already have an equally- or more-preferred candidate for this
+            # platform; do not let a less-preferred asset overwrite it.
             continue
         sig = sig_reader(name + ".sig")
         if sig is None:
@@ -194,6 +220,7 @@ def updater_platforms(manifest: dict, sig_reader) -> dict:
             "signature": sig,
             "url": f"/api/releases/download/{name}",
         }
+        ranks[key] = rank
     return platforms
 
 
