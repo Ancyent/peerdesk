@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '../api/client';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
@@ -24,6 +25,7 @@ const buttonStyle = (busy: boolean) => ({
 });
 
 export function InvitePage({ token }: Props) {
+  const { t } = useTranslation('invite');
   const { user, accessToken, applyTokens } = useAuth();
   const { brand_name, logo_data_url } = useBrandingContext();
   const [email, setEmail] = useState('');
@@ -51,7 +53,7 @@ export function InvitePage({ token }: Props) {
       // The server returns one message for expired, already-used, forged,
       // and email-mismatched invitations, so it is not an oracle for which
       // invitations exist or who was invited -- shown as-is, untranslated.
-      setError(err instanceof ApiError ? err.message : 'Invitația nu a putut fi acceptată');
+      setError(err instanceof ApiError ? err.message : t('invite:acceptError'));
     } finally {
       setBusy(false);
     }
@@ -66,7 +68,7 @@ export function InvitePage({ token }: Props) {
         ? <img src={logo_data_url} alt={brand_name} style={{ height: 48, objectFit: 'contain', maxWidth: 200 }} />
         : <h1 style={{ margin: 0, color: 'var(--text-1)' }}>{brand_name}</h1>}
       <p style={{ color: 'var(--text-2)', margin: 0, textAlign: 'center', maxWidth: 320 }}>
-        Ai fost invitat într-un cont PeerDesk
+        {t('invite:subtitle')}
       </p>
 
       {error && (
@@ -76,33 +78,33 @@ export function InvitePage({ token }: Props) {
       {user ? (
         <div style={cardStyle}>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
-            Ești autentificat ca <strong style={{ color: 'var(--text-1)' }}>{user.email}</strong>. Acceptă invitația
-            pentru a te alătura contului.
+            {t('invite:signedInAsPrefix')} <strong style={{ color: 'var(--text-1)' }}>{user.email}</strong>
+            {t('invite:signedInAsSuffix')}
           </p>
           <button onClick={() => accept()} disabled={busy} style={buttonStyle(busy)}>
-            {busy ? 'Se acceptă…' : 'Acceptă invitația'}
+            {busy ? t('invite:accept.submitting') : t('invite:accept.submit')}
           </button>
         </div>
       ) : (
         <>
           <form onSubmit={accept} style={cardStyle}>
-            <input type="text" placeholder="Nume complet" value={name} onChange={e => setName(e.target.value)}
+            <input type="text" placeholder={t('invite:fields.fullName')} value={name} onChange={e => setName(e.target.value)}
               style={inputStyle} required />
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
+            <input type="email" placeholder={t('invite:fields.email')} value={email} onChange={e => setEmail(e.target.value)}
               style={inputStyle} required />
-            <input type="password" placeholder="Parolă (minim 8 caractere)" value={password}
+            <input type="password" placeholder={t('invite:fields.passwordMin')} value={password}
               onChange={e => setPassword(e.target.value)} minLength={8} style={inputStyle} required />
             <button type="submit" disabled={busy} style={buttonStyle(busy)}>
-              {busy ? 'Se creează contul…' : 'Creează cont și acceptă'}
+              {busy ? t('invite:form.submitting') : t('invite:form.submit')}
             </button>
           </form>
           <p style={{ color: 'var(--text-2)', fontSize: 13, margin: 0, maxWidth: 300, textAlign: 'center' }}>
-            Ai deja un cont PeerDesk cu acest email?{' '}
+            {t('invite:haveAccountPrefix')}{' '}
             <button onClick={() => { window.location.href = '/login'; }}
               style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13, padding: 0, textDecoration: 'underline' }}>
-              Autentifică-te
+              {t('invite:signInLink')}
             </button>{' '}
-            și deschide din nou acest link — invitația se aplică automat contului tău.
+            {t('invite:reopenLink')}
           </p>
         </>
       )}

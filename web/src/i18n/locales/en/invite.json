@@ -1,0 +1,22 @@
+{
+  "subtitle": "You've been invited to a PeerDesk account",
+  "acceptError": "The invitation could not be accepted",
+  "signedInAsPrefix": "You are signed in as",
+  "signedInAsSuffix": ". Accept the invitation to join the account.",
+  "accept": {
+    "submit": "Accept invitation",
+    "submitting": "Accepting…"
+  },
+  "fields": {
+    "fullName": "Full name",
+    "email": "Email",
+    "passwordMin": "Password (min 8 characters)"
+  },
+  "form": {
+    "submit": "Create account and accept",
+    "submitting": "Creating account…"
+  },
+  "haveAccountPrefix": "Already have a PeerDesk account with this email?",
+  "signInLink": "Sign in",
+  "reopenLink": "and open this link again — the invitation will apply to your account automatically."
+}

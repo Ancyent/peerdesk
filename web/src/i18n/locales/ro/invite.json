@@ -1,0 +1,22 @@
+{
+  "subtitle": "Ai fost invitat într-un cont PeerDesk",
+  "acceptError": "Invitația nu a putut fi acceptată",
+  "signedInAsPrefix": "Ești autentificat ca",
+  "signedInAsSuffix": ". Acceptă invitația pentru a te alătura contului.",
+  "accept": {
+    "submit": "Acceptă invitația",
+    "submitting": "Se acceptă…"
+  },
+  "fields": {
+    "fullName": "Nume complet",
+    "email": "Email",
+    "passwordMin": "Parolă (minim 8 caractere)"
+  },
+  "form": {
+    "submit": "Creează cont și acceptă",
+    "submitting": "Se creează contul…"
+  },
+  "haveAccountPrefix": "Ai deja un cont PeerDesk cu acest email?",
+  "signInLink": "Autentifică-te",
+  "reopenLink": "și deschide din nou acest link — invitația se aplică automat contului tău."
+}
