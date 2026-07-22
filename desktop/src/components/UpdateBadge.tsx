@@ -1,60 +1,22 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getVersion } from '@tauri-apps/api/app';
-import { open } from '@tauri-apps/plugin-shell';
+import { useUpdate } from '../update/UpdateManager';
 
-const RELEASES_API = 'https://api.github.com/repos/Ancyent/peerdesk/releases/latest';
-const RELEASES_PAGE = 'https://github.com/Ancyent/peerdesk/releases/latest';
-
-/** -1 if a<b, 0 if equal, 1 if a>b (numeric dotted versions). */
-function cmpVer(a: string, b: string): number {
-  const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
-  const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] || 0;
-    const y = pb[i] || 0;
-    if (x > y) return 1;
-    if (x < y) return -1;
-  }
-  return 0;
-}
-
-/** Bottom-right version badge; checks GitHub for a newer release and offers a
- *  one-click jump to the download page when one is available. */
+/** Bottom-right version badge; a thin view over UpdateManager. Shows the current
+ *  version and, when an update is available, a click-to-update pill. */
 export function UpdateBadge() {
   const { t } = useTranslation('app');
-  const [current, setCurrent] = useState('');
-  const [latest, setLatest] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { current, latest, available, status, isAndroid, openDownloadPage, check } = useUpdate();
 
-  const goToRelease = async () => {
-    try {
-      await open(RELEASES_PAGE);
-    } catch {
-      // shell open not permitted — copy the link so the user can paste it
-      try {
-        await navigator.clipboard.writeText(RELEASES_PAGE);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2500);
-      } catch { /* ignore */ }
-    }
+  const onClick = () => {
+    if (isAndroid) { void openDownloadPage(); return; }
+    void check(true); // re-open the dialog (clears the dismissed flag)
   };
-
-  useEffect(() => {
-    getVersion().then(setCurrent).catch(() => {});
-    fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.tag_name) setLatest(String(d.tag_name).replace(/^v/, '')); })
-      .catch(() => {});
-  }, []);
-
-  const updateAvailable = !!current && !!latest && cmpVer(latest!, current) > 0;
 
   return (
     <div style={{ position: 'fixed', right: 10, bottom: 7, zIndex: 500, userSelect: 'none' }}>
-      {updateAvailable ? (
+      {available ? (
         <button
-          onClick={goToRelease}
+          onClick={onClick}
           title={t('app:updateBadge.updateTooltip', { version: latest })}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
@@ -64,11 +26,11 @@ export function UpdateBadge() {
           }}
         >
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#26c6da', boxShadow: '0 0 6px #26c6da', animation: 'pulsedot 2s infinite' }} />
-          {copied ? t('app:updateBadge.linkCopied') : t('app:updateBadge.updateAvailable', { version: latest })}
+          {t('app:updateBadge.updateAvailable', { version: latest })}
         </button>
       ) : (
         <span style={{ fontSize: 10, color: '#5b6675', padding: '3px 8px' }}>
-          v{current || '—'}{latest && current ? ` · ${t('app:updateBadge.upToDate')}` : ''}
+          {status === 'checking' ? t('app:updateBadge.checking') : `v${current || '—'}`}
         </span>
       )}
       <style>{`@keyframes pulsedot{0%,100%{opacity:1}50%{opacity:.35}}`}</style>
