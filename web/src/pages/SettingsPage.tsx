@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError } from '../api/client';
+import { SUPPORTED_LANGUAGES } from '../i18n';
+
+const LANGUAGE_NAMES: Record<(typeof SUPPORTED_LANGUAGES)[number], string> = {
+  en: 'English',
+  ro: 'Română',
+};
 
 // Defined at module level — NOT inside SettingsPage — to avoid focus loss on re-render
 const inp: CSSProperties = {
@@ -20,6 +27,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function SettingsPage() {
+  const { t, i18n } = useTranslation(['settings', 'common']);
   const { user, accessToken } = useAuth();
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
@@ -54,7 +62,23 @@ export function SettingsPage() {
 
   return (
     <div style={{ padding: '24px', maxWidth: 500, background: 'var(--bg-base)', minHeight: '100%' }}>
-      <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>Setări</h2>
+      <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('settings:title')}</h2>
+      <Section title={t('settings:language.title')}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{t('settings:language.label')}</label>
+            <select
+              style={inp}
+              value={i18n.language.split('-')[0]}
+              onChange={e => i18n.changeLanguage(e.target.value)}
+            >
+              {SUPPORTED_LANGUAGES.map(lng => (
+                <option key={lng} value={lng}>{LANGUAGE_NAMES[lng]}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </Section>
       <Section title="Profil">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Nume</label><input style={inp} value={name} onChange={e => setName(e.target.value)} /></div>
