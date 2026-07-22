@@ -589,6 +589,106 @@ async fn get_security_code(
     Ok(guard.security_code.clone())
 }
 
+// ── check_for_update / download_and_install_update ─────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct UpdateInfo {
+    version: String,
+    current_version: String,
+    notes: String,
+    pub_date: String,
+}
+
+/// Build the Tauri updater endpoint from the client's configured server URL,
+/// so a client bound to server X updates from X. None if no server configured.
+#[cfg(not(target_os = "android"))]
+fn updater_endpoint() -> Option<String> {
+    let cfg = Config::load(&Config::config_path(false)).ok()?;
+    let api = cfg.api_url()?; // "<server>/api"
+    // Doubled braces so format! emits Tauri's literal {{target}} placeholders.
+    Some(format!(
+        "{api}/releases/update/{{{{target}}}}/{{{{arch}}}}/{{{{current_version}}}}"
+    ))
+}
+
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    #[cfg(not(target_os = "android"))]
+    {
+        use tauri_plugin_updater::UpdaterExt;
+        let endpoint = updater_endpoint().ok_or("No server configured")?;
+        let url = endpoint.parse().map_err(|_| "Invalid updater endpoint".to_string())?;
+        let updater = app
+            .updater_builder()
+            .endpoints(vec![url])
+            .map_err(|e| e.to_string())?
+            .build()
+            .map_err(|e| e.to_string())?;
+        match updater.check().await {
+            Ok(Some(u)) => Ok(Some(UpdateInfo {
+                version: u.version.clone(),
+                current_version: u.current_version.clone(),
+                notes: u.body.clone().unwrap_or_default(),
+                pub_date: u.date.map(|d| d.to_string()).unwrap_or_default(),
+            })),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+    #[cfg(target_os = "android")]
+    {
+        let _ = app;
+        Err("in-app update is not available on Android".into())
+    }
+}
+
+#[tauri::command]
+async fn download_and_install_update(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(not(target_os = "android"))]
+    {
+        use tauri_plugin_updater::UpdaterExt;
+        let endpoint = updater_endpoint().ok_or("No server configured")?;
+        let url = endpoint.parse().map_err(|_| "Invalid updater endpoint".to_string())?;
+        let updater = app
+            .updater_builder()
+            .endpoints(vec![url])
+            .map_err(|e| e.to_string())?
+            .build()
+            .map_err(|e| e.to_string())?;
+        let update = updater
+            .check()
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or("No update available")?;
+
+        let mut downloaded: u64 = 0;
+        let app_for_progress = app.clone();
+        let app_for_finish = app.clone();
+        update
+            .download_and_install(
+                move |chunk, total| {
+                    downloaded += chunk as u64;
+                    let _ = app_for_progress.emit(
+                        "update://progress",
+                        serde_json::json!({ "downloaded": downloaded, "total": total }),
+                    );
+                },
+                move || {
+                    let _ = app_for_finish.emit("update://finished", ());
+                },
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+
+        app.restart();
+    }
+    #[cfg(target_os = "android")]
+    {
+        let _ = app;
+        Err("in-app update is not available on Android".into())
+    }
+}
+
 // ── Tauri app ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -621,6 +721,8 @@ pub fn run() {
             get_pending_approval,
             get_agent_log,
             get_turn_credentials,
+            check_for_update,
+            download_and_install_update,
         ])
         .setup(|app| {
             #[cfg(desktop)]
