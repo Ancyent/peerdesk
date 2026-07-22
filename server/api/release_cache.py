@@ -168,6 +168,35 @@ async def refresh() -> bool:
         return False
 
 
+def updater_platforms(manifest: dict, sig_reader) -> dict:
+    """Map cached release assets to Tauri updater platform keys.
+
+    `sig_reader(name) -> str | None` supplies the `.sig` contents for an asset
+    name (the caller owns any filesystem access — this stays pure). A bundle
+    is only included once its `.sig` is found; anything else (including the
+    non-updater `.deb`/`.rpm` packages) is ignored.
+    """
+    platforms: dict = {}
+    for asset in manifest.get("assets", []):
+        name = asset["name"]
+        if name.endswith(".sig"):
+            continue
+        if name.endswith("-setup.exe") or name.endswith(".msi"):
+            key = "windows-x86_64"
+        elif name.endswith(".AppImage"):
+            key = "linux-x86_64"
+        else:
+            continue
+        sig = sig_reader(name + ".sig")
+        if sig is None:
+            continue
+        platforms[key] = {
+            "signature": sig,
+            "url": f"/api/releases/download/{name}",
+        }
+    return platforms
+
+
 async def refresh_loop(interval: int = REFRESH_SECONDS) -> None:
     """Refresh now, then every `interval` seconds.
 
