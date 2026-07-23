@@ -183,6 +183,7 @@ jobs:
       - name: Install Rust Android targets
         run: |
           rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+          sudo apt-get update
           sudo apt-get install -y libxdo-dev libasound2-dev
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
