@@ -260,6 +260,15 @@ jobs:
       - name: List artifacts
         run: find . -type f | sort
 
+      - name: Warn if signed viewer bundles are missing
+        run: |
+          missing=0
+          ls viewer-linux/peerdesk-viewer-linux-*.AppImage.sig >/dev/null 2>&1 \
+            || { echo "::warning::No Linux .AppImage.sig — updater signing likely failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-linux build pass?)"; missing=1; }
+          ls viewer-windows/peerdesk-viewer-windows-*-setup.exe.sig >/dev/null 2>&1 \
+            || { echo "::warning::No Windows setup.exe.sig — updater signing likely failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-windows build pass?)"; missing=1; }
+          [ "$missing" = 0 ] && echo "Signed viewer updater bundles present." || true
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:

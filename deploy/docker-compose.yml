@@ -76,6 +76,12 @@ services:
       RELEASE_REPO: ${RELEASE_REPO:-Ancyent/peerdesk}
       RELEASE_REFRESH_SECONDS: ${RELEASE_REFRESH_SECONDS:-3600}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      # Optional: pin the public base URL used in the desktop updater manifest's
+      # download links. When set, it is authoritative and request Host headers are
+      # ignored (hardens against Host-header spoofing). Leave empty to derive from
+      # the incoming request (X-Forwarded-Proto + Host), which is correct for a
+      # normal single-domain deploy behind nginx.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

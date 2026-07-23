@@ -104,3 +104,11 @@ first updater-enabled version; every release after that is seamless.
 
 **Not self-updatable:** `.deb`/`.rpm` installs and Android get a notify+link
 (open the releases page), not in-app install — same as before.
+
+**Optional hardening — `PUBLIC_BASE_URL`:** the update manifest's download links are
+built from the incoming request (`X-Forwarded-Proto` + `Host`), which is correct for a
+normal single-domain deploy behind nginx. To pin them explicitly and ignore request
+Host headers entirely (defense against Host-header spoofing), set `PUBLIC_BASE_URL` in
+the api service env (e.g. `PUBLIC_BASE_URL=https://peerdesk.example.com`) — see
+`deploy/docker-compose.yml`. When set it is authoritative; leave empty to auto-derive.
+(The forgeable `X-Forwarded-Host` header is never trusted regardless.)
