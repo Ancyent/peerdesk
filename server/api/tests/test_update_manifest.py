@@ -138,22 +138,44 @@ async def test_update_endpoint_returns_tauri_manifest(client, cache):
 
 
 async def test_update_endpoint_url_is_absolute_and_honors_forwarded_headers(client, cache):
-    # Behind nginx the request's own scheme/host is the proxy's internal one;
-    # the manifest must reflect the PUBLIC scheme/host the client actually
-    # connected to, carried via X-Forwarded-Proto/X-Forwarded-Host.
+    # Our nginx sets X-Forwarded-Proto (trusted) but not X-Forwarded-Host, so
+    # the manifest must be built from Host + X-Forwarded-Proto, and a forged
+    # X-Forwarded-Host must be ignored entirely.
     _seed_full_release(cache)
     r = await client.get(
         "/releases/update/windows/x86_64/0.4.0",
         headers={
+            "Host": "real.example.com",
             "X-Forwarded-Proto": "https",
-            "X-Forwarded-Host": "updates.example.com",
+            "X-Forwarded-Host": "evil.example.com",
         },
     )
     assert r.status_code == 200
     body = r.json()
     win = body["platforms"]["windows-x86_64"]
-    assert win["url"] == f"https://updates.example.com/api/releases/download/{WIN_NAME}"
+    assert win["url"] == f"https://real.example.com/api/releases/download/{WIN_NAME}"
     assert win["url"].startswith(("http://", "https://"))
+    assert "evil.example.com" not in win["url"]
+
+
+async def test_update_endpoint_url_uses_public_base_url_override(client, cache, monkeypatch):
+    # PUBLIC_BASE_URL is the authoritative, non-spoofable override for
+    # self-host/white-label deployments -- it must win outright and ignore
+    # request headers entirely (even a forged Host/X-Forwarded-Host).
+    monkeypatch.setattr("routers.releases.PUBLIC_BASE_URL", "https://pinned.example.com")
+    _seed_full_release(cache)
+    r = await client.get(
+        "/releases/update/windows/x86_64/0.4.0",
+        headers={
+            "Host": "real.example.com",
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-Host": "evil.example.com",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    win = body["platforms"]["windows-x86_64"]
+    assert win["url"] == f"https://pinned.example.com/api/releases/download/{WIN_NAME}"
 
 
 async def test_update_endpoint_returns_notes_and_pub_date_from_release_body(client, cache):

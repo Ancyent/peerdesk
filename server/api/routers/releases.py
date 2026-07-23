@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
@@ -7,6 +9,11 @@ router = APIRouter(prefix="/releases", tags=["releases"])
 
 # Public on purpose: install.sh fetches this before any session exists, and the
 # binaries are public artefacts on GitHub anyway.
+
+# Authoritative, non-spoofable override for the update manifest's base URL.
+# Set this for self-host/white-label deployments (or anywhere the request's
+# own Host header isn't the public one) to pin the URL fully.
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 
 
 @router.get("/latest")
@@ -55,9 +62,12 @@ async def update_manifest(target: str, arch: str, current_version: str, request:
     tauri-plugin-updater deserializes each platform's `url` as a `url::Url`,
     which requires an ABSOLUTE url (a bare path fails with
     `RelativeUrlWithoutBase`), so it must be rebuilt from the request that
-    actually arrived here -- honoring `X-Forwarded-Proto`/`X-Forwarded-Host`
-    since this endpoint sits behind nginx -- rather than a hardcoded/config
-    host, keeping self-host and white-label deployments correct.
+    actually arrived here. If `PUBLIC_BASE_URL` is set that wins outright
+    (the authoritative override for self-host/white-label deployments).
+    Otherwise the base is `X-Forwarded-Proto` (set by our nginx, trusted) +
+    `Host` (what the client used to reach us). `X-Forwarded-Host` is
+    intentionally NOT trusted here -- our nginx doesn't set it, so a client
+    could forge it to point the manifest's download URL anywhere.
     """
     m = release_cache.read_manifest()
     if not m:
@@ -72,13 +82,15 @@ async def update_manifest(target: str, arch: str, current_version: str, request:
         except OSError:
             return None
 
-    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-    host = (
-        request.headers.get("x-forwarded-host")
-        or request.headers.get("host")
-        or request.base_url.netloc
-    )
-    base = f"{proto}://{host}".rstrip("/")
+    if PUBLIC_BASE_URL:
+        base = PUBLIC_BASE_URL
+    else:
+        # X-Forwarded-Proto is set by our nginx (trusted). Host is what the client used
+        # to reach this server. X-Forwarded-Host is NOT set by our nginx, so a client
+        # could forge it -- do not trust it. Set PUBLIC_BASE_URL to pin the URL fully.
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        host = request.headers.get("host") or request.base_url.netloc
+        base = f"{proto}://{host}".rstrip("/")
 
     platforms = release_cache.updater_platforms(m, sig_reader, base_url=base)
     if not platforms:
