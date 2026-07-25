@@ -21,7 +21,15 @@ export default defineConfig({
       },
     },
   ],
+  resolve: {
+    alias: {
+      '@pd/ui': path.resolve(__dirname, '../shared/ui'),
+    },
+  },
   server: {
+    fs: {
+      allow: [path.resolve(__dirname, '..')],
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_PROXY_API ?? 'http://localhost:8000',
