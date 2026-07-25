@@ -199,6 +199,42 @@ describe('NotifyProvider', () => {
     expect(document.body.textContent).not.toContain('Saved');
   });
 
+  it('keeps auto-dismissing a new toast after the hover flag is left set by a close with no mouseleave (regression: hover must not latch)', () => {
+    // Real browsers do not reliably fire mouseleave/mouseout when a toast
+    // disappears out from under a stationary cursor (hit-testing is
+    // pointer-movement-driven, not layout-change-driven) — the same
+    // structural gap that blur/focusout has on removal. happy-dom has no
+    // layout or hit-testing engine at all, so it can't reproduce that
+    // failure organically; this test simulates it directly by firing
+    // mouseenter on the host and dismissing the last toast via its close
+    // button while deliberately never firing mouseleave/mouseout, which is
+    // exactly the event sequence the real browser produces in the failing
+    // case. A pass here is not proof the real-browser bug is fixed by
+    // itself — it proves the app doesn't depend on mouseleave firing to
+    // heal, which is the actual fix.
+    vi.useFakeTimers();
+    let api!: ReturnType<typeof useNotify>;
+    render(<NotifyProvider><Trigger onReady={(a) => { api = a; }} /></NotifyProvider>);
+
+    act(() => { api.notify.error('Boom'); });
+    const host = document.querySelector<HTMLDivElement>('[data-testid="toast-host"]')!;
+    const close = document.querySelector<HTMLButtonElement>('[data-testid="toast-close"]')!;
+
+    act(() => {
+      host.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+    });
+    // Dismiss the only toast via its close button. No mouseleave/mouseout
+    // is ever fired — mirrors the real browser's missing event.
+    act(() => { close.click(); });
+    expect(document.body.textContent).not.toContain('Boom');
+
+    act(() => { api.notify.success('Saved'); });
+    expect(document.body.textContent).toContain('Saved');
+
+    act(() => { vi.advanceTimersByTime(DEFAULT_DURATION_MS.success + 500); });
+    expect(document.body.textContent).not.toContain('Saved');
+  });
+
   it('applies closeLabel to the close button\'s accessible name', () => {
     let api!: ReturnType<typeof useNotify>;
     render(<NotifyProvider closeLabel="Fermer"><Trigger onReady={(a) => { api = a; }} /></NotifyProvider>);

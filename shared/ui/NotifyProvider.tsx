@@ -41,13 +41,16 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
   // Hover and focus are two independent channels that both pause the timer;
   // combining them into one boolean (as an earlier version of this file did)
   // makes the mouse leaving the stack able to resume a toast that a
-  // keyboard user is still focused on. Hover is cheap to track as a ref: it
-  // only ever changes via the host's own mouse events, so nothing needs to
-  // react to it — it's read fresh inside the tick below. Focus is not
-  // tracked via focus/blur events at all: some environments don't reliably
-  // deliver `blur`/`focusout` when the focused element (e.g. a toast's
-  // close button) is removed from the DOM, which would let the pause latch
-  // on forever. Instead it's read live off the DOM every tick.
+  // keyboard user is still focused on. Hover is tracked as a ref: it only
+  // ever changes via the host's own mouse events, so nothing needs to react
+  // to it — it's read fresh inside the tick below. Because it's
+  // event-driven (not polled), it can latch on if the browser skips an
+  // event; see the empty-stack reset a few lines down for how that's
+  // healed. Focus is not tracked via focus/blur events at all: some
+  // environments don't reliably deliver `blur`/`focusout` when the focused
+  // element (e.g. a toast's close button) is removed from the DOM, which
+  // would let the pause latch on forever. Instead it's read live off the
+  // DOM every tick, so it can never go stale in the first place.
   const hostRef = useRef<HTMLDivElement>(null);
   const hoveredRef = useRef(false);
 
@@ -61,6 +64,26 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
   }, [onExternal]);
 
   const isEmpty = state.visible.length === 0 && state.queued.length === 0;
+
+  // Unlike focus, hover has no live DOM query to re-derive it from at tick
+  // time (`:hover` matching needs a hit-testing/layout engine, which this
+  // repo's test environment — happy-dom — doesn't implement, so a
+  // tick-time-poll design for hover couldn't be exercised by the test
+  // suite). Hover therefore stays an event-driven ref, written only by
+  // `onHoverChange` below. That means it needs its own heal point: a real
+  // browser does not reliably fire mouseleave/mouseout when the hovered
+  // toast disappears out from under a stationary cursor (hit-testing is
+  // driven by pointer movement, not by layout changes), so a toast closed
+  // while hovered can leave `hoveredRef.current` stuck at `true` forever,
+  // silently blocking auto-dismiss for every toast pushed afterward. An
+  // empty stack is a safe, deterministic place to clear it: there is
+  // nothing left to protect from expiring, so a stale "hovered" reading
+  // can never be observably wrong at that point, regardless of which
+  // event mechanism did or didn't fire.
+  useEffect(() => {
+    if (isEmpty) hoveredRef.current = false;
+  }, [isEmpty]);
+
   useEffect(() => {
     // Nothing to advance and nothing worth pausing for — skip the interval
     // entirely rather than ticking a no-op state update 4x/second for the
@@ -77,6 +100,10 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
 
   const push = useCallback((input: ToastInput) => {
     setState((s) => addToast(s, input));
+  }, []);
+
+  const onHoverChange = useCallback((hovered: boolean) => {
+    hoveredRef.current = hovered;
   }, []);
 
   // Fires `onExternal` exactly once per genuinely new toast. `addToast` only
@@ -115,7 +142,7 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
       <ToastHost
         toasts={state.visible}
         onDismiss={onDismiss}
-        onHoverChange={(hovered) => { hoveredRef.current = hovered; }}
+        onHoverChange={onHoverChange}
         hostRef={hostRef}
         closeLabel={closeLabel}
       />
