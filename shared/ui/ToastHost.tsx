@@ -23,10 +23,17 @@ interface Props {
 }
 
 /** Bottom-right stack. Hovering or focusing pauses every running timer, so a
- *  toast can't expire out from under someone who is reading it. */
+ *  toast can't expire out from under someone who is reading it.
+ *
+ *  The container always renders, even with zero toasts: browsers do not
+ *  reliably fire `mouseleave`/`blur` on an element that gets removed from
+ *  the DOM while hovered or focused (e.g. clicking a toast's close button
+ *  focuses it first, and closing the last toast used to unmount this whole
+ *  host). Unmounting the host mid-interaction could leave `paused` stuck
+ *  `true` in the parent forever. An empty container has no children, so
+ *  with `pointerEvents: 'none'` and no set height it occupies no visible
+ *  space and intercepts nothing. */
 export function ToastHost({ toasts, onDismiss, onPauseChange, closeLabel }: Props) {
-  if (toasts.length === 0) return null;
-
   return (
     <div
       data-testid="toast-host"

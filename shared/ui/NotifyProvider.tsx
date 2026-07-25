@@ -39,8 +39,14 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
   const [state, setState] = useState<ToastState>(emptyToastState);
   const [paused, setPaused] = useState(false);
 
+  // Kept in a ref (rather than read directly in the effect below) purely so
+  // the notify-effect doesn't need to depend on `onExternal` identity; the
+  // ref itself is written from an effect, never during render, so it stays
+  // pure under concurrent rendering.
   const externalRef = useRef(onExternal);
-  externalRef.current = onExternal;
+  useEffect(() => {
+    externalRef.current = onExternal;
+  }, [onExternal]);
 
   useEffect(() => {
     if (paused) return;
@@ -48,17 +54,39 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
     return () => clearInterval(h);
   }, [paused]);
 
+  // Safety net: an empty stack has nothing left to hover or focus, so it can
+  // never legitimately stay paused. This guards against `paused` latching on
+  // when the DOM element that was hovered/focused gets removed without ever
+  // delivering `mouseleave`/`blur` — a real gap in some environments (not
+  // just this one) since those events are tied to pointer/focus movement,
+  // not to DOM mutation.
+  const isEmpty = state.visible.length === 0 && state.queued.length === 0;
+  useEffect(() => {
+    if (isEmpty) setPaused(false);
+  }, [isEmpty]);
+
   const push = useCallback((input: ToastInput) => {
-    setState((s) => {
-      const next = addToast(s, input);
-      // Only a genuinely new toast bumps nextId; a dedup hit must not re-fire.
-      if (next.nextId !== s.nextId) {
-        const created = [...next.visible, ...next.queued].find((t) => t.id === s.nextId);
-        if (created) externalRef.current?.(created);
-      }
-      return next;
-    });
+    setState((s) => addToast(s, input));
   }, []);
+
+  // Fires `onExternal` exactly once per genuinely new toast. `addToast` only
+  // bumps `nextId` on a real creation, never on a dedup bump, so the id
+  // range [notifiedUpTo, state.nextId) is exactly the set of toasts created
+  // since this effect last ran. This runs from an effect rather than inside
+  // the `setState` updater above: React's StrictMode intentionally
+  // double-invokes updater functions to catch impurities, which was firing
+  // this side effect twice per toast; effects don't get that same
+  // double-invocation for ordinary (non-mount) updates.
+  const notifiedUpToRef = useRef(state.nextId);
+  useEffect(() => {
+    const from = notifiedUpToRef.current;
+    const to = state.nextId;
+    if (to > from) {
+      const created = [...state.visible, ...state.queued].filter((t) => t.id >= from && t.id < to);
+      for (const toast of created) externalRef.current?.(toast);
+    }
+    notifiedUpToRef.current = to;
+  }, [state]);
 
   const notify = useMemo<NotifyApi>(() => ({
     success: (message, opts) => push({ kind: 'success', message, ...opts }),
