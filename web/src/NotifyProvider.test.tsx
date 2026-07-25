@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { NotifyProvider, useNotify, DEFAULT_DURATION_MS } from '@pd/ui';
+import { NotifyProvider, useNotify, DEFAULT_DURATION_MS, MAX_VISIBLE } from '@pd/ui';
 
 // react-dom's act() requires this flag when @testing-library isn't in play.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -165,6 +165,75 @@ describe('NotifyProvider', () => {
 
     act(() => { vi.advanceTimersByTime(DEFAULT_DURATION_MS.success + 500); });
     expect(document.body.textContent).not.toContain('Saved');
+  });
+
+  it('does not resume while focus remains inside the host, even after the mouse leaves (regression: hover and focus are independent pause channels)', () => {
+    vi.useFakeTimers();
+    let api!: ReturnType<typeof useNotify>;
+    render(<NotifyProvider><Trigger onReady={(a) => { api = a; }} /></NotifyProvider>);
+
+    act(() => { api.notify.success('Saved'); });
+    const host = document.querySelector<HTMLDivElement>('[data-testid="toast-host"]')!;
+    const close = document.querySelector<HTMLButtonElement>('[data-testid="toast-close"]')!;
+
+    // Hover the stack, then tab focus onto the close button while still
+    // hovering — mirrors a keyboard user reading a toast they moused onto.
+    act(() => {
+      host.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+    });
+    act(() => { close.focus(); });
+
+    // Move the mouse off the stack. Focus is still inside the host, so the
+    // toast must stay paused — this is the bug: a single shared boolean
+    // would let mouseleave resume the timer out from under the focused
+    // close button.
+    act(() => {
+      host.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, cancelable: true }));
+    });
+    act(() => { vi.advanceTimersByTime(DEFAULT_DURATION_MS.success + 500); });
+    expect(document.body.textContent).toContain('Saved');
+
+    // Focus leaving too (and no hover) finally lets it resume and expire.
+    act(() => { close.blur(); });
+    act(() => { vi.advanceTimersByTime(DEFAULT_DURATION_MS.success + 500); });
+    expect(document.body.textContent).not.toContain('Saved');
+  });
+
+  it('applies closeLabel to the close button\'s accessible name', () => {
+    let api!: ReturnType<typeof useNotify>;
+    render(<NotifyProvider closeLabel="Fermer"><Trigger onReady={(a) => { api = a; }} /></NotifyProvider>);
+
+    act(() => { api.notify.info('Hello'); });
+    const close = document.querySelector<HTMLButtonElement>('[data-testid="toast-close"]')!;
+
+    expect(close.getAttribute('aria-label')).toBe('Fermer');
+  });
+
+  it('calls onExternal exactly once for a toast that lands in the overflow queue', () => {
+    const onExternal = vi.fn();
+    let api!: ReturnType<typeof useNotify>;
+    render(
+      <NotifyProvider onExternal={onExternal}>
+        <Trigger onReady={(a) => { api = a; }} />
+      </NotifyProvider>,
+    );
+
+    act(() => {
+      for (let i = 0; i < MAX_VISIBLE + 1; i++) {
+        api.notify.info(`Message ${i}`);
+      }
+    });
+
+    const queuedCall = onExternal.mock.calls.find(([toast]) => toast.message === `Message ${MAX_VISIBLE}`);
+    expect(queuedCall).toBeDefined();
+    expect(onExternal.mock.calls.filter(([toast]) => toast.message === `Message ${MAX_VISIBLE}`)).toHaveLength(1);
+    expect(onExternal).toHaveBeenCalledTimes(MAX_VISIBLE + 1);
+  });
+
+  it('always renders the toast host container, even with zero toasts', () => {
+    render(<NotifyProvider><Trigger onReady={() => {}} /></NotifyProvider>);
+
+    expect(document.querySelector('[data-testid="toast-host"]')).not.toBeNull();
   });
 
   it('throws a clear error when useNotify is used outside the provider', () => {

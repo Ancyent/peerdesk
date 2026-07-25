@@ -37,7 +37,19 @@ interface Props {
 
 export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }: Props) {
   const [state, setState] = useState<ToastState>(emptyToastState);
-  const [paused, setPaused] = useState(false);
+
+  // Hover and focus are two independent channels that both pause the timer;
+  // combining them into one boolean (as an earlier version of this file did)
+  // makes the mouse leaving the stack able to resume a toast that a
+  // keyboard user is still focused on. Hover is cheap to track as a ref: it
+  // only ever changes via the host's own mouse events, so nothing needs to
+  // react to it — it's read fresh inside the tick below. Focus is not
+  // tracked via focus/blur events at all: some environments don't reliably
+  // deliver `blur`/`focusout` when the focused element (e.g. a toast's
+  // close button) is removed from the DOM, which would let the pause latch
+  // on forever. Instead it's read live off the DOM every tick.
+  const hostRef = useRef<HTMLDivElement>(null);
+  const hoveredRef = useRef(false);
 
   // Kept in a ref (rather than read directly in the effect below) purely so
   // the notify-effect doesn't need to depend on `onExternal` identity; the
@@ -48,21 +60,19 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
     externalRef.current = onExternal;
   }, [onExternal]);
 
-  useEffect(() => {
-    if (paused) return;
-    const h = setInterval(() => setState((s) => tickToasts(s, TICK_MS)), TICK_MS);
-    return () => clearInterval(h);
-  }, [paused]);
-
-  // Safety net: an empty stack has nothing left to hover or focus, so it can
-  // never legitimately stay paused. This guards against `paused` latching on
-  // when the DOM element that was hovered/focused gets removed without ever
-  // delivering `mouseleave`/`blur` — a real gap in some environments (not
-  // just this one) since those events are tied to pointer/focus movement,
-  // not to DOM mutation.
   const isEmpty = state.visible.length === 0 && state.queued.length === 0;
   useEffect(() => {
-    if (isEmpty) setPaused(false);
+    // Nothing to advance and nothing worth pausing for — skip the interval
+    // entirely rather than ticking a no-op state update 4x/second for the
+    // lifetime of the app (this provider is long-lived, e.g. the desktop
+    // app's whole process).
+    if (isEmpty) return;
+    const h = setInterval(() => {
+      const focused = hostRef.current?.contains(document.activeElement) ?? false;
+      if (hoveredRef.current || focused) return;
+      setState((s) => tickToasts(s, TICK_MS));
+    }, TICK_MS);
+    return () => clearInterval(h);
   }, [isEmpty]);
 
   const push = useCallback((input: ToastInput) => {
@@ -105,7 +115,8 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
       <ToastHost
         toasts={state.visible}
         onDismiss={onDismiss}
-        onPauseChange={setPaused}
+        onHoverChange={(hovered) => { hoveredRef.current = hovered; }}
+        hostRef={hostRef}
         closeLabel={closeLabel}
       />
     </NotifyContext.Provider>

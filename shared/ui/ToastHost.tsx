@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import type { Toast } from './toastStore';
 import type { ToastKind } from './types';
 
@@ -18,30 +19,40 @@ const GLYPH: Record<ToastKind, string> = {
 interface Props {
   toasts: Toast[];
   onDismiss: (id: number) => void;
-  onPauseChange: (paused: boolean) => void;
+  /** Reports hover state only. Focus is intentionally NOT reported through
+   *  an event here — see `hostRef` below. */
+  onHoverChange: (hovered: boolean) => void;
+  /** Attached to the outer container so the caller can derive "is focus
+   *  currently inside the host" on demand (`hostRef.current?.contains(
+   *  document.activeElement)`), instead of tracking it via focus/blur
+   *  events. Blur/focusout are not reliably delivered when the focused
+   *  element (e.g. a toast's close button, focused right before it's
+   *  clicked) is removed from the DOM — some environments update
+   *  `document.activeElement` on removal without ever queuing the event.
+   *  Polling the live DOM at tick time sidesteps that gap entirely. */
+  hostRef: RefObject<HTMLDivElement | null>;
   closeLabel: string;
 }
 
 /** Bottom-right stack. Hovering or focusing pauses every running timer, so a
- *  toast can't expire out from under someone who is reading it.
+ *  toast can't expire out from under someone who is reading it — the two
+ *  are independent: hover is reported live via `onHoverChange`, and focus
+ *  is read on demand via `hostRef` (see above), so neither can override the
+ *  other (e.g. mouse leaving while focus remains inside must still pause).
  *
- *  The container always renders, even with zero toasts: browsers do not
- *  reliably fire `mouseleave`/`blur` on an element that gets removed from
- *  the DOM while hovered or focused (e.g. clicking a toast's close button
- *  focuses it first, and closing the last toast used to unmount this whole
- *  host). Unmounting the host mid-interaction could leave `paused` stuck
- *  `true` in the parent forever. An empty container has no children, so
- *  with `pointerEvents: 'none'` and no set height it occupies no visible
- *  space and intercepts nothing. */
-export function ToastHost({ toasts, onDismiss, onPauseChange, closeLabel }: Props) {
+ *  The container always renders, even with zero toasts, so `hostRef`
+ *  keeps pointing at a live, still-hoverable element between toasts rather
+ *  than going stale. An empty container has no children, so with
+ *  `pointerEvents: 'none'` and no set height it occupies no visible space
+ *  and intercepts nothing. */
+export function ToastHost({ toasts, onDismiss, onHoverChange, hostRef, closeLabel }: Props) {
   return (
     <div
+      ref={hostRef}
       data-testid="toast-host"
       role="status"
-      onMouseEnter={() => onPauseChange(true)}
-      onMouseLeave={() => onPauseChange(false)}
-      onFocusCapture={() => onPauseChange(true)}
-      onBlurCapture={() => onPauseChange(false)}
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
       style={{
         position: 'fixed', right: 16, bottom: 16, zIndex: 1100,
         display: 'flex', flexDirection: 'column', gap: 8,
