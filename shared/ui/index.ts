@@ -14,3 +14,7 @@ export { NotifyProvider, useNotify } from './NotifyProvider';
 export { ToastHost } from './ToastHost';
 
 export { Modal } from './Modal';
+
+export type { ConfirmOptions } from './ConfirmDialog';
+export { ConfirmDialog } from './ConfirmDialog';
+export { ConfirmProvider, useConfirm } from './ConfirmProvider';
