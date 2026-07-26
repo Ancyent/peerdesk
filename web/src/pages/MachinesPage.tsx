@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useConfirm, useNotify } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
 import { api, type MachineOut } from '../api/client';
+import { localizeError } from '../api/errors';
 import { MachineCard } from '../components/MachineCard';
 import { formatDate } from '../i18n/format';
 
@@ -12,6 +14,8 @@ interface Props {
 export function MachinesPage({ onConnect }: Props) {
   const { t } = useTranslation('machines');
   const { accessToken } = useAuth();
+  const confirm = useConfirm();
+  const { notify } = useNotify();
   const [machines, setMachines] = useState<MachineOut[]>([]);
   const [pending, setPending] = useState<MachineOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,11 +53,21 @@ export function MachinesPage({ onConnect }: Props) {
   const handleDelete = async (id: string) => {
     if (!accessToken) return;
     const m = machines.find(x => x.id === id);
-    if (!window.confirm(t('machines:page.deleteConfirm', { name: m?.name ?? '', peerId: m?.peer_id ?? '' }))) return;
+
+    const ok = await confirm({
+      title: t('notify:confirm.deleteMachineTitle'),
+      message: t('machines:page.deleteConfirm', { name: m?.name ?? '', peerId: m?.peer_id ?? '' }),
+      confirmLabel: t('notify:confirm.deleteMachineAction'),
+      cancelLabel: t('notify:cancel'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+
     try {
       await api.machines.remove(accessToken, id);
+      notify.success(t('notify:machines.deleted'));
     } catch (e) {
-      console.error(e);
+      notify.error(t('notify:machines.deleteFailed'), { detail: localizeError(e) });
     }
     load();
   };
@@ -62,8 +76,9 @@ export function MachinesPage({ onConnect }: Props) {
     if (!accessToken) return;
     try {
       await api.machines.clearSavedPassword(accessToken, m.id);
+      notify.success(t('notify:machines.forgotten'));
     } catch (e) {
-      console.error(e);
+      notify.error(t('notify:machines.forgetFailed'), { detail: localizeError(e) });
     }
     load();
   };

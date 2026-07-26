@@ -1,0 +1,14 @@
+{
+  "close": "Dismiss",
+  "cancel": "Cancel",
+  "confirm": {
+    "deleteMachineTitle": "Delete machine?",
+    "deleteMachineAction": "Delete"
+  },
+  "machines": {
+    "deleted": "Machine deleted",
+    "deleteFailed": "Could not delete the machine",
+    "forgotten": "Saved password removed",
+    "forgetFailed": "Could not remove the saved password"
+  }
+}

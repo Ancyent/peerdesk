@@ -1,0 +1,14 @@
+{
+  "close": "Închide",
+  "cancel": "Anulează",
+  "confirm": {
+    "deleteMachineTitle": "Ștergi mașina?",
+    "deleteMachineAction": "Șterge"
+  },
+  "machines": {
+    "deleted": "Mașină ștearsă",
+    "deleteFailed": "Mașina nu a putut fi ștearsă",
+    "forgotten": "Parola salvată a fost ștearsă",
+    "forgetFailed": "Parola salvată nu a putut fi ștearsă"
+  }
+}
