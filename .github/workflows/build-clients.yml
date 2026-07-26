@@ -261,14 +261,22 @@ jobs:
       - name: List artifacts
         run: find . -type f | sort
 
-      - name: Warn if signed viewer bundles are missing
+      # Hard gate, deliberately: an unsigned release publishes fine and looks
+      # green, but the updater then silently stops working for every existing
+      # client. Refusing to publish is the cheaper failure — fix the cause and
+      # re-run the tag.
+      - name: Require signed viewer bundles
         run: |
           missing=0
           ls viewer-linux/peerdesk-viewer-linux-*.AppImage.sig >/dev/null 2>&1 \
-            || { echo "::warning::No Linux .AppImage.sig — updater signing likely failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-linux build pass?)"; missing=1; }
+            || { echo "::error::No Linux .AppImage.sig — updater signing failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-linux build pass?)"; missing=1; }
           ls viewer-windows/peerdesk-viewer-windows-*-setup.exe.sig >/dev/null 2>&1 \
-            || { echo "::warning::No Windows setup.exe.sig — updater signing likely failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-windows build pass?)"; missing=1; }
-          [ "$missing" = 0 ] && echo "Signed viewer updater bundles present." || true
+            || { echo "::error::No Windows setup.exe.sig — updater signing failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-windows build pass?)"; missing=1; }
+          if [ "$missing" != 0 ]; then
+            echo "::error::Refusing to publish an unsigned release. Nothing was published; fix the cause and re-run this tag."
+            exit 1
+          fi
+          echo "Signed viewer updater bundles present."
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

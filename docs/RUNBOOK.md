@@ -92,10 +92,14 @@ Add two GitHub Actions secrets (Settings → Secrets and variables → Actions):
   file (`peerdesk-updater.key`).
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — the password chosen when generating it.
 
-Without these, the Linux and Windows viewer build jobs FAIL (they are
-`continue-on-error`, so the release still publishes — but without the viewer
-bundles). Store the private key in a password manager; losing it means no future
-client can verify updates and every user must reinstall manually.
+Without these, the viewer builds produce no `.sig` files, and the release job's
+**Require signed viewer bundles** step fails the run and publishes NOTHING. That
+is deliberate: an unsigned release looks green but silently breaks auto-update
+for every existing client, so refusing to publish is the cheaper failure. Fix the
+cause, then re-run the same tag.
+
+Store the private key in a password manager; losing it means no future client can
+verify updates and every user must reinstall manually.
 
 **First updater-enabled release caveat:** clients built BEFORE auto-update
 shipped have no updater and cannot auto-install this first signed release. Users
