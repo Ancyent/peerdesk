@@ -115,7 +115,7 @@ describe('Modal', () => {
     expect(document.body.style.overflow).not.toBe('hidden');
   });
 
-  it('does not throw when the previously focused element is removed before close', () => {
+  it('does not call .focus() on the previously-focused element when it was removed from the DOM before close', () => {
     const outside = document.createElement('button');
     document.body.appendChild(outside);
     outside.focus();
@@ -123,11 +123,111 @@ describe('Modal', () => {
     render(<Modal open onClose={() => {}} labelledBy="t"><Body /></Modal>);
     outside.remove();
 
-    expect(() => {
+    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus');
+    try {
       act(() => { root!.render(<Modal open={false} onClose={() => {}} labelledBy="t"><Body /></Modal>); });
-    }).not.toThrow();
 
-    expect(document.activeElement).not.toBe(outside);
-    expect(document.body.contains(document.activeElement)).toBe(true);
+      // Proves the isConnected guard's branch actually ran: .focus() must
+      // never be invoked with `outside` as `this`, since it's detached.
+      expect(focusSpy.mock.instances).not.toContain(outside);
+    } finally {
+      focusSpy.mockRestore();
+    }
+  });
+
+  it('keeps focus on the dialog when Tab is pressed and there are no focusable descendants', () => {
+    render(<Modal open onClose={() => {}} labelledBy="t"><h2 id="t">Title only</h2></Modal>);
+    const dialog = document.querySelector<HTMLDivElement>('[role="dialog"]')!;
+    expect(document.activeElement).toBe(dialog);
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    act(() => { dialog.dispatchEvent(event); });
+
+    // The browser's default Tab behavior must be suppressed, or focus would
+    // escape the dialog (it's outside the tab order via tabIndex={-1}).
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(dialog);
+  });
+
+  it('wraps Shift+Tab from the first focusable back to the last', () => {
+    render(<Modal open onClose={() => {}} labelledBy="t"><Body /></Modal>);
+    const dialog = document.querySelector<HTMLDivElement>('[role="dialog"]')!;
+    const buttons = dialog.querySelectorAll('button');
+    const first = buttons[0] as HTMLButtonElement;
+    const last = buttons[buttons.length - 1] as HTMLButtonElement;
+
+    first.focus();
+    act(() => {
+      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
+    });
+
+    expect(document.activeElement).toBe(last);
+  });
+
+  it('keeps body scroll locked while a second modal is still open after the first closes, and restores it once both are closed', () => {
+    const containerA = document.createElement('div');
+    document.body.appendChild(containerA);
+    const rootA = createRoot(containerA);
+
+    const containerB = document.createElement('div');
+    document.body.appendChild(containerB);
+    const rootB = createRoot(containerB);
+
+    act(() => {
+      rootA.render(<Modal open onClose={() => {}} labelledBy="tA"><h2 id="tA">A</h2><button>a</button></Modal>);
+    });
+    expect(document.body.style.overflow).toBe('hidden');
+
+    act(() => {
+      rootB.render(<Modal open onClose={() => {}} labelledBy="tB"><h2 id="tB">B</h2><button>b</button></Modal>);
+    });
+    expect(document.body.style.overflow).toBe('hidden');
+
+    // Close A while B is still open — scroll must remain locked.
+    act(() => {
+      rootA.render(<Modal open={false} onClose={() => {}} labelledBy="tA"><h2 id="tA">A</h2><button>a</button></Modal>);
+    });
+    expect(document.body.style.overflow).toBe('hidden');
+
+    // Now close B — the lock should finally release.
+    act(() => {
+      rootB.render(<Modal open={false} onClose={() => {}} labelledBy="tB"><h2 id="tB">B</h2><button>b</button></Modal>);
+    });
+    expect(document.body.style.overflow).not.toBe('hidden');
+
+    act(() => { rootA.unmount(); });
+    act(() => { rootB.unmount(); });
+    containerA.remove();
+    containerB.remove();
+  });
+
+  it('does not close when a drag starts inside the dialog and is released over the overlay', () => {
+    const onClose = vi.fn();
+    render(<Modal open onClose={onClose} labelledBy="t"><Body /></Modal>);
+    const dialog = document.querySelector<HTMLDivElement>('[role="dialog"]')!;
+    const overlay = document.querySelector<HTMLDivElement>('[data-testid="modal-overlay"]')!;
+
+    // Simulate: mousedown inside the dialog (e.g. starting a text
+    // selection), then the click lands on the overlay because mouseup
+    // happened outside — the browser resolves the click's target to the
+    // nearest common ancestor of mousedown/mouseup targets.
+    act(() => {
+      dialog.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    act(() => {
+      overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still calls onClose for a plain overlay click with no prior mousedown', () => {
+    const onClose = vi.fn();
+    render(<Modal open onClose={onClose} labelledBy="t"><Body /></Modal>);
+    const overlay = document.querySelector<HTMLDivElement>('[data-testid="modal-overlay"]')!;
+
+    act(() => { overlay.click(); });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,9 +1,30 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+// Body scroll lock, reference-counted at module scope so two Modals can be
+// open concurrently (e.g. a confirm dialog opened over another modal)
+// without one closing first and unlocking scroll out from under the other.
+let scrollLockCount = 0;
+let scrollLockPreviousOverflow = '';
+
+function acquireScrollLock() {
+  if (scrollLockCount === 0) {
+    scrollLockPreviousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  scrollLockCount += 1;
+}
+
+function releaseScrollLock() {
+  scrollLockCount = Math.max(0, scrollLockCount - 1);
+  if (scrollLockCount === 0) {
+    document.body.style.overflow = scrollLockPreviousOverflow;
+  }
+}
 
 interface Props {
   open: boolean;
@@ -55,18 +76,49 @@ export function Modal({ open, onClose, labelledBy, children, width = 380, initia
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  // Body scroll lock.
+  // Body scroll lock — reference-counted so concurrently-open Modals don't
+  // unlock scroll for each other when one closes first.
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previous; };
+    acquireScrollLock();
+    return () => { releaseScrollLock(); };
   }, [open]);
+
+  // Tracks whether the current mousedown-click sequence on the overlay
+  // started inside the dialog (e.g. a text selection drag whose mouseup
+  // lands on the backdrop). The browser resolves such a click's target to
+  // the nearest common ancestor of the mousedown/mouseup targets — the
+  // overlay — bypassing the dialog's stopPropagation, so we must detect and
+  // ignore it explicitly rather than close the modal underneath the user.
+  const startedInsideDialog = useRef(false);
+
+  const onDialogMouseDown = () => { startedInsideDialog.current = true; };
+
+  const onOverlayMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) startedInsideDialog.current = false;
+  };
+
+  const onOverlayClick = () => {
+    if (startedInsideDialog.current) {
+      startedInsideDialog.current = false;
+      return;
+    }
+    onClose();
+  };
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
     if (e.key !== 'Tab') return;
     const items = focusables();
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      // No focusable descendants: the dialog itself (tabIndex={-1}) is the
+      // only thing that should hold focus. Without preventDefault here the
+      // browser's default Tab behavior takes over — since the dialog is
+      // outside the normal tab order, focus escapes to the page behind the
+      // overlay.
+      e.preventDefault();
+      dialogRef.current?.focus();
+      return;
+    }
 
     const first = items[0];
     const last = items[items.length - 1];
@@ -86,7 +138,8 @@ export function Modal({ open, onClose, labelledBy, children, width = 380, initia
   return createPortal(
     <div
       data-testid="modal-overlay"
-      onClick={onClose}
+      onMouseDown={onOverlayMouseDown}
+      onClick={onOverlayClick}
       style={{
         position: 'fixed', inset: 0, zIndex: 1200,
         background: 'rgba(5, 8, 13, 0.72)', backdropFilter: 'blur(2px)',
@@ -100,6 +153,7 @@ export function Modal({ open, onClose, labelledBy, children, width = 380, initia
         aria-labelledby={labelledBy}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={onDialogMouseDown}
         onKeyDown={onKeyDown}
         style={{
           width, maxWidth: '100%',
