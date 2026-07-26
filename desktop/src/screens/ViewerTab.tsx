@@ -62,13 +62,32 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   const videoRef = useRef<HTMLVideoElement>(null);
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
   const iceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The agent pushes a clipboard update on every remote clipboard change (as
+  // often as every 500ms), with no user gesture behind it, so a failing
+  // writeText (e.g. "document not focused" in WebKitGTK) would otherwise
+  // stack a fresh permanent error toast per change. Report only the first
+  // failure since the last success, mirroring LogPanel's reportedRef guard.
+  // Unlike LogPanel (one poll loop, reset on unmount), this fires for the
+  // component's whole lifetime, so it resets on success instead: the user
+  // is told once per outage, and told again if sync recovers and then
+  // breaks a second time.
+  const clipboardErrorReportedRef = useRef(false);
 
   const webrtc = useWebRTC(
     useCallback((m: SignalingMessage) => { sendRef.current?.(m); }, []),
     // Writes the remote host's clipboard sync into the local clipboard. If this
     // fails, the user pastes and silently gets stale content instead of what
     // they just copied on the remote machine, so it's worth a toast.
-    useCallback((text: string) => { navigator.clipboard.writeText(text).catch(() => notify.error(t('notify:clipboardFailed'))); }, [notify, t]),
+    useCallback((text: string) => {
+      navigator.clipboard.writeText(text)
+        .then(() => { clipboardErrorReportedRef.current = false; })
+        .catch(() => {
+          if (!clipboardErrorReportedRef.current) {
+            clipboardErrorReportedRef.current = true;
+            notify.error(t('notify:clipboardFailed'));
+          }
+        });
+    }, [notify, t]),
   );
 
   const liveStats = useStats(webrtc.getPc, showStats);
