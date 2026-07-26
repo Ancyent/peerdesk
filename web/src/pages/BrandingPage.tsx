@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api } from '../api/client';
+import { localizeError } from '../api/errors';
 import { applyBranding } from '../hooks/useBranding';
-import { InlineError } from '@pd/ui';
+import { InlineError, useNotify } from '@pd/ui';
 
 interface Props {
   onBack: () => void;
@@ -12,6 +13,7 @@ interface Props {
 export function BrandingPage({ onBack }: Props) {
   const { t } = useTranslation('branding');
   const { accessToken } = useAuth();
+  const { notify } = useNotify();
   const [brandName, setBrandName] = useState('PeerDesk');
   const [accentColor, setAccentColor] = useState('#2563eb');
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
@@ -27,8 +29,11 @@ export function BrandingPage({ onBack }: Props) {
         setAccentColor(b.accent_color);
         setLogoDataUrl(b.logo_data_url);
       })
-      .catch(() => {});
-  }, []);
+      // A failed load silently falls back to the built-in defaults shown
+      // above, which an admin who has actually customized branding could
+      // mistake for "branding was reset" and then overwrite by hitting Save.
+      .catch((e) => notify.error(t('notify:branding.loadFailed'), { detail: localizeError(e) }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -67,11 +72,19 @@ export function BrandingPage({ onBack }: Props) {
   const handleReset = async () => {
     if (!accessToken) return;
     const defaults = { brand_name: 'PeerDesk', accent_color: '#2563eb', logo_data_url: null };
-    await api.branding.update(accessToken, defaults).catch(() => {});
-    setBrandName('PeerDesk');
-    setAccentColor('#2563eb');
-    setLogoDataUrl(null);
-    applyBranding({ brand_name: 'PeerDesk', logo_data_url: null, accent_color: '#2563eb' });
+    try {
+      await api.branding.update(accessToken, defaults);
+      // Only reflect the reset locally once the server has actually accepted
+      // it -- otherwise the form would show defaults while the server still
+      // has the old branding, and the admin would have no way of knowing.
+      setBrandName('PeerDesk');
+      setAccentColor('#2563eb');
+      setLogoDataUrl(null);
+      applyBranding({ brand_name: 'PeerDesk', logo_data_url: null, accent_color: '#2563eb' });
+      notify.success(t('notify:branding.reset'));
+    } catch (e) {
+      notify.error(t('notify:branding.resetFailed'), { detail: localizeError(e) });
+    }
   };
 
   const inputStyle: React.CSSProperties = {

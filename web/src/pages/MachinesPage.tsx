@@ -32,7 +32,7 @@ export function MachinesPage({ onConnect }: Props) {
         setMachines(all.filter(m => m.approval_status !== 'pending'));
         setPending(pend);
       })
-      .catch(console.error)
+      .catch((e) => notify.error(t('notify:loadFailed'), { detail: localizeError(e) }))
       .finally(() => setLoading(false));
   };
 

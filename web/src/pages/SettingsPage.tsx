@@ -69,6 +69,9 @@ export function SettingsPage() {
               onChange={e => {
                 const value = e.target.value;
                 i18n.changeLanguage(value);
+                // Best-effort server sync: the UI has already switched language
+                // (visible immediately), so a failure here only means the
+                // preference won't be remembered on the next login elsewhere.
                 if (accessToken) api.users.update(accessToken, { language: value }).catch(() => {});
               }}
             >

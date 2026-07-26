@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNotify } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
 import { api, type ApiKeyListOut } from '../api/client';
+import { localizeError } from '../api/errors';
 import { copyText } from '../lib/clipboard';
 import { formatDate } from '../i18n/format';
 
 export function ApiKeysPage() {
   const { t } = useTranslation(['apikeys', 'common']);
   const { accessToken } = useAuth();
+  const { notify } = useNotify();
   const [keys, setKeys] = useState<ApiKeyListOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
@@ -18,7 +21,10 @@ export function ApiKeysPage() {
 
   const load = () => {
     if (!accessToken) return;
-    api.apiKeys.list(accessToken).then(setKeys).catch(console.error).finally(() => setLoading(false));
+    api.apiKeys.list(accessToken)
+      .then(setKeys)
+      .catch((e) => notify.error(t('notify:loadFailed'), { detail: localizeError(e) }))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, [accessToken]);
@@ -32,14 +38,22 @@ export function ApiKeysPage() {
       setNewName('');
       setAutoApprove(false);
       load();
-    } catch (e) { console.error(e); }
+      notify.success(t('notify:apiKeys.created'));
+    } catch (e) {
+      notify.error(t('notify:apiKeys.createFailed'), { detail: localizeError(e) });
+    }
     finally { setCreating(false); }
   };
 
   const handleRevoke = async (id: string) => {
     if (!accessToken) return;
-    await api.apiKeys.revoke(accessToken, id);
-    setKeys(prev => prev.filter(k => k.id !== id));
+    try {
+      await api.apiKeys.revoke(accessToken, id);
+      setKeys(prev => prev.filter(k => k.id !== id));
+      notify.success(t('notify:apiKeys.revoked'));
+    } catch (e) {
+      notify.error(t('notify:apiKeys.revokeFailed'), { detail: localizeError(e) });
+    }
   };
 
   const handleCopy = async (text: string) => {

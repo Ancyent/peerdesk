@@ -10,5 +10,23 @@
     "deleteFailed": "Mașina nu a putut fi ștearsă",
     "forgotten": "Parola salvată a fost ștearsă",
     "forgetFailed": "Parola salvată nu a putut fi ștearsă"
-  }
+  },
+  "apiKeys": {
+    "created": "Cheie API creată",
+    "createFailed": "Cheia API nu a putut fi creată",
+    "revoked": "Cheie API revocată",
+    "revokeFailed": "Cheia API nu a putut fi revocată"
+  },
+  "branding": {
+    "reset": "Branding resetat la valorile implicite",
+    "resetFailed": "Branding-ul nu a putut fi resetat",
+    "loadFailed": "Setările de branding nu au putut fi încărcate"
+  },
+  "downloads": {
+    "tokenFailed": "Jetonul de înregistrare nu a putut fi generat"
+  },
+  "organization": {
+    "saveFailed": "Modificarea nu a putut fi salvată"
+  },
+  "loadFailed": "Lista nu a putut fi încărcată"
 }

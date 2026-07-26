@@ -148,6 +148,8 @@ export default function App() {
       const pending = pendingSaveRef.current;
       pendingSaveRef.current = null;
       if (pending && accessToken) {
+        // Best-effort: the password is already applied to this session, and a
+        // failure here only means it won't be remembered next time.
         api.machines.saveSavedPassword(accessToken, pending.machineId, pending.password).catch(() => {});
       }
     }
@@ -157,6 +159,9 @@ export default function App() {
       // A saved password that no longer works (host rotated it) is stale — drop it
       // so we stop auto-connecting with it and fall back to manual entry.
       if (msg.code === 'unauthorized' && autoSavedMachineRef.current && accessToken) {
+        // Best-effort cleanup of a stale saved password: if this fails we'll
+        // just try it again and get the same "wrong credentials" error next
+        // connect attempt, same as if we'd never cleared it.
         api.machines.clearSavedPassword(accessToken, autoSavedMachineRef.current).catch(() => {});
       }
       autoSavedMachineRef.current = null;

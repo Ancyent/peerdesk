@@ -75,6 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const doLogout = useCallback(() => {
     const refresh = getTokens()?.refresh;
+    // Best-effort: we clear local storage and drop the session regardless,
+    // so the user is logged out client-side either way. Failing to also
+    // invalidate the refresh token server-side is not something they need
+    // to act on.
     if (refresh) api.auth.logout(refresh).catch(() => {});
     clearStore();
     setState({ accessToken: null, user: null, loading: false });

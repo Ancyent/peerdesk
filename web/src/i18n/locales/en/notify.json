@@ -10,5 +10,23 @@
     "deleteFailed": "Could not delete the machine",
     "forgotten": "Saved password removed",
     "forgetFailed": "Could not remove the saved password"
-  }
+  },
+  "apiKeys": {
+    "created": "API key created",
+    "createFailed": "Could not create the API key",
+    "revoked": "API key revoked",
+    "revokeFailed": "Could not revoke the API key"
+  },
+  "branding": {
+    "reset": "Branding reset to defaults",
+    "resetFailed": "Could not reset branding",
+    "loadFailed": "Could not load the current branding settings"
+  },
+  "downloads": {
+    "tokenFailed": "Could not generate the registration token"
+  },
+  "organization": {
+    "saveFailed": "Could not save the change"
+  },
+  "loadFailed": "Could not load the list"
 }

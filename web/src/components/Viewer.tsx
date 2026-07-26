@@ -35,6 +35,9 @@ export const Viewer = forwardRef<ViewerHandle, Props>(function Viewer(
     const video = videoRef.current;
     if (!video || !stream) return;
     video.srcObject = stream;
+    // Autoplay rejection is normal browser behavior (e.g. no prior user
+    // gesture) and the viewer already shows the video element either way;
+    // nothing actionable for the user to do here.
     video.play().catch(console.error);
     const sync = setInterval(() => {
       if (video.buffered.length > 0) {
@@ -48,6 +51,8 @@ export const Viewer = forwardRef<ViewerHandle, Props>(function Viewer(
   useEffect(() => {
     if (audioRef.current && audioStream) {
       audioRef.current.srcObject = audioStream;
+      // Same as the video element above: autoplay rejection is normal and
+      // recoverable (the mute toggle below lets the user start it manually).
       audioRef.current.play().catch(() => {});
     }
   }, [audioStream]);

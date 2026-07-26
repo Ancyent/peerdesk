@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { useNotify } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError, type RegistrationTokenOut, type Release, type ReleaseAsset } from '../api/client';
 import { localizeError } from '../api/errors';
@@ -18,6 +19,7 @@ const h: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--te
 export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: OsId) => void }) {
   const { t } = useTranslation('downloads');
   const { accessToken } = useAuth();
+  const { notify } = useNotify();
   const releasesUrl = getConfig().releasesUrl;
 
   const [release, setRelease] = useState<Release | null>(null);
@@ -63,7 +65,9 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
         ...(machineName.trim() ? { name: machineName.trim() } : {}),
       });
       setToken(tok);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      notify.error(t('notify:downloads.tokenFailed'), { detail: localizeError(e) });
+    }
     finally { setGenerating(false); }
   };
 

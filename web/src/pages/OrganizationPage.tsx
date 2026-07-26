@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNotify } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
 import { api, type MachineOut } from '../api/client';
+import { localizeError } from '../api/errors';
 import { type OrgNode } from '../components/OrgTree';
 import { MachineCard } from '../components/MachineCard';
 
@@ -13,11 +15,14 @@ interface Props {
 export function OrganizationPage({ onConnect, orgNode }: Props) {
   const { t } = useTranslation('organization');
   const { accessToken } = useAuth();
+  const { notify } = useNotify();
   const [machines, setMachines] = useState<MachineOut[]>([]);
 
   const load = () => {
     if (!accessToken) return;
-    api.machines.list(accessToken).then(setMachines).catch(console.error);
+    api.machines.list(accessToken)
+      .then(setMachines)
+      .catch((e) => notify.error(t('notify:loadFailed'), { detail: localizeError(e) }));
   };
 
   useEffect(() => { load(); }, [accessToken]);
@@ -26,8 +31,9 @@ export function OrganizationPage({ onConnect, orgNode }: Props) {
     if (!accessToken) return;
     try {
       await api.machines.clearSavedPassword(accessToken, m.id);
+      notify.success(t('notify:machines.forgotten'));
     } catch (e) {
-      console.error(e);
+      notify.error(t('notify:machines.forgetFailed'), { detail: localizeError(e) });
     }
     load();
   };

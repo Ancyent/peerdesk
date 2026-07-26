@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNotify } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
 import { api, type CompanyOut, type LocationOut, type GroupOut, type GrantOut } from '../api/client';
+import { localizeError } from '../api/errors';
 import {
   childTypeOf, renameInList, removeFromList, renameInRecord, removeFromRecord, coveredBy,
   type NodeType, type GrantNode,
@@ -44,6 +46,7 @@ const confirmBtn: CSSProperties = { padding: '3px 6px', fontSize: 11, background
 export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props) {
   const { t } = useTranslation('organization');
   const { accessToken } = useAuth();
+  const { notify } = useNotify();
   const [companies, setCompanies] = useState<CompanyOut[]>([]);
   const [locations, setLocations] = useState<Record<string, LocationOut[]>>({});
   const [groups, setGroups] = useState<Record<string, GroupOut[]>>({});
@@ -57,10 +60,17 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
   const [childName, setChildName] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<{ type: NodeType; id: string } | null>(null);
 
+  // Shared by every tree fetch/mutation below so a failed request always
+  // tells the admin something went wrong instead of quietly rendering an
+  // empty branch (which reads as "this company has no locations") or doing
+  // nothing at all when they click add/rename/delete.
+  const notifyLoadFailed = (e: unknown) => notify.error(t('notify:loadFailed'), { detail: localizeError(e) });
+  const notifySaveFailed = (e: unknown) => notify.error(t('notify:organization.saveFailed'), { detail: localizeError(e) });
+
   useEffect(() => {
     if (!accessToken) return;
-    api.companies.list(accessToken).then(setCompanies).catch(console.error);
-  }, [accessToken]);
+    api.companies.list(accessToken).then(setCompanies).catch(notifyLoadFailed);
+  }, [accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const expand = (id: string) => setExpanded(prev => { const n = new Set(prev); n.add(id); return n; });
 
@@ -70,18 +80,18 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
     next.add(id); setExpanded(next);
     if (!accessToken) return;
     if (type === 'company' && !locations[id]) {
-      const locs = await api.locations.list(accessToken, id).catch(() => [] as LocationOut[]);
+      const locs = await api.locations.list(accessToken, id).catch((e) => { notifyLoadFailed(e); return [] as LocationOut[]; });
       setLocations(p => ({ ...p, [id]: locs }));
     }
     if (type === 'location' && !groups[id]) {
-      const grps = await api.groups.list(accessToken, id).catch(() => [] as GroupOut[]);
+      const grps = await api.groups.list(accessToken, id).catch((e) => { notifyLoadFailed(e); return [] as GroupOut[]; });
       setGroups(p => ({ ...p, [id]: grps }));
     }
   };
 
   const addCompany = async () => {
     if (!accessToken || !newName.trim()) return;
-    const co = await api.companies.create(accessToken, newName.trim()).catch(() => null);
+    const co = await api.companies.create(accessToken, newName.trim()).catch((e) => { notifySaveFailed(e); return null; });
     if (co) { setCompanies(p => [...p, co]); setNewName(''); setAdding(false); }
   };
 
@@ -90,20 +100,20 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
   const commitEdit = async () => {
     if (!accessToken || !editing || !editName.trim()) { cancelEdit(); return; }
     const { type, id } = editing; const name = editName.trim();
-    if (type === 'company') { const r = await api.companies.update(accessToken, id, name).catch(() => null); if (r) setCompanies(p => renameInList(p, id, name)); }
-    else if (type === 'location') { const r = await api.locations.update(accessToken, id, name).catch(() => null); if (r) setLocations(p => renameInRecord(p, id, name)); }
-    else { const r = await api.groups.update(accessToken, id, name).catch(() => null); if (r) setGroups(p => renameInRecord(p, id, name)); }
+    if (type === 'company') { const r = await api.companies.update(accessToken, id, name).catch((e) => { notifySaveFailed(e); return null; }); if (r) setCompanies(p => renameInList(p, id, name)); }
+    else if (type === 'location') { const r = await api.locations.update(accessToken, id, name).catch((e) => { notifySaveFailed(e); return null; }); if (r) setLocations(p => renameInRecord(p, id, name)); }
+    else { const r = await api.groups.update(accessToken, id, name).catch((e) => { notifySaveFailed(e); return null; }); if (r) setGroups(p => renameInRecord(p, id, name)); }
     cancelEdit();
   };
 
   const startAddChild = async (type: 'company' | 'location', id: string) => {
     if (accessToken) {
       if (type === 'company' && !locations[id]) {
-        const locs = await api.locations.list(accessToken, id).catch(() => [] as LocationOut[]);
+        const locs = await api.locations.list(accessToken, id).catch((e) => { notifyLoadFailed(e); return [] as LocationOut[]; });
         setLocations(p => (p[id] ? p : { ...p, [id]: locs }));
       }
       if (type === 'location' && !groups[id]) {
-        const grps = await api.groups.list(accessToken, id).catch(() => [] as GroupOut[]);
+        const grps = await api.groups.list(accessToken, id).catch((e) => { notifyLoadFailed(e); return [] as GroupOut[]; });
         setGroups(p => (p[id] ? p : { ...p, [id]: grps }));
       }
     }
@@ -113,8 +123,8 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
   const commitAddChild = async () => {
     if (!accessToken || !addingChild || !childName.trim()) { cancelAddChild(); return; }
     const { type, id } = addingChild; const name = childName.trim();
-    if (type === 'company') { const loc = await api.locations.create(accessToken, id, name).catch(() => null); if (loc) setLocations(p => ({ ...p, [id]: [...(p[id] ?? []), loc] })); }
-    else { const grp = await api.groups.create(accessToken, id, name).catch(() => null); if (grp) setGroups(p => ({ ...p, [id]: [...(p[id] ?? []), grp] })); }
+    if (type === 'company') { const loc = await api.locations.create(accessToken, id, name).catch((e) => { notifySaveFailed(e); return null; }); if (loc) setLocations(p => ({ ...p, [id]: [...(p[id] ?? []), loc] })); }
+    else { const grp = await api.groups.create(accessToken, id, name).catch((e) => { notifySaveFailed(e); return null; }); if (grp) setGroups(p => ({ ...p, [id]: [...(p[id] ?? []), grp] })); }
     cancelAddChild();
   };
 
@@ -125,18 +135,18 @@ export function OrgTree({ selected, onSelect, machineCounts, selectable }: Props
         await api.companies.delete(accessToken, id);
         setCompanies(p => removeFromList(p, id));
         setLocations(p => { const n = { ...p }; delete n[id]; return n; });
-      } catch { /* leave state intact */ }
+      } catch (e) { notifySaveFailed(e); /* leave state intact */ }
     } else if (type === 'location') {
       try {
         await api.locations.delete(accessToken, id);
         setLocations(p => removeFromRecord(p, id));
         setGroups(p => { const n = { ...p }; delete n[id]; return n; });
-      } catch { /* leave state intact */ }
+      } catch (e) { notifySaveFailed(e); /* leave state intact */ }
     } else {
       try {
         await api.groups.delete(accessToken, id);
         setGroups(p => removeFromRecord(p, id));
-      } catch { /* leave state intact */ }
+      } catch (e) { notifySaveFailed(e); /* leave state intact */ }
     }
     setConfirmDelete(null);
   };
