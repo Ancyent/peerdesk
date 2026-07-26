@@ -228,18 +228,62 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: cd desktop && cargo tauri android build --apk
+      # Searches the whole generated tree instead of a hardcoded output path.
+      # The previous version pointed at .../outputs/apk/release and used
+      # `find ... | while read`, so when the path stopped matching, find's error
+      # went to stderr, the pipeline still exited 0, dist/ stayed empty, and
+      # `if-no-files-found: warn` made the upload green too — v0.5.1 shipped
+      # with no APK and nothing anywhere said so. Fail loudly instead.
       - name: Collect artifacts
+        shell: bash
         run: |
+          set -o pipefail
           VERSION="${{ github.ref_name }}"
+          GEN=desktop/src-tauri/gen/android
           mkdir -p dist
-          find desktop/src-tauri/gen/android/app/build/outputs/apk/release -name '*.apk' | while read f; do
-            cp "$f" "dist/peerdesk-android-${VERSION}.apk"
+
+          mapfile -t all < <(find "$GEN" -type f -name '*.apk' 2>/dev/null | sort)
+          if [ ${#all[@]} -eq 0 ]; then
+            echo "::error::No .apk found anywhere under $GEN — the build step reported success but produced nothing."
+            echo "Directories present, for diagnosis:"
+            find "$GEN" -type d -name outputs -o -type d -name '*release*' 2>/dev/null | head -40
+            exit 1
+          fi
+
+          echo "APKs found:"; printf '  %s\n' "${all[@]}"
+
+          mapfile -t apks < <(printf '%s\n' "${all[@]}" | grep -viE 'unsigned|/debug/' || true)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "::error::Only unsigned or debug APKs were produced — refusing to ship one. Check the signing config."
+            exit 1
+          fi
+
+          # A universal APK covers every ABI, so prefer it; otherwise keep each
+          # split under its own name so they cannot overwrite one another.
+          universal=""
+          for f in "${apks[@]}"; do
+            case "$f" in *universal*) universal="$f"; break ;; esac
           done
+
+          if [ -n "$universal" ]; then
+            cp "$universal" "dist/peerdesk-android-${VERSION}.apk"
+          elif [ ${#apks[@]} -eq 1 ]; then
+            cp "${apks[0]}" "dist/peerdesk-android-${VERSION}.apk"
+          else
+            for f in "${apks[@]}"; do
+              abi=$(basename "$f" .apk | sed 's/^app-//; s/-release$//')
+              cp "$f" "dist/peerdesk-android-${VERSION}-${abi}.apk"
+            done
+          fi
+
+          echo "Collected:"; ls -l dist/
+
       - uses: actions/upload-artifact@v4
         with:
           name: viewer-android
           path: dist/
-          if-no-files-found: warn
+          # `warn` was the second half of the silent failure above.
+          if-no-files-found: error
 
   # ── Release ───────────────────────────────────────────────
   #
