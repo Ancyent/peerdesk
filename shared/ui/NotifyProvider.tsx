@@ -69,9 +69,11 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
   // mouseleave when the hovered element is removed under a stationary cursor.
   // This effect heals the flag when the stack fully drains, which is safe.
   // Known gap (accepted): dismissing one of several toasts while hovering,
-  // with the cursor stationary, leaves the flag set until the next pointer
-  // movement or full drain. This is bounded, self-heals, and doesn't affect
-  // error toasts or click-to-dismiss. Not fixed because a fully self-correcting
+  // with the cursor stationary, leaves the flag set — and with it, every
+  // remaining toast's timer paused — until the pointer moves or the user
+  // dismisses the rest (a full drain can't happen on its own here, since
+  // nothing auto-dismisses while paused). Doesn't affect error toasts or
+  // click-to-dismiss. Not fixed because a fully self-correcting
   // design would poll cursor geometry at tick time, which happy-dom cannot test.
   useEffect(() => {
     if (isEmpty) hoveredRef.current = false;

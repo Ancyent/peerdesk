@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNotify } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
-import { api, type LocationOut, type GroupOut } from '../api/client';
+import { api, type CompanyOut, type LocationOut, type GroupOut } from '../api/client';
+import { localizeError } from '../api/errors';
 import { buildPickerNodes, filterNodes, type PickerNode } from './treePicker';
 
 interface Props {
@@ -30,12 +32,19 @@ const icon: Record<PickerNode['type'], string> = { company: 'üè¢', location: '
 export function TreePicker({ value, onChange, disabled }: Props) {
   const { t } = useTranslation('organization');
   const { accessToken } = useAuth();
+  const { notify } = useNotify();
   const [open, setOpen] = useState(false);
   const [nodes, setNodes] = useState<PickerNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState('');
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Shared by every load below so a failed request always tells the user
+  // something went wrong instead of quietly rendering an empty tree, which
+  // reads as "this company has no locations" -- the same failure mode
+  // OrgTree's notifyLoadFailed was introduced to fix (web/src/components/OrgTree.tsx).
+  const notifyLoadFailed = (e: unknown) => notify.error(t('notify:loadFailed'), { detail: localizeError(e) });
 
   // Eager-load the whole visible tree the first time the popover opens. The tree
   // is small and everything comes through the account-filtered list endpoints,
@@ -46,14 +55,14 @@ export function TreePicker({ value, onChange, disabled }: Props) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const companies = await api.companies.list(accessToken).catch(() => []);
+      const companies = await api.companies.list(accessToken).catch((e) => { notifyLoadFailed(e); return [] as CompanyOut[]; });
       const locsByCo: Record<string, LocationOut[]> = {};
       const grpsByLoc: Record<string, GroupOut[]> = {};
       await Promise.all(companies.map(async co => {
-        const locs = await api.locations.list(accessToken, co.id).catch(() => [] as LocationOut[]);
+        const locs = await api.locations.list(accessToken, co.id).catch((e) => { notifyLoadFailed(e); return [] as LocationOut[]; });
         locsByCo[co.id] = locs;
         await Promise.all(locs.map(async loc => {
-          grpsByLoc[loc.id] = await api.groups.list(accessToken, loc.id).catch(() => [] as GroupOut[]);
+          grpsByLoc[loc.id] = await api.groups.list(accessToken, loc.id).catch((e) => { notifyLoadFailed(e); return [] as GroupOut[]; });
         }));
       }));
       if (cancelled) return;
@@ -62,7 +71,7 @@ export function TreePicker({ value, onChange, disabled }: Props) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [open, loaded, accessToken]);
+  }, [open, loaded, accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on click outside and on Escape.
   useEffect(() => {

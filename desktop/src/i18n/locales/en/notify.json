@@ -4,5 +4,7 @@
   "logsFailed": "Could not load the agent log",
   "updateCheckFailed": "Could not check for updates",
   "clipboardFailed": "Could not copy to the clipboard",
-  "approvalFailed": "Could not send the response to the agent"
+  "approvalFailed": "Could not send the response to the agent",
+  "settingsLoadFailed": "Could not load your settings — showing defaults for now",
+  "settingsSaveFailed": "Could not save your settings"
 }

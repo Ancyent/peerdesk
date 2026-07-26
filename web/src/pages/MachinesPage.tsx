@@ -40,13 +40,25 @@ export function MachinesPage({ onConnect }: Props) {
 
   const handleApprove = async (id: string) => {
     if (!accessToken) return;
-    await api.machines.approve(accessToken, id);
+    try {
+      await api.machines.approve(accessToken, id);
+      // No success toast: the row visibly moving out of the pending list and
+      // into the active tab already confirms the approval happened.
+    } catch (e) {
+      notify.error(t('notify:machines.approveFailed'), { detail: localizeError(e) });
+    }
     load();
   };
 
   const handleDeny = async (id: string) => {
     if (!accessToken) return;
-    await api.machines.deny(accessToken, id);
+    try {
+      await api.machines.deny(accessToken, id);
+      // No success toast: the row disappearing from the pending list is
+      // itself the confirmation.
+    } catch (e) {
+      notify.error(t('notify:machines.denyFailed'), { detail: localizeError(e) });
+    }
     load();
   };
 

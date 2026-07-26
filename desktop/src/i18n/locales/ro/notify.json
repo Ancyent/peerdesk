@@ -4,5 +4,7 @@
   "logsFailed": "Jurnalul agentului nu a putut fi încărcat",
   "updateCheckFailed": "Verificarea actualizărilor a eșuat",
   "clipboardFailed": "Copierea în clipboard a eșuat",
-  "approvalFailed": "Răspunsul nu a putut fi trimis către agent"
+  "approvalFailed": "Răspunsul nu a putut fi trimis către agent",
+  "settingsLoadFailed": "Setările nu au putut fi încărcate — se afișează valorile implicite",
+  "settingsSaveFailed": "Setările nu au putut fi salvate"
 }

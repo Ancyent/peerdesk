@@ -9,7 +9,9 @@
     "deleted": "Mașină ștearsă",
     "deleteFailed": "Mașina nu a putut fi ștearsă",
     "forgotten": "Parola salvată a fost ștearsă",
-    "forgetFailed": "Parola salvată nu a putut fi ștearsă"
+    "forgetFailed": "Parola salvată nu a putut fi ștearsă",
+    "approveFailed": "Mașina nu a putut fi aprobată",
+    "denyFailed": "Mașina nu a putut fi refuzată"
   },
   "apiKeys": {
     "created": "Cheie API creată",

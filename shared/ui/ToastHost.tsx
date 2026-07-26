@@ -50,7 +50,6 @@ export function ToastHost({ toasts, onDismiss, onHoverChange, hostRef, closeLabe
     <div
       ref={hostRef}
       data-testid="toast-host"
-      role="status"
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
       style={{

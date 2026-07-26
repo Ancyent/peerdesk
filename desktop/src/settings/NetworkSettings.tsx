@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
+import { useNotify } from '@pd/ui';
 import { useAgentContext } from '../context/AppContext';
 import { LogPanel } from '../components/LogPanel';
 
 export function NetworkSettings() {
   const { status, start } = useAgentContext();
   const { t } = useTranslation('settings');
+  const { notify } = useNotify();
   const [serverUrl, setServerUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -19,22 +21,16 @@ export function NetworkSettings() {
       setServerUrl(status.server_url ?? '');
     }
   }, [status.server_url]);
-  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
-
-  const showMsg = (text: string, ok: boolean) => {
-    setToast({ text, ok });
-    setTimeout(() => setToast(null), 3000);
-  };
 
   const applyUrl = async (url: string) => {
     try {
       await invoke('apply_config_link', { url });
-      showMsg(t('settings:network.toastApplied'), true);
+      notify.success(t('settings:network.toastApplied'));
       // apply_config_link stops the agent; restart it so it registers with
       // the new server/key.
       setTimeout(() => { start(); }, 1500);
     } catch (e) {
-      showMsg(t('settings:network.toastError', { message: String(e) }), false);
+      notify.error(t('settings:network.toastError', { message: String(e) }));
     }
   };
 
@@ -42,22 +38,17 @@ export function NetworkSettings() {
     try {
       const text = await navigator.clipboard.readText();
       if (!text.startsWith('peerdesk://')) {
-        showMsg(t('settings:network.toastNoConfigLink'), false);
+        notify.error(t('settings:network.toastNoConfigLink'));
         return;
       }
       await applyUrl(text);
     } catch (e) {
-      showMsg(t('settings:network.toastError', { message: String(e) }), false);
+      notify.error(t('settings:network.toastError', { message: String(e) }));
     }
   };
 
   return (
     <div style={{ padding: '20px 24px', position: 'relative' }}>
-      {toast && (
-        <div style={{ position: 'absolute', top: 12, right: 12, background: toast.ok ? '#1a3a1a' : '#3a1a1a', border: `1px solid ${toast.ok ? '#56d364' : '#f85149'}`, borderRadius: 6, padding: '8px 14px', fontSize: 12, color: toast.ok ? '#56d364' : '#f85149', zIndex: 10 }}>
-          {toast.text}
-        </div>
-      )}
       <div style={{ fontSize: 15, fontWeight: 600, color: '#e6edf3', marginBottom: 20 }}>{t('settings:network.title')}</div>
 
       <div style={{ marginBottom: 20 }}>

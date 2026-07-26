@@ -9,7 +9,9 @@
     "deleted": "Machine deleted",
     "deleteFailed": "Could not delete the machine",
     "forgotten": "Saved password removed",
-    "forgetFailed": "Could not remove the saved password"
+    "forgetFailed": "Could not remove the saved password",
+    "approveFailed": "Could not approve the machine",
+    "denyFailed": "Could not deny the machine"
   },
   "apiKeys": {
     "created": "API key created",
