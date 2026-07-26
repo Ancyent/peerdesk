@@ -242,13 +242,21 @@ jobs:
           if-no-files-found: warn
 
   # ── Release ───────────────────────────────────────────────
-  release:
-    name: Publish GitHub Release
+  #
+  # Split in two on purpose. Only the desktop viewers feed the Tauri updater,
+  # so only they are gated on signing. Agents and the Android APK do not use
+  # the updater (Android gets notify+link), and blocking them because a desktop
+  # bundle failed to sign would punish the wrong artifacts.
+  #
+  # Both jobs use `!cancelled()`, so each runs regardless of whether the other
+  # — or its own build jobs — failed. `release-viewers` merely runs AFTER
+  # `release-agents` so the two never race to create the same release.
+
+  release-agents:
+    name: Publish agents + Android
     needs:
       - build-agent-linux
       - build-agent-windows
-      - build-viewer-linux
-      - build-viewer-windows
       - build-viewer-android
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') && !cancelled()
@@ -261,24 +269,8 @@ jobs:
       - name: List artifacts
         run: find . -type f | sort
 
-      # Hard gate, deliberately: an unsigned release publishes fine and looks
-      # green, but the updater then silently stops working for every existing
-      # client. Refusing to publish is the cheaper failure — fix the cause and
-      # re-run the tag.
-      - name: Require signed viewer bundles
-        run: |
-          missing=0
-          ls viewer-linux/peerdesk-viewer-linux-*.AppImage.sig >/dev/null 2>&1 \
-            || { echo "::error::No Linux .AppImage.sig — updater signing failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-linux build pass?)"; missing=1; }
-          ls viewer-windows/peerdesk-viewer-windows-*-setup.exe.sig >/dev/null 2>&1 \
-            || { echo "::error::No Windows setup.exe.sig — updater signing failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-windows build pass?)"; missing=1; }
-          if [ "$missing" != 0 ]; then
-            echo "::error::Refusing to publish an unsigned release. Nothing was published; fix the cause and re-run this tag."
-            exit 1
-          fi
-          echo "Signed viewer updater bundles present."
-
-      - name: Publish release
+      # Creates the release for this tag; release-viewers adds to it afterwards.
+      - name: Publish agent and Android assets
         uses: softprops/action-gh-release@v2
         with:
           draft: false
@@ -287,6 +279,49 @@ jobs:
           files: |
             agent-linux/peerdesk-agent-linux-x86_64-*
             agent-windows/peerdesk-agent-windows-x86_64-*.exe
+            viewer-android/peerdesk-android-*.apk
+
+  release-viewers:
+    name: Publish desktop viewers (signed)
+    needs:
+      - build-viewer-linux
+      - build-viewer-windows
+      - release-agents
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled()
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: List artifacts
+        run: find . -type f | sort
+
+      # Hard gate, deliberately: an unsigned viewer publishes fine and looks
+      # green, but the updater then silently stops working for every existing
+      # desktop client. Refusing to publish the viewers is the cheaper failure
+      # — fix the cause and re-run the tag. Agents and Android are unaffected;
+      # they were published by release-agents.
+      - name: Require signed viewer bundles
+        run: |
+          missing=0
+          ls viewer-linux/peerdesk-viewer-linux-*.AppImage.sig >/dev/null 2>&1 \
+            || { echo "::error::No Linux .AppImage.sig — updater signing failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-linux build pass?)"; missing=1; }
+          ls viewer-windows/peerdesk-viewer-windows-*-setup.exe.sig >/dev/null 2>&1 \
+            || { echo "::error::No Windows setup.exe.sig — updater signing failed (are TAURI_SIGNING_PRIVATE_KEY/_PASSWORD set, and did the viewer-windows build pass?)"; missing=1; }
+          if [ "$missing" != 0 ]; then
+            echo "::error::Refusing to publish unsigned desktop viewers. Agents and Android were still published; fix the cause and re-run this tag."
+            exit 1
+          fi
+          echo "Signed viewer updater bundles present."
+
+      - name: Publish viewer assets
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          fail_on_unmatched_files: false
+          files: |
             viewer-linux/peerdesk-viewer-linux-*.deb
             viewer-linux/peerdesk-viewer-linux-*.rpm
             viewer-linux/peerdesk-viewer-linux-*.AppImage
@@ -295,4 +330,3 @@ jobs:
             viewer-windows/peerdesk-viewer-windows-*-setup.exe
             viewer-windows/peerdesk-viewer-windows-*-setup.exe.sig
             viewer-windows/peerdesk-viewer-windows-*-portable.exe
-            viewer-android/peerdesk-android-*.apk

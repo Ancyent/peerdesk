@@ -92,11 +92,17 @@ Add two GitHub Actions secrets (Settings → Secrets and variables → Actions):
   file (`peerdesk-updater.key`).
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — the password chosen when generating it.
 
-Without these, the viewer builds produce no `.sig` files, and the release job's
-**Require signed viewer bundles** step fails the run and publishes NOTHING. That
-is deliberate: an unsigned release looks green but silently breaks auto-update
-for every existing client, so refusing to publish is the cheaper failure. Fix the
-cause, then re-run the same tag.
+Without these, the viewer builds produce no `.sig` files and the
+**Require signed viewer bundles** step fails, so the `release-viewers` job
+publishes no desktop viewers. That is deliberate: an unsigned viewer looks green
+but silently breaks auto-update for every existing desktop client, so refusing to
+publish it is the cheaper failure. Fix the cause, then re-run the same tag.
+
+Releasing is split across two jobs so one failure does not take out the rest:
+- `release-agents` — agents + Android APK. Never gated on signing (Android uses
+  notify+link, not the updater), so these publish even when the viewers fail.
+- `release-viewers` — desktop viewers only, gated as above. Runs after
+  `release-agents` so the two never race to create the same release.
 
 Store the private key in a password manager; losing it means no future client can
 verify updates and every user must reinstall manually.
