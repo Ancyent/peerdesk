@@ -1,26 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
+import { useNotify } from '@pd/ui';
 
 /** Live view of the agent's activity (connect, register, errors, reconnects),
  *  polled from the Rust log buffer. */
 export function LogPanel() {
   const { t } = useTranslation('viewer');
+  const { notify } = useNotify();
   const [lines, setLines] = useState<string[]>([]);
   const boxRef = useRef<HTMLDivElement>(null);
   // Auto-scroll to newest only while the user is already at the bottom; if they
   // scroll up to read older lines, leave them there.
   const stickRef = useRef(true);
+  // Report the failure only once per mount (opening the panel), not once per
+  // 2s poll tick — a stuck agent would otherwise stack an error toast forever.
+  const reportedRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
     const tick = () =>
       invoke<string[]>('get_agent_log')
         .then((l) => { if (alive) setLines(l); })
-        .catch(() => {});
+        .catch(() => {
+          if (alive && !reportedRef.current) {
+            reportedRef.current = true;
+            notify.error(t('notify:logsFailed'));
+          }
+        });
     tick();
     const id = setInterval(tick, 2000);
     return () => { alive = false; clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

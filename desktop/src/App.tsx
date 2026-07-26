@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ConfirmProvider } from '@pd/ui';
+import { NotifyRoot } from './NotifyRoot';
 import { HomeScreen } from './screens/HomeScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ViewerTab } from './screens/ViewerTab';
@@ -89,8 +91,12 @@ function AppInner() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppInner />
-    </AppProvider>
+    <NotifyRoot>
+      <ConfirmProvider>
+        <AppProvider>
+          <AppInner />
+        </AppProvider>
+      </ConfirmProvider>
+    </NotifyRoot>
   );
 }

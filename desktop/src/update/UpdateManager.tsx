@@ -1,9 +1,11 @@
-import { createContext, useContext, useCallback, useEffect, useState } from 'react';
+import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-shell';
+import { useNotify } from '@pd/ui';
 import { useSettingsContext } from '../context/AppContext';
 import { cmpVer, shouldPrompt } from './shouldPrompt';
 
@@ -32,6 +34,16 @@ const Ctx = createContext<UpdateValue | null>(null);
 const isAndroid = /android/i.test(navigator.userAgent);
 
 export function UpdateProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  const { notify } = useNotify();
+  // Refs (not deps) for check(): notify/t only need to be current when the
+  // catch block runs, and keeping them out of check's own identity keeps the
+  // auto-check effect below (deps: [..., check]) from re-running on language
+  // switches — it only re-runs when loaded/auto_update actually change.
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+  const tRef = useRef(t);
+  tRef.current = t;
   const { settings, loaded } = useSettingsContext();
   const [current, setCurrent] = useState('');
   const [latest, setLatest] = useState<string | null>(null);
@@ -46,12 +58,15 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   // dismiss()/persist() (Skip, Later, No).
   const [forced, setForced] = useState(false);
 
+  // Silent: reading our own version on mount, nothing the user did or can act on.
   useEffect(() => { getVersion().then(setCurrent).catch(() => {}); }, []);
 
   // Load skip/snooze bookkeeping once. Uses state (not refs) so the initial
   // load re-renders and promptOpen is recomputed once it resolves — otherwise
   // a check() that resolves first can prompt for an already-skipped/snoozed
   // version and the stale prompt won't clear (ref writes don't re-render).
+  // Silent: background bookkeeping load on mount, not a user-visible action;
+  // worst case is a previously skipped/snoozed prompt reappearing.
   useEffect(() => {
     invoke<UpdateStateJson>('get_update_state')
       .then((s) => { setSkipVersion(s.skip_version ?? ''); setSnoozeUntil(s.snooze_until ?? null); })
@@ -79,6 +94,11 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
       setStatus('idle');
     } catch {
       setStatus('error'); // no server / offline / old server without the endpoint — never crash
+      // Toast only for a manual check (Settings > Check Now). The automatic
+      // startup/6h check runs this same path with manual=false; a background
+      // check failing (e.g. offline) must not interrupt the user — the
+      // Settings screen already reflects status === 'error' inline.
+      if (manual) notifyRef.current.error(tRef.current('notify:updateCheckFailed'));
     }
   }, []);
 

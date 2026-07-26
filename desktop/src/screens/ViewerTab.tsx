@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNotify } from '@pd/ui';
 import { useSignaling } from '../hooks/useSignaling';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { ViewerToolbar } from '../components/ViewerToolbar';
@@ -48,6 +49,7 @@ interface Props {
 
 export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Props) {
   const { t } = useTranslation(['viewer', 'common']);
+  const { notify } = useNotify();
   const [password, setPassword] = useState('');
   const [viewState, setViewState] = useState<'connecting' | 'pending_approval' | 'negotiating' | 'connected' | 'error'>('connecting');
   const [errMsg, setErrMsg] = useState('');
@@ -63,7 +65,10 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
 
   const webrtc = useWebRTC(
     useCallback((m: SignalingMessage) => { sendRef.current?.(m); }, []),
-    useCallback((text: string) => { navigator.clipboard.writeText(text).catch(() => {}); }, []),
+    // Writes the remote host's clipboard sync into the local clipboard. If this
+    // fails, the user pastes and silently gets stale content instead of what
+    // they just copied on the remote machine, so it's worth a toast.
+    useCallback((text: string) => { navigator.clipboard.writeText(text).catch(() => notify.error(t('notify:clipboardFailed'))); }, [notify, t]),
   );
 
   const liveStats = useStats(webrtc.getPc, showStats);
@@ -127,6 +132,8 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   useEffect(() => {
     if (!webrtc.stream || !videoRef.current) return;
     videoRef.current.srcObject = webrtc.stream;
+    // Silent: autoplay rejection is normal browser policy (e.g. no user
+    // gesture yet); the video plays once the user interacts with the tab.
     videoRef.current.play().catch(() => {});
     videoRef.current.focus();
     if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
@@ -158,6 +165,9 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   };
 
   const handleFullscreen = () => {
+    // Silent both ways: fullscreen enter/exit rejections are normal OS/browser
+    // behavior (e.g. permission policy, already in the requested state) and
+    // the toolbar button reflects the real state either way.
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     } else {
@@ -171,9 +181,11 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   };
 
   const handleClipboardSync = () => {
+    // Explicit toolbar action: if this fails, the user believes the local
+    // clipboard reached the remote host when it never left this machine.
     navigator.clipboard.readText()
       .then(text => webrtc.sendClipboard(text))
-      .catch(() => {});
+      .catch(() => notify.error(t('notify:clipboardFailed')));
   };
 
   const center: CSSProperties = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' };

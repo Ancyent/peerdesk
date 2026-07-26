@@ -1,0 +1,8 @@
+{
+  "close": "Închide",
+  "cancel": "Anulează",
+  "logsFailed": "Jurnalul agentului nu a putut fi încărcat",
+  "updateCheckFailed": "Verificarea actualizărilor a eșuat",
+  "clipboardFailed": "Copierea în clipboard a eșuat",
+  "approvalFailed": "Răspunsul nu a putut fi trimis către agent"
+}

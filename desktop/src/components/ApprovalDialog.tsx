@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
+import { useNotify } from '@pd/ui';
 
 interface ApprovalReq {
   viewer_id: string;
@@ -13,6 +14,7 @@ interface ApprovalReq {
  *  60s (matching the agent-side timeout) so a stale prompt can't hang. */
 export function ApprovalDialog() {
   const { t } = useTranslation('viewer');
+  const { notify } = useNotify();
   const [req, setReq] = useState<ApprovalReq | null>(null);
   const [secs, setSecs] = useState(60);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -28,6 +30,8 @@ export function ApprovalDialog() {
 
   // Two mechanisms so the prompt is reliable: a Tauri event (instant) and a
   // poll of get_pending_approval (works even if the event doesn't arrive).
+  // Both failures stay silent — they're deliberately redundant, so either
+  // one failing to register/poll is covered by the other still working.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     listen<ApprovalReq>('approval-request', (e) => show(e.payload))
@@ -46,7 +50,9 @@ export function ApprovalDialog() {
   }, []);
 
   const respond = (approved: boolean) => {
-    if (req) invoke('respond_approval', { viewerId: req.viewer_id, approved }).catch(() => {});
+    // Deliberate action (accept/reject a specific viewer): if this fails, the
+    // host would otherwise believe they answered when the agent never heard it.
+    if (req) invoke('respond_approval', { viewerId: req.viewer_id, approved }).catch(() => notify.error(t('notify:approvalFailed')));
     setReq(null);
     if (timer.current) clearInterval(timer.current);
   };

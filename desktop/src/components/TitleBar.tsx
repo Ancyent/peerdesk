@@ -11,6 +11,9 @@ export function TitleBar() {
   const { t } = useTranslation('app');
   const [maximized, setMaximized] = useState(false);
 
+  // Silent throughout: window-chrome state sync (maximize icon), not a user
+  // action — a failure just means the toggle icon may lag reality, which is
+  // cosmetic and self-corrects on the next resize.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     appWindow.isMaximized().then(setMaximized).catch(() => {});

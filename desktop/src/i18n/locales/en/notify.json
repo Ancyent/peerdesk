@@ -1,0 +1,8 @@
+{
+  "close": "Dismiss",
+  "cancel": "Cancel",
+  "logsFailed": "Could not load the agent log",
+  "updateCheckFailed": "Could not check for updates",
+  "clipboardFailed": "Could not copy to the clipboard",
+  "approvalFailed": "Could not send the response to the agent"
+}
