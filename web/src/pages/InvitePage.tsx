@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { localizeError } from '../api/errors';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
+import { InlineError } from '@pd/ui';
 
 interface Props {
   token: string;
@@ -75,7 +76,9 @@ export function InvitePage({ token }: Props) {
       </p>
 
       {error && (
-        <p style={{ color: 'var(--red)', margin: 0, fontSize: 14, maxWidth: 320, textAlign: 'center' }}>{error}</p>
+        <div style={{ maxWidth: 320, textAlign: 'center' }}>
+          <InlineError>{error}</InlineError>
+        </div>
       )}
 
       {user ? (

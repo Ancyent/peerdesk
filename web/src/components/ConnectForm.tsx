@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBrandingContext } from '../branding/BrandingContext';
+import { InlineError } from '@pd/ui';
 
 interface Props {
   onConnect: (peerId: string, password: string, remember: boolean) => void;
@@ -57,8 +58,10 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
           <div style={{
             marginBottom: 16, padding: '10px 14px',
             background: 'var(--red-bg)', border: '1px solid rgba(248,113,113,0.3)',
-            borderRadius: 8, color: 'var(--red)', fontSize: 13,
-          }}>{error}</div>
+            borderRadius: 8,
+          }}>
+            <InlineError>{error}</InlineError>
+          </div>
         )}
 
         <form onSubmit={e => { e.preventDefault(); onConnect(peerId, password, remember); }}

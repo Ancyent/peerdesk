@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { localizeError } from '../api/errors';
 import { useBrandingContext } from '../branding/BrandingContext';
+import { InlineError } from '@pd/ui';
 
 interface Props {
   onGoLogin: () => void;
@@ -38,7 +39,7 @@ export function RegisterPage({ onGoLogin }: Props) {
         : <h1 style={{ margin:0, color:'var(--text-1)' }}>{brand_name}</h1>
       }
       <p style={{ color:'var(--text-2)', margin:0 }}>{t('auth:register.subtitle')}</p>
-      {error && <p style={{ color:'var(--red)', margin:0, fontSize:14 }}>{error}</p>}
+      <InlineError>{error}</InlineError>
       <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12, width:300, background:'var(--bg-surface)', padding:24, borderRadius:10, border:'1px solid var(--border-dim)' }}>
         <input type="text" placeholder={t('auth:fields.fullName')} value={name} onChange={e => setName(e.target.value)}
           style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid var(--border-dim)', background:'var(--bg-surface)', color:'var(--text-1)' }} required />

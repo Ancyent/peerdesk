@@ -8,6 +8,7 @@ import { localizeError } from '../api/errors';
 import { copyText } from '../lib/clipboard';
 import { MemberAccessEditor } from '../components/MemberAccessEditor';
 import { formatDate } from '../i18n/format';
+import { InlineError } from '@pd/ui';
 
 const rowStyle = {
   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
@@ -141,7 +142,7 @@ export function TeamPage() {
           marginBottom: 20, padding: '10px 14px', background: 'var(--red-bg)',
           border: '1px solid var(--red)', borderRadius: 8,
         }}>
-          <span style={{ fontSize: 13, color: 'var(--red)' }}>{error}</span>
+          <InlineError>{error}</InlineError>
           <button onClick={() => setError(null)} title={t('team:close')} aria-label={t('team:close')}
             style={{ ...iconBtn, color: 'var(--red)' }}>✕</button>
         </div>

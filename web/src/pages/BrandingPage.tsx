@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api } from '../api/client';
 import { applyBranding } from '../hooks/useBranding';
+import { InlineError } from '@pd/ui';
 
 interface Props {
   onBack: () => void;
@@ -91,8 +92,8 @@ export function BrandingPage({ onBack }: Props) {
       </div>
 
       {error && (
-        <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red)', borderRadius: 6, padding: '10px 14px', marginBottom: 16, color: 'var(--red)', fontSize: 14 }}>
-          {error}
+        <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red)', borderRadius: 6, padding: '10px 14px', marginBottom: 16 }}>
+          <InlineError>{error}</InlineError>
         </div>
       )}
 

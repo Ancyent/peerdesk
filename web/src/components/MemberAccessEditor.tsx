@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { api, ApiError, type GrantOut, type GrantIn } from '../api/client';
 import { localizeError } from '../api/errors';
+import { InlineError } from '@pd/ui';
 import { OrgTree, type OrgNode } from './OrgTree';
 import type { GrantNode } from './orgTreeOps';
 
@@ -97,7 +98,7 @@ export function MemberAccessEditor({ membershipId }: Props) {
           marginBottom: 8, padding: '8px 10px', background: 'var(--red-bg)',
           border: '1px solid var(--red)', borderRadius: 6,
         }}>
-          <span style={{ fontSize: 12, color: 'var(--red)' }}>{error}</span>
+          <InlineError>{error}</InlineError>
           <button onClick={() => setError(null)} title={t('team:close')} aria-label={t('team:close')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: 12 }}>✕</button>
         </div>

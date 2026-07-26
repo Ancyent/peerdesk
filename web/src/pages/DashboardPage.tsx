@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth';
 import { api } from '../api/client';
 import type { MachineOut } from '../api/client';
 import { localizeError } from '../api/errors';
+import { InlineError } from '@pd/ui';
 
 interface Props {
   onConnect: (peerId: string) => void;
@@ -47,7 +48,7 @@ export function DashboardPage({ onConnect, onBranding }: Props) {
       </div>
 
       {loading && <p style={{ color:'#9ca3af', textAlign:'center', padding:32 }}>{t('common:loading')}</p>}
-      {error && <p style={{ color:'red' }}>{error}</p>}
+      <InlineError>{error}</InlineError>
 
       {!loading && !error && machines.length === 0 && (
         <div style={{ padding:32, border:'1px dashed #d1d5db', borderRadius:8, textAlign:'center', color:'#6b7280' }}>

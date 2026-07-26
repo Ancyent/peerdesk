@@ -18,3 +18,5 @@ export { Modal } from './Modal';
 export type { ConfirmOptions } from './ConfirmDialog';
 export { ConfirmDialog } from './ConfirmDialog';
 export { ConfirmProvider, useConfirm } from './ConfirmProvider';
+
+export { InlineError } from './InlineError';
