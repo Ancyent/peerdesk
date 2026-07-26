@@ -60,7 +60,7 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
             background: 'var(--red-bg)', border: '1px solid rgba(248,113,113,0.3)',
             borderRadius: 8,
           }}>
-            <InlineError>{error}</InlineError>
+            <InlineError size={13}>{error}</InlineError>
           </div>
         )}
 

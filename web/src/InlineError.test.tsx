@@ -41,4 +41,28 @@ describe('InlineError', () => {
     render(<InlineError>Boom</InlineError>);
     expect(container!.querySelector('[role="alert"]')).not.toBeNull();
   });
+
+  it('uses default font size of 14 when size prop is not provided', () => {
+    render(<InlineError>Default size</InlineError>);
+    const element = container!.querySelector('[role="alert"]') as HTMLElement;
+    expect(element).not.toBeNull();
+    const computedStyle = window.getComputedStyle(element);
+    expect(computedStyle.fontSize).toBe('14px');
+  });
+
+  it('respects explicit size prop', () => {
+    render(<InlineError size={12}>Custom size 12</InlineError>);
+    const element = container!.querySelector('[role="alert"]') as HTMLElement;
+    expect(element).not.toBeNull();
+    const computedStyle = window.getComputedStyle(element);
+    expect(computedStyle.fontSize).toBe('12px');
+  });
+
+  it('respects size prop when set to 13', () => {
+    render(<InlineError size={13}>Custom size 13</InlineError>);
+    const element = container!.querySelector('[role="alert"]') as HTMLElement;
+    expect(element).not.toBeNull();
+    const computedStyle = window.getComputedStyle(element);
+    expect(computedStyle.fontSize).toBe('13px');
+  });
 });

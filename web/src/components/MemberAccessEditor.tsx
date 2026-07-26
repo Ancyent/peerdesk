@@ -98,7 +98,7 @@ export function MemberAccessEditor({ membershipId }: Props) {
           marginBottom: 8, padding: '8px 10px', background: 'var(--red-bg)',
           border: '1px solid var(--red)', borderRadius: 6,
         }}>
-          <InlineError>{error}</InlineError>
+          <InlineError size={12}>{error}</InlineError>
           <button onClick={() => setError(null)} title={t('team:close')} aria-label={t('team:close')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: 12 }}>✕</button>
         </div>

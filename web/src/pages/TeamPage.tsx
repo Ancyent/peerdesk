@@ -142,7 +142,7 @@ export function TeamPage() {
           marginBottom: 20, padding: '10px 14px', background: 'var(--red-bg)',
           border: '1px solid var(--red)', borderRadius: 8,
         }}>
-          <InlineError>{error}</InlineError>
+          <InlineError size={13}>{error}</InlineError>
           <button onClick={() => setError(null)} title={t('team:close')} aria-label={t('team:close')}
             style={{ ...iconBtn, color: 'var(--red)' }}>✕</button>
         </div>
