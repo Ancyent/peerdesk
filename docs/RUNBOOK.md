@@ -86,6 +86,14 @@ The desktop viewer verifies every update against a Tauri signing key. The public
 key is committed in `desktop/src-tauri/tauri.conf.json`; the private key is a CI
 secret and is NEVER committed.
 
+**Update endpoint.** `plugins.updater.endpoints` in that same file points at
+`https://app.peerdesk.eu/api/releases/update/...` and is compiled into every
+client, so it cannot be changed after a build. **If you self-host or fork, edit
+that URL to your own server before cutting a tag** — otherwise your users'
+clients ask this project's server for updates. It previously read
+`updates.invalid`, a reserved never-resolving TLD, so auto-update silently
+failed in every build up to and including v0.5.3.
+
 **One-time maintainer setup (required before the next tagged release):**
 Add two GitHub Actions secrets (Settings → Secrets and variables → Actions):
 - `TAURI_SIGNING_PRIVATE_KEY` — the full contents of the generated private key
