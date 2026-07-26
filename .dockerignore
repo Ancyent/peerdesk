@@ -1,0 +1,18 @@
+# The web image is built from the REPO ROOT, not from web/, because the app
+# imports shared source via the `@pd/ui` alias which resolves to ../shared/ui.
+# That path has to exist inside the build context.
+#
+# Only web/ and shared/ are needed. Everything else must stay out — the Rust
+# target/ directory alone is ~17 GB, and sending it to the daemon on every
+# build would be ruinous.
+
+*
+!web
+!shared
+
+# Never ship these, even from inside the directories included above.
+web/node_modules
+web/dist
+shared/**/node_modules
+**/.DS_Store
+**/*.log

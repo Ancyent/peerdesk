@@ -1,6 +1,9 @@
+# Build context is the REPO ROOT (see deploy/docker-compose.dev.yml). The app
+# imports shared components via `@pd/ui` -> ../shared/ui, so shared/ must sit
+# beside web/ inside the container as well; compose bind-mounts both.
 FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
+WORKDIR /repo/web
+COPY web/package*.json ./
 RUN npm install
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

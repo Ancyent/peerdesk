@@ -85,7 +85,9 @@ services:
 
   web:
     build:
-      context: ../web
+      # Repo root, not ../web — see the note in docker-compose.yml.
+      context: ..
+      dockerfile: web/Dockerfile
     restart: unless-stopped
     ports:
       - "80:80"

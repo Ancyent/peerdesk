@@ -72,14 +72,20 @@ services:
 
   web:
     build:
-      context: ../web
-      dockerfile: Dockerfile.dev
+      # Repo root, not ../web — see the note in docker-compose.yml. shared/ is
+      # mounted alongside web/ so the `@pd/ui` alias resolves during dev too,
+      # and Vite's server.fs.allow already covers the repo root.
+      context: ..
+      dockerfile: web/Dockerfile.dev
     ports:
       - "5173:5173"
     volumes:
-      - ../web:/app
-      - /app/node_modules
-      - ./config.json:/deploy/config.json:ro
+      - ../web:/repo/web
+      - /repo/web/node_modules
+      - ../shared:/repo/shared
+      # Vite resolves this as ../deploy/config.json from the app dir, which
+      # moved from /app to /repo/web.
+      - ./config.json:/repo/deploy/config.json:ro
     environment:
       VITE_PROXY_API: http://api:8000
       VITE_PROXY_WS: ws://signaling:8001

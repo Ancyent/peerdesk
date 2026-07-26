@@ -104,7 +104,12 @@ services:
 
   web:
     build:
-      context: ../web
+      # Repo root, not ../web: the app imports shared components via the
+      # `@pd/ui` alias, which resolves to ../shared/ui. A web-only context
+      # leaves that path missing and the build fails at tsc. The repo-root
+      # .dockerignore keeps everything but web/ and shared/ out.
+      context: ..
+      dockerfile: web/Dockerfile
       args:
         VITE_SIGNALING_URL: ${VITE_SIGNALING_URL:-ws://localhost/ws}
         VITE_API_URL: ${VITE_API_URL:-http://localhost/api}
