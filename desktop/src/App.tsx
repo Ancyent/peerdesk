@@ -11,7 +11,11 @@ import { ApprovalDialog } from './components/ApprovalDialog';
 import { UpdateDialog } from './components/UpdateDialog';
 import { UpdateBadge } from './components/UpdateBadge';
 import { AppProvider, useAgentContext } from './context/AppContext';
+import { createOsNotifier } from './lib/osNotify';
 import type { Session, SessionState } from './types';
+
+// Created once at module scope so its dedup set survives re-renders of App.
+const osNotifier = createOsNotifier();
 
 function AppInner() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -91,7 +95,7 @@ function AppInner() {
 
 export default function App() {
   return (
-    <NotifyRoot>
+    <NotifyRoot onExternal={osNotifier}>
       <ConfirmProvider>
         <AppProvider>
           <AppInner />

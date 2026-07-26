@@ -698,7 +698,8 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default()
         .manage(shared_state)
-        .plugin(tauri_plugin_shell::init());
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
     {

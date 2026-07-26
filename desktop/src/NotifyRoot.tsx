@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NotifyProvider } from '@pd/ui';
+import type { Toast } from '@pd/ui';
 
 /**
  * Wraps NotifyProvider with a `closeLabel` that tracks the active language.
@@ -14,7 +15,11 @@ import { NotifyProvider } from '@pd/ui';
  * switch. `useTranslation()` re-renders this component on every language
  * change, keeping `closeLabel` current.
  */
-export function NotifyRoot({ children }: { children: ReactNode }) {
+export function NotifyRoot({ children, onExternal }: { children: ReactNode; onExternal?: (toast: Toast) => void }) {
   const { t } = useTranslation();
-  return <NotifyProvider closeLabel={t('notify:close')}>{children}</NotifyProvider>;
+  return (
+    <NotifyProvider closeLabel={t('notify:close')} onExternal={onExternal}>
+      {children}
+    </NotifyProvider>
+  );
 }
