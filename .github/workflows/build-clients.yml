@@ -287,21 +287,23 @@ jobs:
 
   # ── Release ───────────────────────────────────────────────
   #
-  # Split in two on purpose. Only the desktop viewers feed the Tauri updater,
-  # so only they are gated on signing. Agents and the Android APK do not use
-  # the updater (Android gets notify+link), and blocking them because a desktop
-  # bundle failed to sign would punish the wrong artifacts.
+  # Split three ways so a slow or failing platform never holds up the others.
+  # Only the desktop viewers feed the Tauri updater, so only they are gated on
+  # signing; agents and Android (notify+link, no updater) must not be blocked
+  # because a desktop bundle failed to sign.
   #
-  # Both jobs use `!cancelled()`, so each runs regardless of whether the other
-  # — or its own build jobs — failed. `release-viewers` merely runs AFTER
-  # `release-agents` so the two never race to create the same release.
+  # Every job uses `!cancelled()`, so each runs regardless of what the others
+  # did. `release-agents` needs only the two agent builds, so agents publish as
+  # soon as they are ready. It runs first purely so that it — and not a race
+  # between the other two — creates the release for this tag; the other two
+  # only ADD assets, and share a concurrency group so their uploads serialise
+  # instead of racing each other.
 
   release-agents:
-    name: Publish agents + Android
+    name: Publish agents
     needs:
       - build-agent-linux
       - build-agent-windows
-      - build-viewer-android
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') && !cancelled()
     permissions:
@@ -313,8 +315,8 @@ jobs:
       - name: List artifacts
         run: find . -type f | sort
 
-      # Creates the release for this tag; release-viewers adds to it afterwards.
-      - name: Publish agent and Android assets
+      # Creates the release for this tag; the other two add to it afterwards.
+      - name: Publish agent assets
         uses: softprops/action-gh-release@v2
         with:
           draft: false
@@ -323,6 +325,32 @@ jobs:
           files: |
             agent-linux/peerdesk-agent-linux-x86_64-*
             agent-windows/peerdesk-agent-windows-x86_64-*.exe
+
+  release-android:
+    name: Publish Android
+    needs:
+      - build-viewer-android
+      - release-agents
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled()
+    permissions:
+      contents: write
+    concurrency:
+      group: release-assets-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: List artifacts
+        run: find . -type f | sort
+
+      - name: Publish Android assets
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          fail_on_unmatched_files: false
+          files: |
             viewer-android/peerdesk-android-*.apk
 
   release-viewers:
@@ -335,6 +363,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/') && !cancelled()
     permissions:
       contents: write
+    concurrency:
+      group: release-assets-${{ github.ref_name }}
+      cancel-in-progress: false
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4

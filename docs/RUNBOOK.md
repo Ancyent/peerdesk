@@ -98,11 +98,17 @@ publishes no desktop viewers. That is deliberate: an unsigned viewer looks green
 but silently breaks auto-update for every existing desktop client, so refusing to
 publish it is the cheaper failure. Fix the cause, then re-run the same tag.
 
-Releasing is split across two jobs so one failure does not take out the rest:
-- `release-agents` — agents + Android APK. Never gated on signing (Android uses
-  notify+link, not the updater), so these publish even when the viewers fail.
-- `release-viewers` — desktop viewers only, gated as above. Runs after
-  `release-agents` so the two never race to create the same release.
+Releasing is split across three jobs so one slow or failing platform never holds
+up the others:
+- `release-agents` — agents only. Needs just the two agent builds, so agents
+  publish as soon as they are ready. Creates the release for the tag.
+- `release-android` — the APK. Ungated (Android uses notify+link, not the
+  updater), so it ships even when viewer signing fails.
+- `release-viewers` — desktop viewers only, hard-gated on signatures.
+
+All three use `!cancelled()`, so none blocks another. The latter two only add
+assets and share a concurrency group, so their uploads serialise rather than
+racing each other.
 
 Store the private key in a password manager; losing it means no future client can
 verify updates and every user must reinstall manually.
