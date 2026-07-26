@@ -12,3 +12,5 @@ export const SHARED_UI_VERSION = 1;
 export type { NotifyApi, NotifyOptions } from './NotifyProvider';
 export { NotifyProvider, useNotify } from './NotifyProvider';
 export { ToastHost } from './ToastHost';
+
+export { Modal } from './Modal';
