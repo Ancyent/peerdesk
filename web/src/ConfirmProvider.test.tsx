@@ -29,9 +29,9 @@ const OPTS: ConfirmOptions = {
   cancelLabel: 'Cancel',
 };
 
-let confirmFn!: (o: ConfirmOptions) => Promise<boolean>;
-function Trigger() {
-  confirmFn = useConfirm();
+function Trigger({ onReady }: { onReady: (fn: (o: ConfirmOptions) => Promise<boolean>) => void }) {
+  const fn = useConfirm();
+  onReady(fn);
   return null;
 }
 
@@ -42,12 +42,13 @@ const click = (testid: string) => {
 
 describe('useConfirm', () => {
   it('shows nothing until confirm() is called', () => {
-    render(<ConfirmProvider><Trigger /></ConfirmProvider>);
+    render(<ConfirmProvider><Trigger onReady={() => {}} /></ConfirmProvider>);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('renders the title and message', async () => {
-    render(<ConfirmProvider><Trigger /></ConfirmProvider>);
+    let confirmFn!: (o: ConfirmOptions) => Promise<boolean>;
+    render(<ConfirmProvider><Trigger onReady={(fn) => { confirmFn = fn; }} /></ConfirmProvider>);
     let p!: Promise<boolean>;
     act(() => { p = confirmFn(OPTS); });
 
@@ -59,7 +60,8 @@ describe('useConfirm', () => {
   });
 
   it('resolves true when confirmed', async () => {
-    render(<ConfirmProvider><Trigger /></ConfirmProvider>);
+    let confirmFn!: (o: ConfirmOptions) => Promise<boolean>;
+    render(<ConfirmProvider><Trigger onReady={(fn) => { confirmFn = fn; }} /></ConfirmProvider>);
     let p!: Promise<boolean>;
     act(() => { p = confirmFn(OPTS); });
 
@@ -69,7 +71,8 @@ describe('useConfirm', () => {
   });
 
   it('resolves false when cancelled', async () => {
-    render(<ConfirmProvider><Trigger /></ConfirmProvider>);
+    let confirmFn!: (o: ConfirmOptions) => Promise<boolean>;
+    render(<ConfirmProvider><Trigger onReady={(fn) => { confirmFn = fn; }} /></ConfirmProvider>);
     let p!: Promise<boolean>;
     act(() => { p = confirmFn(OPTS); });
 
@@ -79,7 +82,8 @@ describe('useConfirm', () => {
   });
 
   it('resolves false on Escape', async () => {
-    render(<ConfirmProvider><Trigger /></ConfirmProvider>);
+    let confirmFn!: (o: ConfirmOptions) => Promise<boolean>;
+    render(<ConfirmProvider><Trigger onReady={(fn) => { confirmFn = fn; }} /></ConfirmProvider>);
     let p!: Promise<boolean>;
     act(() => { p = confirmFn(OPTS); });
 
@@ -91,7 +95,8 @@ describe('useConfirm', () => {
   });
 
   it('closes the dialog after settling', async () => {
-    render(<ConfirmProvider><Trigger /></ConfirmProvider>);
+    let confirmFn!: (o: ConfirmOptions) => Promise<boolean>;
+    render(<ConfirmProvider><Trigger onReady={(fn) => { confirmFn = fn; }} /></ConfirmProvider>);
     let p!: Promise<boolean>;
     act(() => { p = confirmFn(OPTS); });
     click('confirm-accept');
@@ -101,14 +106,16 @@ describe('useConfirm', () => {
   });
 
   it('focuses Cancel first for a danger confirm so a stray Enter destroys nothing', () => {
-    render(<ConfirmProvider><Trigger /></ConfirmProvider>);
+    let confirmFn!: (o: ConfirmOptions) => Promise<boolean>;
+    render(<ConfirmProvider><Trigger onReady={(fn) => { confirmFn = fn; }} /></ConfirmProvider>);
     act(() => { void confirmFn({ ...OPTS, tone: 'danger' }); });
 
     expect(document.activeElement?.getAttribute('data-testid')).toBe('confirm-cancel');
   });
 
   it('resolves a second concurrent confirm to false instead of stacking dialogs', async () => {
-    render(<ConfirmProvider><Trigger /></ConfirmProvider>);
+    let confirmFn!: (o: ConfirmOptions) => Promise<boolean>;
+    render(<ConfirmProvider><Trigger onReady={(fn) => { confirmFn = fn; }} /></ConfirmProvider>);
     let first!: Promise<boolean>;
     let second!: Promise<boolean>;
     act(() => { first = confirmFn(OPTS); });
@@ -122,6 +129,6 @@ describe('useConfirm', () => {
   });
 
   it('throws a clear error when useConfirm is used outside the provider', () => {
-    expect(() => render(<Trigger />)).toThrow(/ConfirmProvider/);
+    expect(() => render(<Trigger onReady={() => {}} />)).toThrow(/ConfirmProvider/);
   });
 });
