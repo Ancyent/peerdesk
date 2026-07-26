@@ -65,21 +65,14 @@ export function NotifyProvider({ children, onExternal, closeLabel = 'Dismiss' }:
 
   const isEmpty = state.visible.length === 0 && state.queued.length === 0;
 
-  // Unlike focus, hover has no live DOM query to re-derive it from at tick
-  // time (`:hover` matching needs a hit-testing/layout engine, which this
-  // repo's test environment — happy-dom — doesn't implement, so a
-  // tick-time-poll design for hover couldn't be exercised by the test
-  // suite). Hover therefore stays an event-driven ref, written only by
-  // `onHoverChange` below. That means it needs its own heal point: a real
-  // browser does not reliably fire mouseleave/mouseout when the hovered
-  // toast disappears out from under a stationary cursor (hit-testing is
-  // driven by pointer movement, not by layout changes), so a toast closed
-  // while hovered can leave `hoveredRef.current` stuck at `true` forever,
-  // silently blocking auto-dismiss for every toast pushed afterward. An
-  // empty stack is a safe, deterministic place to clear it: there is
-  // nothing left to protect from expiring, so a stale "hovered" reading
-  // can never be observably wrong at that point, regardless of which
-  // event mechanism did or didn't fire.
+  // Hover is tracked via event-driven refs: browsers don't reliably fire
+  // mouseleave when the hovered element is removed under a stationary cursor.
+  // This effect heals the flag when the stack fully drains, which is safe.
+  // Known gap (accepted): dismissing one of several toasts while hovering,
+  // with the cursor stationary, leaves the flag set until the next pointer
+  // movement or full drain. This is bounded, self-heals, and doesn't affect
+  // error toasts or click-to-dismiss. Not fixed because a fully self-correcting
+  // design would poll cursor geometry at tick time, which happy-dom cannot test.
   useEffect(() => {
     if (isEmpty) hoveredRef.current = false;
   }, [isEmpty]);
