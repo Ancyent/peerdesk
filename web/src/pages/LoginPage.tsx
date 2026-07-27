@@ -34,9 +34,14 @@ export function LoginPage({ onGoRegister }: Props) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:16, fontFamily:'sans-serif', background:'var(--bg-base)' }}>
+      {/* A white-labelled deployment keeps its own logo, or its own name as
+          text. The PeerDesk wordmark is only for un-branded deployments —
+          putting it above someone else's product name would be wrong. */}
       {logo_data_url
         ? <img src={logo_data_url} alt={brand_name} style={{ height: 48, objectFit: 'contain', maxWidth: 200 }} />
-        : <h1 style={{ margin:0, color:'var(--text-1)' }}>{brand_name}</h1>
+        : (!brand_name || brand_name === 'PeerDesk')
+          ? <img src="/peerdesk-wordmark-350x64.png" alt="PeerDesk" style={{ height: 48, objectFit: 'contain', maxWidth: 280 }} />
+          : <h1 style={{ margin:0, color:'var(--text-1)' }}>{brand_name}</h1>
       }
       <p style={{ color:'var(--text-2)', margin:0 }}>{t('auth:login.subtitle')}</p>
       <InlineError>{error}</InlineError>

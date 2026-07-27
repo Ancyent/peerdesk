@@ -105,9 +105,13 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 16, boxShadow: '0 0 22px rgba(0,200,150,0.45)',
           }}>
+            {/* Same rule as the login screen: our mark only stands in for an
+                un-branded deployment, never above someone else's name. */}
             {logo_data_url
               ? <img src={logo_data_url} alt={brand_name} style={{ width: 22, height: 22, objectFit: 'contain', borderRadius: 4 }} />
-              : '🖥'}
+              : (!brand_name || brand_name === 'PeerDesk')
+                ? <img src="/peerdesk-icon-32x32.png" alt="PeerDesk" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+                : '🖥'}
           </div>
           <span style={{
             fontSize: 16, fontWeight: 700, letterSpacing: -0.3, whiteSpace: 'nowrap',
