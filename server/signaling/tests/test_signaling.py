@@ -226,6 +226,7 @@ async def test_a_dead_displaced_socket_does_not_block_the_new_viewer():
 
     await handle_approval(state, "123456789", "new", True)
 
+    assert old_ws.send_text.await_count == 1, "the dead socket must actually be notified, not skipped"
     assert state.agent_to_viewer["123456789"] == "new"
     sent = [json.loads(c.args[0])["type"] for c in new_ws.send_text.call_args_list]
     assert "joined" in sent
