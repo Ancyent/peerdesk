@@ -24,7 +24,8 @@ export function useRoute(
 
   return useCallback((page: RoutablePage, sub: string | null) => {
     const target = pathFor(page, sub);
-    if (target === window.location.pathname) return;
+    const current = window.location.pathname + window.location.search;
+    if (target === current) return;
     const onDownloads = window.location.pathname.startsWith('/downloads');
     if (page === 'downloads' && onDownloads) {
       window.history.replaceState({}, '', target);

@@ -104,7 +104,7 @@ export default function App() {
   // change (pathFor has no notion of query strings), so it writes the URL
   // itself rather than going through `navigate`.
   const goToMachinesFilteredByKey = (keyId: string) => {
-    window.history.pushState({}, '', `/machines?key=${keyId}`);
+    window.history.pushState({}, '', `/machines?key=${encodeURIComponent(keyId)}`);
     setMachineKeyFilter(keyId);
     setPage('machines');
   };

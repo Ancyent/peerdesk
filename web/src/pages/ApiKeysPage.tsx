@@ -158,7 +158,7 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
                   {k.key_preview}
                 </code>
                 <a
-                  href={`/machines?key=${k.id}`}
+                  href={`/machines?key=${encodeURIComponent(k.id)}`}
                   data-testid="key-machine-count"
                   onClick={(e) => {
                     if (!isPlainLeftClick(e)) return;
