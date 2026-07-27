@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm, useNotify, Modal, InlineError } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
-import { api, type ApiKeyListOut } from '../api/client';
+import { api, ApiError, type ApiKeyListOut } from '../api/client';
 import { localizeError } from '../api/errors';
 import { copyText } from '../lib/clipboard';
 import { formatDate } from '../i18n/format';
@@ -114,8 +114,8 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
       const result = await api.apiKeys.reveal(accessToken, revealTarget.id, revealPassword);
       setRevealedKeys(prev => ({ ...prev, [revealTarget.id]: result.key }));
       closeReveal();
-    } catch {
-      setRevealError(t('apikeys:reveal.failed'));
+    } catch (e) {
+      setRevealError(e instanceof ApiError && e.status === 403 ? t('apikeys:reveal.failed') : localizeError(e));
     } finally {
       setRevealSubmitting(false);
     }

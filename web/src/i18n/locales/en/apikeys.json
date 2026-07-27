@@ -6,7 +6,7 @@
   "create": "Create Key",
   "creating": "Creating…",
   "created": {
-    "notice": "Key created — copy it now, it won't be shown again in full.",
+    "notice": "Key created — copy it now. You can reveal it later with your password.",
     "deployLabel": "Deploy:"
   },
   "copy": "Copy",

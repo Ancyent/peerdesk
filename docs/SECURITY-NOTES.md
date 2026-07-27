@@ -22,3 +22,14 @@ reinstalled agent given a fresh key re-enrols itself automatically (commit
 **Revisit when** convenience stops outweighing the exposure — for example
 before any third party is given database access, or before the first customer
 deployment this project does not itself operate.
+
+`POST /api-keys/{id}/reveal` also creates a second consequence beyond
+plaintext storage: it is an authenticated, 2FA-free, unthrottled
+password-verification oracle. `/auth/login` requires a second factor for
+users who have 2FA enabled; reveal checks the password alone, so a stolen
+refresh token gives an attacker a password oracle for the life of that
+token, bypassing 2FA entirely for that one check. bcrypt bounds the
+achievable rate, and the project has no rate limiting anywhere, including on
+login, so this endpoint is not a bypass of an existing control — nothing
+here throttles login either — but it belongs in this register as its own
+recorded risk.

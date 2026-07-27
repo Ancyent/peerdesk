@@ -92,7 +92,11 @@ async def reveal_api_key(
     """
     assert_admin(membership)
 
-    result = await db.execute(visible_api_keys(membership).where(ApiKey.id == key_id))
+    result = await db.execute(
+        visible_api_keys(membership).where(
+            ApiKey.id == key_id, ApiKey.is_active == True
+        )
+    )
     key = result.scalar_one_or_none()
     if not key:
         # 404, not 403 — a caller must not learn that a key outside their

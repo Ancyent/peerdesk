@@ -6,7 +6,7 @@
   "create": "Creează cheie",
   "creating": "Se creează…",
   "created": {
-    "notice": "Cheie creată — copiaz-o acum, nu va mai fi afișată integral din nou.",
+    "notice": "Cheie creată — copiaz-o acum. O poți afișa din nou mai târziu cu parola ta.",
     "deployLabel": "Desfășurare:"
   },
   "copy": "Copiază",
