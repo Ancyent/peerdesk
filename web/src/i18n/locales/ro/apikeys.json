@@ -28,5 +28,13 @@
     "withMachines_other": "«{{name}}» e folosită de {{count}} de mașini. Vor pierde credențialul până le dai o cheie nouă.",
     "noMachines": "«{{name}}» nu e folosită de nicio mașină.",
     "action": "Revocă"
+  },
+  "reveal": {
+    "action": "Arată",
+    "title": "Arăt cheia?",
+    "prompt": "Introdu parola ta ca să vezi cheia întreagă.",
+    "password": "Parola ta",
+    "submit": "Arată cheia",
+    "failed": "Parolă greșită"
   }
 }

@@ -214,6 +214,14 @@ class ApiKeyOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ApiKeyRevealIn(BaseModel):
+    password: str
+
+
+class ApiKeyRevealOut(BaseModel):
+    key: str
+
+
 class ApiKeyListOut(BaseModel):
     id: str
     key_preview: str   # first 10 chars of key, e.g. "pd_abc123de..."

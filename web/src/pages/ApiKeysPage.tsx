@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useConfirm, useNotify } from '@pd/ui';
+import { useConfirm, useNotify, Modal, InlineError } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
 import { api, type ApiKeyListOut } from '../api/client';
 import { localizeError } from '../api/errors';
@@ -25,6 +25,13 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
   const [creating, setCreating] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [revealTarget, setRevealTarget] = useState<ApiKeyListOut | null>(null);
+  const [revealPassword, setRevealPassword] = useState('');
+  const [revealError, setRevealError] = useState<string | null>(null);
+  const [revealSubmitting, setRevealSubmitting] = useState(false);
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({});
+  const [copiedRevealedId, setCopiedRevealedId] = useState<string | null>(null);
+  const revealTitleId = useId();
 
   const load = () => {
     if (!accessToken) return;
@@ -79,6 +86,39 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
     if (!(await copyText(text))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyRevealed = async (id: string, text: string) => {
+    if (!(await copyText(text))) return;
+    setCopiedRevealedId(id);
+    setTimeout(() => setCopiedRevealedId(null), 2000);
+  };
+
+  const openReveal = (key: ApiKeyListOut) => {
+    setRevealTarget(key);
+    setRevealPassword('');
+    setRevealError(null);
+  };
+
+  const closeReveal = () => {
+    setRevealTarget(null);
+    setRevealPassword('');
+    setRevealError(null);
+  };
+
+  const handleRevealSubmit = async () => {
+    if (!accessToken || !revealTarget || !revealPassword) return;
+    setRevealSubmitting(true);
+    setRevealError(null);
+    try {
+      const result = await api.apiKeys.reveal(accessToken, revealTarget.id, revealPassword);
+      setRevealedKeys(prev => ({ ...prev, [revealTarget.id]: result.key }));
+      closeReveal();
+    } catch {
+      setRevealError(t('apikeys:reveal.failed'));
+    } finally {
+      setRevealSubmitting(false);
+    }
   };
 
   return (
@@ -154,8 +194,8 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
                 )}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
-                <code style={{ background: 'var(--bg-hover)', padding: '1px 4px', borderRadius: 3, color: 'var(--text-1)' }}>
-                  {k.key_preview}
+                <code style={{ background: 'var(--bg-hover)', padding: '1px 4px', borderRadius: 3, color: 'var(--text-1)', wordBreak: 'break-all' }}>
+                  {revealedKeys[k.id] ?? k.key_preview}
                 </code>
                 <a
                   href={`/machines?key=${encodeURIComponent(k.id)}`}
@@ -172,11 +212,55 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
                 {k.last_used_at && <span style={{ marginLeft: 8 }}>{t('apikeys:lastUsed', { date: formatDate(k.last_used_at) })}</span>}
               </div>
             </div>
-            <span title={t('apikeys:copyHint')} style={{ padding: '5px 10px', fontSize: 12, color: 'var(--text-3)', cursor: 'default', userSelect: 'none' }}>••••</span>
+            {revealedKeys[k.id] ? (
+              <button onClick={() => handleCopyRevealed(k.id, revealedKeys[k.id])} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                {copiedRevealedId === k.id ? t('apikeys:copied') : t('apikeys:copy')}
+              </button>
+            ) : (
+              <button onClick={() => openReveal(k)} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--bg-hover)', color: 'var(--text-2)', border: '1px solid var(--border-dim)', borderRadius: 6, cursor: 'pointer' }}>
+                {t('apikeys:reveal.action')}
+              </button>
+            )}
             <button onClick={() => handleRevoke(k)} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red)', borderRadius: 6, cursor: 'pointer' }}>{t('apikeys:revoke')}</button>
           </div>
         ))}
       </div>
+
+      <Modal open={revealTarget !== null} onClose={closeReveal} labelledBy={revealTitleId}>
+        <div id={revealTitleId} style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 8 }}>
+          {t('apikeys:reveal.title')}
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.5 }}>
+          {t('apikeys:reveal.prompt')}
+        </p>
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={revealPassword}
+          onChange={e => setRevealPassword(e.target.value)}
+          placeholder={t('apikeys:reveal.password')}
+          style={{ width: '100%', boxSizing: 'border-box', padding: '7px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-hover)', color: 'var(--text-1)' }}
+          onKeyDown={e => e.key === 'Enter' && handleRevealSubmit()}
+        />
+        <div style={{ marginTop: 8 }}>
+          <InlineError>{revealError}</InlineError>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <button
+            onClick={closeReveal}
+            style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: '1px solid var(--border-dim)', background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            {t('notify:cancel')}
+          </button>
+          <button
+            onClick={handleRevealSubmit}
+            disabled={revealSubmitting || !revealPassword}
+            style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: 'none', background: 'var(--accent-2)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: revealSubmitting || !revealPassword ? 0.5 : 1 }}
+          >
+            {t('apikeys:reveal.submit')}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

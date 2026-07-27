@@ -28,5 +28,13 @@
     "withMachines_other": "«{{name}}» is used by {{count}} machines. They will lose their credential until you give them a new key.",
     "noMachines": "«{{name}}» is not used by any machine.",
     "action": "Revoke"
+  },
+  "reveal": {
+    "action": "Reveal",
+    "title": "Show this key?",
+    "prompt": "Enter your password to show the full key.",
+    "password": "Your password",
+    "submit": "Show key",
+    "failed": "Wrong password"
   }
 }

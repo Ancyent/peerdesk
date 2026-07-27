@@ -302,6 +302,12 @@ export const api = {
         method: 'DELETE',
         headers: authHeaders(token),
       }),
+    reveal: (token: string, id: string, password: string) =>
+      request<{ key: string }>(`/api-keys/${id}/reveal`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ password }),
+      }),
   },
   companies: {
     list: (token: string) =>
