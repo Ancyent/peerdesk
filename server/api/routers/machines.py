@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deps import get_db, get_current_user, get_api_key, get_current_membership
@@ -105,13 +105,45 @@ async def _account_id_for_creator(db: AsyncSession, user_id: str) -> str:
 @router.post("/register", response_model=MachineOut, status_code=201)
 async def register_machine_via_key(
     body: MachineRegisterViaKey,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     api_key: ApiKey = Depends(get_api_key),
 ):
     """Agent self-registration — no user auth, uses X-API-Key header."""
-    existing = await db.execute(select(Machine).where(Machine.peer_id == body.peer_id))
-    if existing.scalar_one_or_none():
-        raise HTTPException(409, "peer_id already registered")
+    caller_account = api_key.account_id or await _account_id_for_creator(db, api_key.created_by)
+
+    existing = (
+        await db.execute(select(Machine).where(Machine.peer_id == body.peer_id))
+    ).scalar_one_or_none()
+
+    if existing:
+        # An agent keeps its peer_id across a reinstall, so a machine coming
+        # back with a fresh API key is the normal case, not a conflict. If it
+        # belongs to the caller's own account, adopt it: re-point it at the key
+        # now in use and take the agent's current details.
+        #
+        # Refusing here used to dead-end the agent — it fell through to the
+        # status check, which answered 404 because the machine still belonged
+        # to the previous key, and it retried that forever.
+        if not access.machine_belongs_to_account(existing, caller_account):
+            # Somebody else's machine. Knowing a peer_id must never be enough
+            # to pull it out of another account.
+            raise HTTPException(409, "peer_id already registered")
+
+        existing.api_key_id = api_key.id
+        existing.name = body.name
+        if body.os:
+            existing.os = body.os
+        # Reinstalling must not demote a machine that was already approved; an
+        # auto-approving key still promotes one that was waiting.
+        if api_key.auto_approve:
+            existing.approval_status = "approved"
+
+        await db.commit()
+        await db.refresh(existing)
+        response.status_code = 200   # adopted, not created
+        return existing
+
     status = "approved" if api_key.auto_approve else "pending"
     machine = Machine(
         peer_id=body.peer_id,
@@ -135,8 +167,13 @@ async def get_machine_approval_status(
     api_key: ApiKey = Depends(get_api_key),
 ):
     """Agent polls this to check if admin has approved the machine."""
+    # Scoped by account, not by the individual key: a reinstalled agent holding
+    # a newly issued key is still asking about its own account's machine, and
+    # every other route here keys off account_id too. Keying off api_key.id
+    # made a reinstall answer 404 forever.
+    caller_account = api_key.account_id or await _account_id_for_creator(db, api_key.created_by)
     result = await db.execute(
-        select(Machine).where(Machine.peer_id == peer_id, Machine.api_key_id == api_key.id)
+        access.machines_in_account(caller_account).where(Machine.peer_id == peer_id)
     )
     machine = result.scalar_one_or_none()
     if not machine:

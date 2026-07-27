@@ -232,6 +232,22 @@ def assert_in_account(membership: Membership, machine: Machine) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Machine not found")
 
 
+# --- Agent-facing scope -------------------------------------------------
+# Agents authenticate with an API key, not a membership, so the helpers above
+# do not apply. The boundary is the same one: the account. Which key enrolled a
+# machine is provenance, not authorization — scoping to the key itself left a
+# reinstalled agent, holding a newly issued key, unable to see its own machine.
+
+def machines_in_account(account_id: str) -> Select:
+    """Machines an API key of this account may act on."""
+    return select(Machine).where(Machine.account_id == account_id)
+
+
+def machine_belongs_to_account(machine: Machine, account_id: str) -> bool:
+    """Whether an already-loaded machine sits inside the given account."""
+    return machine.account_id == account_id
+
+
 async def assert_placement_consistent(db, company_id, location_id, group_id) -> None:
     """The three placement columns must describe one consistent path down the
     tree: company_id/location_id/group_id all naming the same branch. This is
