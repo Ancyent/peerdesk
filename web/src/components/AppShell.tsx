@@ -3,8 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
 import { AccountSwitcher } from './AccountSwitcher';
+import { pathFor } from '../routing/paths';
 
 export type AppPage = 'machines' | 'organization' | 'api-keys' | 'downloads' | 'branding' | 'settings' | 'team';
+
+/** A modified click means the user asked the BROWSER to handle it: new tab,
+ *  new window, download. Intercepting those is the bug this fixes. Only a
+ *  plain left click routes in-app.
+ *  Exported alongside the component so Task 4 can move it into paths.ts
+ *  mechanically; that move is what resolves the fast-refresh lint below. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function isPlainLeftClick(e: React.MouseEvent): boolean {
+  return !e.defaultPrevented && e.button === 0
+    && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
 
 interface Props {
   page: AppPage;
@@ -52,15 +64,24 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
   const navItem = (p: AppPage, icon: string, label: string) => {
     const active = page === p;
     return (
-      <div key={p} onClick={() => onNavigate(p)} style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-        position: 'relative', overflow: 'hidden',
-        background: active ? 'var(--bg-active)' : 'transparent',
-        transition: 'background 0.18s',
-      }}
-        onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'; }}
-        onMouseLeave={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+      <a
+        key={p}
+        href={pathFor(p)}
+        onClick={(e) => {
+          if (!isPlainLeftClick(e)) return;   // let the browser open a new tab
+          e.preventDefault();
+          onNavigate(p);
+        }}
+        style={{
+          textDecoration: 'none',
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+          position: 'relative', overflow: 'hidden',
+          background: active ? 'var(--bg-active)' : 'transparent',
+          transition: 'background 0.18s',
+        }}
+        onMouseEnter={e => { if (!active) (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg-hover)'; }}
+        onMouseLeave={e => { if (!active) (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; }}
       >
         <div style={{
           position: 'absolute', left: 0, top: '22%', bottom: '22%', width: 3,
@@ -76,7 +97,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
           transform: collapsed ? 'translateX(-8px)' : 'translateX(0)',
           transition: 'opacity 0.2s, transform 0.3s, color 0.18s',
         }}>{label}</span>
-      </div>
+      </a>
     );
   };
 
