@@ -81,4 +81,52 @@ describe('AppShell navigation', () => {
     expect(onNavigate).not.toHaveBeenCalled();
     expect(ev.defaultPrevented).toBe(false);
   });
+
+  it('leaves a shift-click to the browser', () => {
+    const onNavigate = vi.fn();
+    render(shell(onNavigate));
+    const link = document.querySelector<HTMLAnchorElement>('a[href="/api-keys"]')!;
+
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, shiftKey: true });
+    act(() => { link.dispatchEvent(ev); });
+
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('leaves an alt-click to the browser', () => {
+    const onNavigate = vi.fn();
+    render(shell(onNavigate));
+    const link = document.querySelector<HTMLAnchorElement>('a[href="/api-keys"]')!;
+
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, altKey: true });
+    act(() => { link.dispatchEvent(ev); });
+
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('leaves a non-left-button click to the browser', () => {
+    const onNavigate = vi.fn();
+    render(shell(onNavigate));
+    const link = document.querySelector<HTMLAnchorElement>('a[href="/api-keys"]')!;
+
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true, button: 1 });
+    act(() => { link.dispatchEvent(ev); });
+
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('does not re-route an already-prevented click', () => {
+    const onNavigate = vi.fn();
+    render(shell(onNavigate));
+    const link = document.querySelector<HTMLAnchorElement>('a[href="/api-keys"]')!;
+
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+    ev.preventDefault();
+    act(() => { link.dispatchEvent(ev); });
+
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
 });

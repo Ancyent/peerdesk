@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react';
 import type { AppPage } from '../components/AppShell';
 
 export type RoutablePage = AppPage | 'login' | 'register' | 'invite';
@@ -35,4 +36,12 @@ const PAGES_WITH_SUB: RoutablePage[] = ['downloads', 'invite'];
 export function pathFor(page: RoutablePage, sub?: string | null): string {
   const base = PAGE_TO_PATH[page];
   return sub && PAGES_WITH_SUB.includes(page) ? `${base}/${sub}` : base;
+}
+
+/** A modified click means the user asked the BROWSER to handle it: new tab,
+ *  new window, download. Intercepting those is the bug this fixes. Only a
+ *  plain left click routes in-app. */
+export function isPlainLeftClick(e: MouseEvent): boolean {
+  return !e.defaultPrevented && e.button === 0
+    && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 }

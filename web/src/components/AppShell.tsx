@@ -3,20 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/useAuth';
 import { useBrandingContext } from '../branding/BrandingContext';
 import { AccountSwitcher } from './AccountSwitcher';
-import { pathFor } from '../routing/paths';
+import { pathFor, isPlainLeftClick } from '../routing/paths';
 
 export type AppPage = 'machines' | 'organization' | 'api-keys' | 'downloads' | 'branding' | 'settings' | 'team';
-
-/** A modified click means the user asked the BROWSER to handle it: new tab,
- *  new window, download. Intercepting those is the bug this fixes. Only a
- *  plain left click routes in-app.
- *  Exported alongside the component so Task 4 can move it into paths.ts
- *  mechanically; that move is what resolves the fast-refresh lint below. */
-// eslint-disable-next-line react-refresh/only-export-components
-export function isPlainLeftClick(e: React.MouseEvent): boolean {
-  return !e.defaultPrevented && e.button === 0
-    && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
-}
 
 interface Props {
   page: AppPage;
