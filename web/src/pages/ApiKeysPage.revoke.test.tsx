@@ -88,6 +88,14 @@ describe('revoking an API key', () => {
     expect(count?.textContent).toContain('3');
   });
 
+  it('renders the machine count as plain text, not a link, when the key has zero machines', async () => {
+    list.mockResolvedValue([IDLE_KEY]);
+    await renderPage();
+    const count = document.querySelector('[data-testid="key-machine-count"]');
+    expect(count?.tagName).not.toBe('A');
+    expect(count?.textContent).toContain('0');
+  });
+
   it('asks for confirmation and names the machine count', async () => {
     await renderPage();
     await clickText('Revoke');

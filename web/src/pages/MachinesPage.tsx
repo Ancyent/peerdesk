@@ -106,14 +106,28 @@ export function MachinesPage({ onConnect, filterKeyId }: Props) {
     load();
   };
 
-  const matching = keyFilter ? machines.filter(m => m.api_key_id === keyFilter) : machines;
-  const filterMatchedNothing = !!keyFilter && matching.length === 0;
-  const shown = filterMatchedNothing ? machines : matching;
+  const matchingActive = keyFilter ? machines.filter(m => m.api_key_id === keyFilter) : machines;
+  const matchingPending = keyFilter ? pending.filter(m => m.api_key_id === keyFilter) : pending;
+  // Gated on `!loading`: while the fetch is in flight `machines`/`pending` are
+  // still `[]`, so any active `keyFilter` would otherwise match nothing on
+  // the very first commit and this would go true before the real data ever
+  // had a chance to load. Also checks both lists — a key whose machines are
+  // all pending (or a zero-machine key) is a valid filter, not an unknown
+  // one, so only treat it as unknown when neither list has a match.
+  const filterMatchedNothing = !loading && !!keyFilter && matchingActive.length === 0 && matchingPending.length === 0;
+  const shownActive = filterMatchedNothing ? machines : matchingActive;
+  const shownPending = filterMatchedNothing ? pending : matchingPending;
 
   // Warn once when the filter matches nothing and fall back to the full list —
   // an empty list would imply the key genuinely has no machines, which is not
   // what happened here (the key may have been revoked, or its machines moved).
   const warnedRef = useRef(false);
+  useEffect(() => {
+    // A changed filter (including one restored via back/forward) deserves its
+    // own chance to warn — otherwise a genuinely unknown key silently passes
+    // once an earlier one has already latched the ref.
+    warnedRef.current = false;
+  }, [keyFilter]);
   useEffect(() => {
     if (filterMatchedNothing && !warnedRef.current) {
       warnedRef.current = true;
@@ -121,7 +135,7 @@ export function MachinesPage({ onConnect, filterKeyId }: Props) {
     }
   }, [filterMatchedNothing, notify, t]);
 
-  const filtered = shown
+  const filtered = shownActive
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()) || m.peer_id.includes(search))
     .sort((a, b) => Number(b.is_online) - Number(a.is_online));
 
@@ -185,13 +199,13 @@ export function MachinesPage({ onConnect, filterKeyId }: Props) {
       {/* Pending tab */}
       {!loading && tab === 'pending' && (
         <>
-          {pending.length === 0 && (
+          {shownPending.length === 0 && (
             <div style={{ padding: 32, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)' }}>
               {t('machines:page.noPending')}
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {pending.map(m => (
+            {shownPending.map(m => (
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 8 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

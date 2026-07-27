@@ -14,7 +14,6 @@
   "dismiss": "Dismiss",
   "empty": "No API keys yet. Create one above to start deploying agents.",
   "lastUsed": "Last used: {{date}}",
-  "copyHint": "Copy the key when first created",
   "revoke": "Revoke",
   "machineCount": "{{count}} machines",
   "machineCount_one": "1 machine",

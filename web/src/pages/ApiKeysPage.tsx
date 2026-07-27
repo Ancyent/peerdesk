@@ -24,13 +24,17 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
   const [autoApprove, setAutoApprove] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [revealTarget, setRevealTarget] = useState<ApiKeyListOut | null>(null);
   const [revealPassword, setRevealPassword] = useState('');
   const [revealError, setRevealError] = useState<string | null>(null);
   const [revealSubmitting, setRevealSubmitting] = useState(false);
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({});
-  const [copiedRevealedId, setCopiedRevealedId] = useState<string | null>(null);
+  // Tracks which "Copy" button most recently succeeded — the freshly-created
+  // key banner uses the sentinel id 'new' (it has no api-key id of its own
+  // in scope here), a revealed key uses its own `k.id`. One id can be
+  // "copied" at a time, matching the one-banner-at-a-time / one-row-click-at-
+  // a-time reality of the UI.
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const revealTitleId = useId();
 
   const load = () => {
@@ -82,16 +86,12 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
     }
   };
 
-  const handleCopy = async (text: string) => {
+  const handleCopy = async (id: string, text: string) => {
     if (!(await copyText(text))) return;
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCopyRevealed = async (id: string, text: string) => {
-    if (!(await copyText(text))) return;
-    setCopiedRevealedId(id);
-    setTimeout(() => setCopiedRevealedId(null), 2000);
+    setCopiedId(id);
+    // Guard against a second, later copy's timeout being clobbered by this
+    // one: only clear if we're still the most recent "copied" id.
+    setTimeout(() => setCopiedId(prev => (prev === id ? null : prev)), 2000);
   };
 
   const openReveal = (key: ApiKeyListOut) => {
@@ -160,8 +160,8 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
             <code style={{ flex: 1, padding: '6px 10px', background: 'rgba(0,229,160,0.15)', borderRadius: 4, fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-1)' }}>
               {newKey}
             </code>
-            <button onClick={() => handleCopy(newKey)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-              {copied ? t('apikeys:copied') : t('apikeys:copy')}
+            <button onClick={() => handleCopy('new', newKey)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+              {copiedId === 'new' ? t('apikeys:copied') : t('apikeys:copy')}
             </button>
             <button onClick={() => setNewKey(null)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--bg-hover)', color: 'var(--text-2)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
               {t('apikeys:dismiss')}
@@ -197,24 +197,30 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
                 <code style={{ background: 'var(--bg-hover)', padding: '1px 4px', borderRadius: 3, color: 'var(--text-1)', wordBreak: 'break-all' }}>
                   {revealedKeys[k.id] ?? k.key_preview}
                 </code>
-                <a
-                  href={`/machines?key=${encodeURIComponent(k.id)}`}
-                  data-testid="key-machine-count"
-                  onClick={(e) => {
-                    if (!isPlainLeftClick(e)) return;
-                    e.preventDefault();
-                    onNavigateToMachines?.(k.id);
-                  }}
-                  style={{ marginLeft: 8, color: 'var(--text-3)', textDecoration: 'none' }}
-                >
-                  {t('apikeys:machineCount', { count: k.machine_count })}
-                </a>
+                {k.machine_count === 0 ? (
+                  <span data-testid="key-machine-count" style={{ marginLeft: 8, color: 'var(--text-3)' }}>
+                    {t('apikeys:machineCount', { count: k.machine_count })}
+                  </span>
+                ) : (
+                  <a
+                    href={`/machines?key=${encodeURIComponent(k.id)}`}
+                    data-testid="key-machine-count"
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      onNavigateToMachines?.(k.id);
+                    }}
+                    style={{ marginLeft: 8, color: 'var(--text-3)', textDecoration: 'none' }}
+                  >
+                    {t('apikeys:machineCount', { count: k.machine_count })}
+                  </a>
+                )}
                 {k.last_used_at && <span style={{ marginLeft: 8 }}>{t('apikeys:lastUsed', { date: formatDate(k.last_used_at) })}</span>}
               </div>
             </div>
             {revealedKeys[k.id] ? (
-              <button onClick={() => handleCopyRevealed(k.id, revealedKeys[k.id])} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-                {copiedRevealedId === k.id ? t('apikeys:copied') : t('apikeys:copy')}
+              <button onClick={() => handleCopy(k.id, revealedKeys[k.id])} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                {copiedId === k.id ? t('apikeys:copied') : t('apikeys:copy')}
               </button>
             ) : (
               <button onClick={() => openReveal(k)} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--bg-hover)', color: 'var(--text-2)', border: '1px solid var(--border-dim)', borderRadius: 6, cursor: 'pointer' }}>
@@ -240,7 +246,7 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
           onChange={e => setRevealPassword(e.target.value)}
           placeholder={t('apikeys:reveal.password')}
           style={{ width: '100%', boxSizing: 'border-box', padding: '7px 12px', fontSize: 13, border: '1px solid var(--border-dim)', borderRadius: 6, background: 'var(--bg-hover)', color: 'var(--text-1)' }}
-          onKeyDown={e => e.key === 'Enter' && handleRevealSubmit()}
+          onKeyDown={e => e.key === 'Enter' && !revealSubmitting && handleRevealSubmit()}
         />
         <div style={{ marginTop: 8 }}>
           <InlineError>{revealError}</InlineError>

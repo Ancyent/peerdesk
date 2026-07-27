@@ -33,3 +33,7 @@ achievable rate, and the project has no rate limiting anywhere, including on
 login, so this endpoint is not a bypass of an existing control — nothing
 here throttles login either — but it belongs in this register as its own
 recorded risk.
+
+Reveals are also not audited: nothing logs who called this endpoint or when,
+so a compromised admin session can exfiltrate every key in the account and
+leave no record of having done so.

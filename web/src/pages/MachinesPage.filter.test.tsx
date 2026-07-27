@@ -89,6 +89,40 @@ describe('MachinesPage key filter', () => {
     await renderPage('does-not-exist');
     expect(document.body.textContent).toContain('on-key-a');
     expect(document.body.textContent).toContain('on-key-b');
+    // Not vacuous: renderPage awaits the mocked fetch inside `act`, so by the
+    // time we assert here `loading` is already false and the effect that
+    // fires this toast has run against the real (empty) match result — not
+    // the transient mount-time state where `machines` is still `[]`. See the
+    // "does not warn" test below for the regression this guards against.
     expect(document.querySelector('[data-testid="toast"]')).not.toBeNull();
+  });
+
+  it('does not warn when deep-linking to a key that has machines', async () => {
+    // Regression test for the finding that `filterMatchedNothing` was
+    // computed against the pre-fetch `machines === []` on the first commit,
+    // so the "unknown key" toast fired on every deep-link — even one for a
+    // key with real machines — before the fetch had a chance to resolve.
+    await renderPage('ka');
+    expect(document.querySelector('[data-testid="toast"]')).toBeNull();
+  });
+
+  it('finds pending machines that belong to the filtered key', async () => {
+    list.mockResolvedValue([]);
+    listByStatus.mockResolvedValue([
+      { ...base, id: 'p1', peer_id: '333333333', name: 'pending-on-key-a', api_key_id: 'ka', approval_status: 'pending' },
+      { ...base, id: 'p2', peer_id: '444444444', name: 'pending-on-key-b', api_key_id: 'kb', approval_status: 'pending' },
+    ]);
+    await renderPage('ka');
+
+    const pendingTab = Array.from(document.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim().startsWith('Pending'),
+    )!;
+    await act(async () => { pendingTab.click(); });
+
+    expect(document.body.textContent).toContain('pending-on-key-a');
+    expect(document.body.textContent).not.toContain('pending-on-key-b');
+    // A key whose machines are all pending must not be treated as unknown —
+    // it has machines, they're just awaiting approval, so no fallback toast.
+    expect(document.querySelector('[data-testid="toast"]')).toBeNull();
   });
 });
