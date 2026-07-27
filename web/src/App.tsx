@@ -349,7 +349,20 @@ export default function App() {
         fontFamily: 'system-ui, sans-serif',
       }}>
         <div style={{ color: 'var(--text-2)', fontSize: 14 }}>{errMsg || t('dashboard:viewer.sessionEnded')}</div>
-        <button onClick={() => { setViewerState('idle'); setPage('connect'); }}
+        <button onClick={() => {
+          setErrMsg('');
+          setViewerState('idle');
+          // A retained peer id means there's a machine to reconnect to (e.g.
+          // after a takeover) -- send the user back to the connect form,
+          // pre-filled. With no peer id (e.g. the machine wasn't found), the
+          // connect form would render blank while still sitting on the bad
+          // /viewer/<id> address, so go to the machine list instead.
+          if (connectPeerId) {
+            setPage('connect');
+          } else {
+            go('machines');
+          }
+        }}
           style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--border-dim)',
             background: 'var(--bg-hover)', color: 'var(--text-1)', cursor: 'pointer', fontSize: 13 }}>
           {t('dashboard:viewer.back')}

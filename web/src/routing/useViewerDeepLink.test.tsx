@@ -130,11 +130,38 @@ describe('useViewerDeepLink', () => {
   });
 
   it('resolves again when the address points at a different machine', async () => {
+    // Two DISTINCT mocks, not one reused across both renders: a stale
+    // callback ref (fetchRef still pointing at the first render's mock)
+    // would still satisfy a same-mock call-count assertion, since the guard
+    // stops a second fetch either way. Only a second mock instance actually
+    // receiving the call proves the ref was updated, exercising the
+    // effect-declaration-order invariant the hook's design leans on.
+    const fetchA = vi.fn().mockResolvedValue(MACHINE);
+    const fetchB = vi.fn().mockResolvedValue(MACHINE);
+    await render(base({ fetchMachine: fetchA }));
+    await rerender(base({ fetchMachine: fetchB, machineId: 'm-2' }));
+
+    expect(fetchA).toHaveBeenCalledTimes(1);
+    expect(fetchB).toHaveBeenCalledTimes(1);
+    expect(fetchB).toHaveBeenCalledWith('m-2');
+  });
+
+  it('resolves again for the same machine id after being disabled and re-enabled', async () => {
+    // Reproduces browsing Back into /viewer/<id> after Disconnect: the
+    // resolver is disabled (e.g. the page leaves 'viewer', or `viewerState`
+    // leaves 'idle') and later re-enabled for the SAME machine id, with
+    // nothing in flight. Before the fix, `resolvedRef` was never cleared, so
+    // the guard refused to fetch a second time and the caller was left
+    // rendering its "resolving" state with no request outstanding — a
+    // permanent spinner.
     const fetchMachine = vi.fn().mockResolvedValue(MACHINE);
-    await render(base({ fetchMachine }));
-    await rerender(base({ fetchMachine, machineId: 'm-2' }));
+    const onMachine = vi.fn();
+    await render(base({ fetchMachine, onMachine }));
+    await rerender(base({ fetchMachine, onMachine, enabled: false }));
+    await rerender(base({ fetchMachine, onMachine, enabled: true }));
 
     expect(fetchMachine).toHaveBeenCalledTimes(2);
-    expect(fetchMachine).toHaveBeenLastCalledWith('m-2');
+    expect(fetchMachine).toHaveBeenLastCalledWith('m-1');
+    expect(onMachine).toHaveBeenCalledTimes(2);
   });
 });

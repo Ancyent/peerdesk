@@ -36,6 +36,23 @@ export function useViewerDeepLink({
     onNotFoundRef.current = onNotFound;
   });
 
+  // Clear the "already resolved" guard whenever the caller disables the
+  // resolver, so a later re-enable for the SAME machine id can resolve again
+  // instead of silently doing nothing. This matters for browser Back: e.g.
+  // disconnecting pushes /machines while `viewerMachineId` is left untouched,
+  // and popping back to /viewer/<id> re-enables the resolver for that same id
+  // with nothing in flight — without this, the guard below would refuse to
+  // fetch and the caller would be stuck rendering its "resolving" state
+  // forever. This is safe against the guard's two original purposes because
+  // both hold `enabled` steady rather than toggling it: at-most-once-per-address
+  // never flips `enabled` on its own, and StrictMode's dev double-invoke
+  // remounts this component's effects while `enabled` stays the same value
+  // throughout, so this effect never observes a "went false" transition
+  // during it.
+  useEffect(() => {
+    if (!enabled) resolvedRef.current = null;
+  }, [enabled]);
+
   useEffect(() => {
     if (!enabled || !machineId) return;
     if (resolvedRef.current === machineId) return;
