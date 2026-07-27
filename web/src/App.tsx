@@ -233,7 +233,11 @@ export default function App() {
   }, [send]);
 
   useViewerDeepLink({
-    enabled: !!user && !!accessToken && page === 'viewer',
+    // `viewerState === 'idle'` excludes connects the app itself started:
+    // handleDashboardConnect always leaves viewerState as 'connecting' or
+    // 'error' before the address settles on /viewer, so 'idle' there can only
+    // mean a fresh deep link nothing else has touched yet.
+    enabled: !!user && !!accessToken && page === 'viewer' && viewerState === 'idle',
     machineId: viewerMachineId,
     // `enabled` already requires a token, but TypeScript cannot narrow it
     // through the object, and a non-null assertion would add a lint error to a

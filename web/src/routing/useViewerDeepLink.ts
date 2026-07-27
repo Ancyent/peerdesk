@@ -41,10 +41,15 @@ export function useViewerDeepLink({
     if (resolvedRef.current === machineId) return;
     resolvedRef.current = machineId;
 
-    let cancelled = false;
+    // No `cancelled` flag here: StrictMode's dev double-invoke runs this
+    // effect, cleans it up, then runs it again for the same machine id. A
+    // `cancelled` local set in the first run's cleanup would suppress the
+    // still-in-flight fetch's callbacks forever, since the guard above skips
+    // starting a second fetch. Gating on `resolvedRef` instead survives the
+    // remount: it is only ever pointed at the current machine id, so a stale
+    // response for an id the resolver has since moved past is still dropped.
     fetchRef.current(machineId)
-      .then(m => { if (!cancelled) onMachineRef.current(m); })
-      .catch(() => { if (!cancelled) onNotFoundRef.current(); });
-    return () => { cancelled = true; };
+      .then(m => { if (resolvedRef.current === machineId) onMachineRef.current(m); })
+      .catch(() => { if (resolvedRef.current === machineId) onNotFoundRef.current(); });
   }, [enabled, machineId]);
 }
