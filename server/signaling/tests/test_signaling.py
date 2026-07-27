@@ -1,8 +1,9 @@
 import pytest
+import json
 from unittest.mock import AsyncMock
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from session import ConnectionState, register_agent, unregister_agent
+from session import ConnectionState, register_agent, unregister_agent, handle_approval
 
 
 @pytest.mark.asyncio
@@ -180,3 +181,67 @@ def test_agent_can_reregister_after_password_change(monkeypatch):
     stored = fake.hset.await_args.kwargs["mapping"]
     assert stored["password_hash"] == "hash-new"
     assert stored["hmac_key"] == "key-new"
+
+
+@pytest.mark.asyncio
+async def test_a_second_viewer_displaces_the_first_with_a_reason():
+    state = ConnectionState()
+    old_ws, new_ws = AsyncMock(), AsyncMock()
+    state.viewer_connections["old"] = old_ws
+    state.viewer_to_agent["old"] = "123456789"
+    state.agent_to_viewer["123456789"] = "old"
+    state.viewer_pending["new"] = new_ws
+
+    await handle_approval(state, "123456789", "new", True)
+
+    sent = [json.loads(c.args[0])["type"] for c in old_ws.send_text.call_args_list]
+    assert "session_taken_over" in sent, "the old viewer must be told, not left to guess"
+    assert state.agent_to_viewer["123456789"] == "new"
+    assert "old" not in state.viewer_connections
+    assert "old" not in state.viewer_to_agent
+
+
+@pytest.mark.asyncio
+async def test_nobody_is_notified_when_no_one_is_displaced():
+    state = ConnectionState()
+    viewer_ws = AsyncMock()
+    state.viewer_pending["only"] = viewer_ws
+
+    await handle_approval(state, "123456789", "only", True)
+
+    sent = [json.loads(c.args[0])["type"] for c in viewer_ws.send_text.call_args_list]
+    assert "session_taken_over" not in sent
+    assert sent == ["joined"]
+
+
+@pytest.mark.asyncio
+async def test_a_dead_displaced_socket_does_not_block_the_new_viewer():
+    state = ConnectionState()
+    old_ws, new_ws = AsyncMock(), AsyncMock()
+    old_ws.send_text.side_effect = RuntimeError("socket closed")
+    state.viewer_connections["old"] = old_ws
+    state.viewer_to_agent["old"] = "123456789"
+    state.agent_to_viewer["123456789"] = "old"
+    state.viewer_pending["new"] = new_ws
+
+    await handle_approval(state, "123456789", "new", True)
+
+    assert state.agent_to_viewer["123456789"] == "new"
+    sent = [json.loads(c.args[0])["type"] for c in new_ws.send_text.call_args_list]
+    assert "joined" in sent
+
+
+@pytest.mark.asyncio
+async def test_reapproving_the_same_viewer_does_not_displace_it():
+    state = ConnectionState()
+    viewer_ws = AsyncMock()
+    state.viewer_connections["same"] = viewer_ws
+    state.viewer_to_agent["same"] = "123456789"
+    state.agent_to_viewer["123456789"] = "same"
+    state.viewer_pending["same"] = viewer_ws
+
+    await handle_approval(state, "123456789", "same", True)
+
+    sent = [json.loads(c.args[0])["type"] for c in viewer_ws.send_text.call_args_list]
+    assert "session_taken_over" not in sent
+    assert state.agent_to_viewer["123456789"] == "same"

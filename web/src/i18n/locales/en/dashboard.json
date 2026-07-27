@@ -23,7 +23,8 @@
       "wrongCredentials": "Wrong ID or password",
       "machineNotFound": "Machine not found",
       "remoteDisconnected": "Remote machine disconnected",
-      "connectionDenied": "Connection denied"
+      "connectionDenied": "Connection denied",
+      "takenOver": "This session was taken over in another window"
     }
   }
 }

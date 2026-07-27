@@ -200,6 +200,21 @@ async def handle_approval(
     if not viewer_ws:
         return
     if approved:
+        # The agent closes its previous PeerConnection on every offer
+        # (agent/src/lib.rs), so admitting a second viewer ends the first one's
+        # session. Say so: otherwise the old window shows the generic
+        # "remote disconnected" error and reads like a fault.
+        displaced_id = state.agent_to_viewer.get(peer_id)
+        if displaced_id and displaced_id != viewer_id:
+            displaced_ws = state.viewer_connections.pop(displaced_id, None)
+            state.viewer_to_agent.pop(displaced_id, None)
+            if displaced_ws:
+                try:
+                    await displaced_ws.send_text(json.dumps({"type": "session_taken_over"}))
+                except Exception:
+                    # A displaced socket that is already dead must not stop the
+                    # new viewer from joining.
+                    pass
         state.viewer_connections[viewer_id] = viewer_ws
         state.viewer_to_agent[viewer_id] = peer_id
         state.agent_to_viewer[peer_id] = viewer_id

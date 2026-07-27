@@ -23,7 +23,8 @@
       "wrongCredentials": "ID sau parolă greșită",
       "machineNotFound": "Mașina nu a fost găsită",
       "remoteDisconnected": "Mașina la distanță s-a deconectat",
-      "connectionDenied": "Conexiune refuzată"
+      "connectionDenied": "Conexiune refuzată",
+      "takenOver": "Sesiunea a fost preluată în altă fereastră"
     }
   }
 }

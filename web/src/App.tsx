@@ -188,6 +188,7 @@ export default function App() {
       setErrMsg(msg.code === 'unauthorized' ? t('dashboard:viewer.errors.wrongCredentials') : t('dashboard:viewer.errors.machineNotFound')); setViewerState('error'); setPage('connect');
     }
     else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg(t('dashboard:viewer.errors.remoteDisconnected')); setViewerState('error'); go('machines'); }
+    else if (msg.type === 'session_taken_over') { webrtc.disconnect(); setErrMsg(t('dashboard:viewer.errors.takenOver')); setViewerState('error'); }
     else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? t('dashboard:viewer.errors.connectionDenied')); setViewerState('error'); setPage('connect'); }
     else if (msg.type === 'session_mode')  { setSessionMode(msg.mode); }
     else if (msg.type === 'display_list')  {
