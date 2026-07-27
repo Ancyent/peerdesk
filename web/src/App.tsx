@@ -31,6 +31,7 @@ import { getConfig } from './config';
 import type { SignalingMessage } from './types/messages';
 import { parsePath, type RoutablePage } from './routing/paths';
 import { useRoute } from './routing/useRoute';
+import { useViewerDeepLink } from './routing/useViewerDeepLink';
 import { coerceOs, type OsId } from './pages/downloads/osData';
 
 type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer' | 'invite';
@@ -46,6 +47,9 @@ export default function App() {
   );
   const [machineKeyFilter, setMachineKeyFilter] = useState<string | undefined>(
     initialRoute.params.key,
+  );
+  const [viewerMachineId, setViewerMachineId] = useState<string | null>(
+    initialRoute.page === 'viewer' ? initialRoute.sub : null,
   );
   const [connectPeerId, setConnectPeerId] = useState('');
   const [connectMachineId, setConnectMachineId] = useState<string | null>(null);
@@ -91,6 +95,7 @@ export default function App() {
     if (p === 'downloads') setDownloadsOs(coerceOs(sub));
     if (p === 'invite') setInviteToken(sub);
     if (p === 'machines') setMachineKeyFilter(params.key);
+    if (p === 'viewer') setViewerMachineId(sub);
   });
   const go = useCallback((p: RoutablePage, sub?: string) => {
     navigate(p, sub ?? null);
@@ -206,6 +211,8 @@ export default function App() {
   };
 
   const handleDashboardConnect = async (machine: MachineOut) => {
+    navigate('viewer', machine.id);
+    setViewerMachineId(machine.id);
     setConnectPeerId(machine.peer_id); setConnectMachineId(machine.id); setErrMsg('');
     // If a password is saved for this machine, connect straight away.
     if (machine.has_saved_password && accessToken) {
@@ -225,6 +232,22 @@ export default function App() {
     setCurrentDisplay(index); send({ type: 'switch_display', index });
   }, [send]);
 
+  useViewerDeepLink({
+    enabled: !!user && !!accessToken && page === 'viewer',
+    machineId: viewerMachineId,
+    // `enabled` already requires a token, but TypeScript cannot narrow it
+    // through the object, and a non-null assertion would add a lint error to a
+    // count that must not rise.
+    fetchMachine: (id) => accessToken
+      ? api.machines.get(accessToken, id)
+      : Promise.reject(new Error('not signed in')),
+    onMachine: handleDashboardConnect,
+    onNotFound: () => {
+      setErrMsg(t('dashboard:viewer.errors.machineNotFound'));
+      setViewerState('error');
+    },
+  });
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9ca3af', fontFamily: 'sans-serif' }}>{t('common:loading')}</div>
   );
@@ -243,7 +266,7 @@ export default function App() {
   if (effectivePage === 'invite') return <InvitePage token={inviteToken ?? ''} />;
 
   if (effectivePage === 'viewer') {
-    if (viewerState === 'connecting') return (
+    if (viewerState === 'connecting' || (viewerState === 'idle' && viewerMachineId)) return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         height: '100vh', background: 'var(--bg-base)', gap: 20,

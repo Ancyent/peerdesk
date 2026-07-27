@@ -238,6 +238,8 @@ export const api = {
   machines: {
     list: (token: string) =>
       request<MachineOut[]>('/machines', { headers: authHeaders(token) }),
+    get: (token: string, machineId: string) =>
+      request<MachineOut>(`/machines/${machineId}`, { headers: authHeaders(token) }),
     register: (token: string, peer_id: string, name: string, os?: string) =>
       request<MachineOut>('/machines', {
         method: 'POST',
