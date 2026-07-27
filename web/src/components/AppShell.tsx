@@ -31,6 +31,10 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
   const { user, logout, role } = useAuth();
   const isAdmin = role === 'admin';
   const { brand_name, logo_data_url } = useBrandingContext();
+  // True when we fall back to the PeerDesk mark. It carries its own colour and
+  // glow, so the accent tile behind it is dropped; an uploaded logo or the
+  // emoji fallback still gets the tile as a backdrop.
+  const ownMark = !logo_data_url && (!brand_name || brand_name === 'PeerDesk');
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -101,16 +105,16 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
         <div style={{ padding: '18px 16px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border-dim)', minHeight: 64 }}>
           <div style={{
             width: 34, height: 34, flexShrink: 0, borderRadius: 10,
-            background: 'linear-gradient(135deg, var(--accent), var(--accent-2))',
+            background: ownMark ? 'none' : 'linear-gradient(135deg, var(--accent), var(--accent-2))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, boxShadow: '0 0 22px rgba(0,200,150,0.45)',
+            fontSize: 16, boxShadow: ownMark ? 'none' : '0 0 22px rgba(0,200,150,0.45)',
           }}>
             {/* Same rule as the login screen: our mark only stands in for an
                 un-branded deployment, never above someone else's name. */}
             {logo_data_url
               ? <img src={logo_data_url} alt={brand_name} style={{ width: 22, height: 22, objectFit: 'contain', borderRadius: 4 }} />
-              : (!brand_name || brand_name === 'PeerDesk')
-                ? <img src="/peerdesk-icon-32x32.png" alt="PeerDesk" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+              : ownMark
+                ? <img src="/peerdesk-icon-64x64.png" alt="PeerDesk" style={{ width: 34, height: 34, objectFit: 'contain' }} />
                 : '🖥'}
           </div>
           <span style={{

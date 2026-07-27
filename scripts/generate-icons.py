@@ -161,7 +161,9 @@ def main() -> int:
         print(f"  {name:<30} {purpose}")
 
     print("\nweb/public/")
-    for size in (16, 32, 180, 192, 512):
+    # 64 is there for the sidebar mark, which renders at 34 CSS px and wants a
+    # 2x source; anything referenced from web/src must be copied here or it 404s.
+    for size in (16, 32, 64, 180, 192, 512):
         name = f"peerdesk-icon-{size}x{size}.png"
         rendered[size].save(OUT_WEB / name)
         print(f"  {name}")
