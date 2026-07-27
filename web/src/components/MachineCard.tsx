@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { MachineOut } from '../api/client';
+import { pathFor, isPlainLeftClick } from '../routing/paths';
 
 interface Props {
   machine: MachineOut;
@@ -56,7 +57,15 @@ export function MachineCard({ machine: m, onConnect, onDelete, onForget }: Props
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span style={{ fontSize: 22 }}>{icon}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
+            <a
+              href={pathFor('viewer', m.id)}
+              onClick={e => {
+                if (!isPlainLeftClick(e)) return;
+                e.preventDefault();
+                if (online) onConnect(m);
+              }}
+              style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'none' }}
+            >{m.name}</a>
             <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'monospace', marginTop: 2, letterSpacing: 1 }}>
               {m.peer_id.replace(/(\d{3})(\d{3})(\d{3})/, '$1 · $2 · $3')}
             </div>
