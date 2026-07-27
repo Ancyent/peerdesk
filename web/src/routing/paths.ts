@@ -1,7 +1,7 @@
 import type { MouseEvent } from 'react';
 import type { AppPage } from '../components/AppShell';
 
-export type RoutablePage = AppPage | 'login' | 'register' | 'invite';
+export type RoutablePage = AppPage | 'login' | 'register' | 'invite' | 'viewer';
 
 const PAGE_TO_PATH: Record<RoutablePage, string> = {
   machines: '/machines',
@@ -14,6 +14,7 @@ const PAGE_TO_PATH: Record<RoutablePage, string> = {
   login: '/login',
   register: '/register',
   invite: '/invite',
+  viewer: '/viewer',
 };
 
 const PATH_TO_PAGE: Record<string, RoutablePage> = Object.fromEntries(
@@ -35,7 +36,7 @@ export function parsePath(
 
 // Pages whose path carries a second segment (e.g. /downloads/windows,
 // /invite/{token}). Any RoutablePage not listed here ignores `sub` entirely.
-const PAGES_WITH_SUB: RoutablePage[] = ['downloads', 'invite'];
+const PAGES_WITH_SUB: RoutablePage[] = ['downloads', 'invite', 'viewer'];
 
 export function pathFor(page: RoutablePage, sub?: string | null): string {
   const base = PAGE_TO_PATH[page];

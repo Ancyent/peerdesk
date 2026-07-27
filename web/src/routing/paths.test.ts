@@ -24,6 +24,16 @@ describe('parsePath', () => {
   it('invite with token sub', () => {
     expect(parsePath('/invite/abc123')).toEqual({ page: 'invite', sub: 'abc123', params: {} });
   });
+  it('parses a viewer deep link into its machine id', () => {
+    expect(parsePath('/viewer/m-123')).toEqual({
+      page: 'viewer', sub: 'm-123', params: {},
+    });
+  });
+  it('parses a bare viewer path with no machine id', () => {
+    // A hand-typed /viewer has nothing to connect to; App renders the connect
+    // form rather than guessing a machine.
+    expect(parsePath('/viewer')).toEqual({ page: 'viewer', sub: null, params: {} });
+  });
   it('unknown path → machines', () => {
     expect(parsePath('/nope/x')).toEqual({ page: 'machines', sub: null, params: {} });
   });
@@ -63,5 +73,13 @@ describe('pathFor', () => {
     expect(parsePath(pathFor('downloads', 'windows'))).toEqual({ page: 'downloads', sub: 'windows', params: {} });
     expect(parsePath(pathFor('settings'))).toEqual({ page: 'settings', sub: null, params: {} });
     expect(parsePath(pathFor('invite', 'abc123'))).toEqual({ page: 'invite', sub: 'abc123', params: {} });
+  });
+  it('builds a viewer path from a machine id', () => {
+    expect(pathFor('viewer', 'm-123')).toBe('/viewer/m-123');
+  });
+  it('round-trips a viewer deep link', () => {
+    expect(parsePath(pathFor('viewer', 'm-123'))).toEqual({
+      page: 'viewer', sub: 'm-123', params: {},
+    });
   });
 });
