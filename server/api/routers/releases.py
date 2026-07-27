@@ -1,4 +1,6 @@
+import asyncio
 import os
+import secrets
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse
@@ -7,6 +9,14 @@ import release_cache
 
 router = APIRouter(prefix="/releases", tags=["releases"])
 
+# Shared secret for POST /releases/refresh. Unset -> the endpoint does not
+# exist. Left open, it would let anyone make this server hammer GitHub's API
+# and re-download every release asset on demand.
+REFRESH_TOKEN = os.getenv("RELEASE_REFRESH_TOKEN", "")
+
+# One refresh at a time; a burst of calls must not multiply the outbound work.
+_refresh_lock = asyncio.Lock()
+
 # Public on purpose: install.sh fetches this before any session exists, and the
 # binaries are public artefacts on GitHub anyway.
 
@@ -14,6 +24,31 @@ router = APIRouter(prefix="/releases", tags=["releases"])
 # Set this for self-host/white-label deployments (or anywhere the request's
 # own Host header isn't the public one) to pin the URL fully.
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+
+
+@router.post("/refresh", status_code=202)
+async def trigger_refresh(request: Request):
+    """Pull the newest release now, instead of waiting for the hourly loop.
+
+    CI calls this after publishing a tag so clients see the release in seconds
+    rather than up to an hour later. The periodic loop stays as the fallback:
+    this endpoint failing must never mean a release goes unnoticed.
+    """
+    if not REFRESH_TOKEN:
+        # Not configured — behave as if the route were never registered rather
+        # than advertising a disabled endpoint.
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    supplied = request.headers.get("X-Refresh-Token", "")
+    if not secrets.compare_digest(supplied, REFRESH_TOKEN):
+        raise HTTPException(status_code=403, detail="Invalid refresh token")
+
+    if _refresh_lock.locked():
+        return {"status": "already-running", "changed": False}
+
+    async with _refresh_lock:
+        changed = await release_cache.refresh()
+    return {"status": "ok", "changed": changed}
 
 
 @router.get("/latest")

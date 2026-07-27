@@ -405,3 +405,43 @@ jobs:
             viewer-windows/peerdesk-viewer-windows-*-setup.exe
             viewer-windows/peerdesk-viewer-windows-*-setup.exe.sig
             viewer-windows/peerdesk-viewer-windows-*-portable.exe
+
+  # The server mirrors GitHub releases locally and re-checks on a timer
+  # (RELEASE_REFRESH_SECONDS, an hour by default). Telling it directly means a
+  # new release reaches clients in seconds instead of up to an hour later.
+  #
+  # Deliberately never fails the run: the timer is still the source of truth,
+  # and a release must not be marked broken because a notification did not land.
+  refresh-release-cache:
+    name: Refresh the server's release cache
+    needs:
+      - release-agents
+      - release-android
+      - release-viewers
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled()
+    steps:
+      - name: Tell the server to pull the new release
+        env:
+          URL: ${{ secrets.RELEASE_REFRESH_URL }}
+          TOKEN: ${{ secrets.RELEASE_REFRESH_TOKEN }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$TOKEN" ]; then
+            echo "::notice::RELEASE_REFRESH_URL/RELEASE_REFRESH_TOKEN not set — skipping. The server picks this release up on its next scheduled refresh."
+            exit 0
+          fi
+
+          code=$(curl -sS -o /tmp/refresh-body -w '%{http_code}' \
+                   -X POST "$URL" \
+                   -H "X-Refresh-Token: $TOKEN" \
+                   --max-time 180 --retry 2 --retry-delay 10) || code=000
+          echo "HTTP $code"
+          cat /tmp/refresh-body 2>/dev/null || true
+          echo
+
+          case "$code" in
+            2*) echo "Server refreshed its release cache." ;;
+            404) echo "::warning::Server returned 404 — RELEASE_REFRESH_TOKEN is probably unset on the server, so the endpoint is disabled. Falling back to its timer." ;;
+            403) echo "::warning::Server rejected the token — the CI secret and the server's RELEASE_REFRESH_TOKEN disagree. Falling back to its timer." ;;
+            *)   echo "::warning::Refresh call failed (HTTP $code). Falling back to the server's timer." ;;
+          esac

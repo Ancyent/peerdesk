@@ -106,6 +106,20 @@ publishes no desktop viewers. That is deliberate: an unsigned viewer looks green
 but silently breaks auto-update for every existing desktop client, so refusing to
 publish it is the cheaper failure. Fix the cause, then re-run the same tag.
 
+**Release cache refresh.** The server mirrors the GitHub release locally and
+re-checks every `RELEASE_REFRESH_SECONDS` (default 3600), so without a nudge a
+new tag can take up to an hour to reach clients. CI nudges it: the
+`refresh-release-cache` job POSTs to `/api/releases/refresh` after publishing.
+
+Set two GitHub Actions secrets to enable it, plus the matching server-side one:
+- `RELEASE_REFRESH_URL` — e.g. `https://app.peerdesk.eu/api/releases/refresh`
+- `RELEASE_REFRESH_TOKEN` — must equal `RELEASE_REFRESH_TOKEN` in `deploy/.env`
+
+Unset on the server, the endpoint 404s and effectively does not exist; unset in
+CI, the job skips with a notice. Either way the timer still picks the release
+up, and the job never fails the run — a release must not be marked broken
+because a notification did not land.
+
 Releasing is split across three jobs so one slow or failing platform never holds
 up the others:
 - `release-agents` — agents only. Needs just the two agent builds, so agents

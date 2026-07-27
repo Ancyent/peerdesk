@@ -82,6 +82,10 @@ services:
       # the incoming request (X-Forwarded-Proto + Host), which is correct for a
       # normal single-domain deploy behind nginx.
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      # Shared secret for POST /releases/refresh, which CI calls after
+      # publishing a tag so a new release appears in seconds instead of
+      # waiting out RELEASE_REFRESH_SECONDS. Unset -> that endpoint 404s.
+      RELEASE_REFRESH_TOKEN: ${RELEASE_REFRESH_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
