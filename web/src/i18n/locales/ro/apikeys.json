@@ -18,12 +18,14 @@
   "revoke": "Revocă",
   "machineCount": "{{count}} mașini",
   "machineCount_one": "1 mașină",
-  "machineCount_other": "{{count}} mașini",
+  "machineCount_few": "{{count}} mașini",
+  "machineCount_other": "{{count}} de mașini",
   "revokeConfirm": {
     "title": "Revoci cheia?",
     "withMachines": "«{{name}}» e folosită de {{count}} mașini. Vor pierde credențialul până le dai o cheie nouă.",
     "withMachines_one": "«{{name}}» e folosită de 1 mașină. Va pierde credențialul până îi dai o cheie nouă.",
-    "withMachines_other": "«{{name}}» e folosită de {{count}} mașini. Vor pierde credențialul până le dai o cheie nouă.",
+    "withMachines_few": "«{{name}}» e folosită de {{count}} mașini. Vor pierde credențialul până le dai o cheie nouă.",
+    "withMachines_other": "«{{name}}» e folosită de {{count}} de mașini. Vor pierde credențialul până le dai o cheie nouă.",
     "noMachines": "«{{name}}» nu e folosită de nicio mașină.",
     "action": "Revocă"
   }

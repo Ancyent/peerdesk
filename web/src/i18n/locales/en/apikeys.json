@@ -18,11 +18,13 @@
   "revoke": "Revoke",
   "machineCount": "{{count}} machines",
   "machineCount_one": "1 machine",
+  "machineCount_few": "{{count}} machines",
   "machineCount_other": "{{count}} machines",
   "revokeConfirm": {
     "title": "Revoke this key?",
     "withMachines": "«{{name}}» is used by {{count}} machines. They will lose their credential until you give them a new key.",
     "withMachines_one": "«{{name}}» is used by 1 machine. It will lose its credential until you give it a new key.",
+    "withMachines_few": "«{{name}}» is used by {{count}} machines. They will lose their credential until you give them a new key.",
     "withMachines_other": "«{{name}}» is used by {{count}} machines. They will lose their credential until you give them a new key.",
     "noMachines": "«{{name}}» is not used by any machine.",
     "action": "Revoke"

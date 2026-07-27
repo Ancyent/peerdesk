@@ -33,6 +33,17 @@ const KEY = {
   machine_count: 3,
 };
 
+const IDLE_KEY = {
+  id: 'k2',
+  key_preview: 'pd_idle0000••••',
+  name: 'Idle Key',
+  auto_approve: false,
+  is_active: true,
+  created_at: '2026-07-27T10:00:00Z',
+  last_used_at: null,
+  machine_count: 0,
+};
+
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
@@ -81,8 +92,22 @@ describe('revoking an API key', () => {
     await renderPage();
     await clickText('Revoke');
 
-    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(document.body.textContent).toContain('3 machines');
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog!.textContent).toContain('Busy Key');
+    expect(dialog!.textContent).toContain('3 machines');
+    expect(revoke).not.toHaveBeenCalled();
+  });
+
+  it('asks for confirmation on a key with no machines', async () => {
+    list.mockResolvedValue([IDLE_KEY]);
+    await renderPage();
+    await clickText('Revoke');
+
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog!.textContent).toContain('Idle Key');
+    expect(dialog!.textContent).toContain('is not used by any machine');
     expect(revoke).not.toHaveBeenCalled();
   });
 
