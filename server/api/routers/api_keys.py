@@ -4,6 +4,7 @@ from deps import get_db, get_current_user, get_current_membership
 from models import User, ApiKey, Membership
 from schemas import ApiKeyCreate, ApiKeyOut, ApiKeyListOut
 from access import visible_api_keys, assert_admin
+import access
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -18,6 +19,9 @@ async def list_api_keys(
         visible_api_keys(membership).where(ApiKey.is_active == True)
     )
     keys = result.scalars().all()
+    counts = dict(
+        (await db.execute(access.machine_counts_by_key(membership.account_id))).all()
+    )
     return [
         ApiKeyListOut(
             id=k.id,
@@ -27,6 +31,7 @@ async def list_api_keys(
             is_active=k.is_active,
             created_at=k.created_at,
             last_used_at=k.last_used_at,
+            machine_count=counts.get(k.id, 0),
         )
         for k in keys
     ]

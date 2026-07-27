@@ -7,7 +7,7 @@ Stage 2 adds per-member grants by changing this module alone.
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import Select, and_, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 
 from models import (
     AccessGrant, ApiKey, Branding, Company, Group, Invitation, Location, Machine, Membership,
@@ -246,6 +246,20 @@ def machines_in_account(account_id: str) -> Select:
 def machine_belongs_to_account(machine: Machine, account_id: str) -> bool:
     """Whether an already-loaded machine sits inside the given account."""
     return machine.account_id == account_id
+
+
+def machine_counts_by_key(account_id: str) -> Select:
+    """(api_key_id, machine count) for one account.
+
+    Scoped by account: a machine row could carry an api_key_id from anywhere,
+    and counting on that column alone would let another account's rows inflate
+    the number shown here.
+    """
+    return (
+        select(Machine.api_key_id, func.count(Machine.id))
+        .where(Machine.account_id == account_id)
+        .group_by(Machine.api_key_id)
+    )
 
 
 async def assert_placement_consistent(db, company_id, location_id, group_id) -> None:

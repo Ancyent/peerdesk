@@ -222,6 +222,7 @@ class ApiKeyListOut(BaseModel):
     is_active: bool
     created_at: datetime
     last_used_at: Optional[datetime]
+    machine_count: int = 0
 
     model_config = {"from_attributes": False}
 
