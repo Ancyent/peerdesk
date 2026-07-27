@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { NotifyProvider } from '@pd/ui';
+import { NotifyProvider, ConfirmProvider } from '@pd/ui';
 
 const list = vi.fn();
 const create = vi.fn();
@@ -33,6 +33,7 @@ const KEY = {
   is_active: true,
   created_at: '2026-01-01T00:00:00Z',
   last_used_at: null,
+  machine_count: 0,
 };
 
 let root: Root | null = null;
@@ -45,7 +46,9 @@ async function renderPage() {
   await act(async () => {
     root!.render(
       <NotifyProvider>
-        <ApiKeysPage />
+        <ConfirmProvider>
+          <ApiKeysPage />
+        </ConfirmProvider>
       </NotifyProvider>,
     );
   });
@@ -138,6 +141,9 @@ describe('ApiKeysPage revoke', () => {
     await renderPage();
 
     await clickByLabel('Revoke');
+
+    const accept = document.querySelector<HTMLButtonElement>('[data-testid="confirm-accept"]')!;
+    await act(async () => { accept.click(); });
 
     expect(document.body.textContent).toContain('Could not revoke the API key');
   });

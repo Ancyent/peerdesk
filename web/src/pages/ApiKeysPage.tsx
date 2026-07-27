@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNotify } from '@pd/ui';
+import { useConfirm, useNotify } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
 import { api, type ApiKeyListOut } from '../api/client';
 import { localizeError } from '../api/errors';
@@ -11,6 +11,7 @@ export function ApiKeysPage() {
   const { t } = useTranslation(['apikeys', 'common']);
   const { accessToken } = useAuth();
   const { notify } = useNotify();
+  const confirm = useConfirm();
   const [keys, setKeys] = useState<ApiKeyListOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
@@ -45,12 +46,24 @@ export function ApiKeysPage() {
     finally { setCreating(false); }
   };
 
-  const handleRevoke = async (id: string) => {
+  const handleRevoke = async (key: ApiKeyListOut) => {
     if (!accessToken) return;
+
+    const ok = await confirm({
+      title: t('apikeys:revokeConfirm.title'),
+      message: key.machine_count > 0
+        ? t('apikeys:revokeConfirm.withMachines', { name: key.name, count: key.machine_count })
+        : t('apikeys:revokeConfirm.noMachines', { name: key.name }),
+      confirmLabel: t('apikeys:revokeConfirm.action'),
+      cancelLabel: t('notify:cancel'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+
     try {
-      await api.apiKeys.revoke(accessToken, id);
-      setKeys(prev => prev.filter(k => k.id !== id));
+      await api.apiKeys.revoke(accessToken, key.id);
       notify.success(t('notify:apiKeys.revoked'));
+      load();
     } catch (e) {
       notify.error(t('notify:apiKeys.revokeFailed'), { detail: localizeError(e) });
     }
@@ -138,11 +151,17 @@ export function ApiKeysPage() {
                 <code style={{ background: 'var(--bg-hover)', padding: '1px 4px', borderRadius: 3, color: 'var(--text-1)' }}>
                   {k.key_preview}
                 </code>
+                <span
+                  data-testid="key-machine-count"
+                  style={{ marginLeft: 8, color: 'var(--text-3)' }}
+                >
+                  {t('apikeys:machineCount', { count: k.machine_count })}
+                </span>
                 {k.last_used_at && <span style={{ marginLeft: 8 }}>{t('apikeys:lastUsed', { date: formatDate(k.last_used_at) })}</span>}
               </div>
             </div>
             <span title={t('apikeys:copyHint')} style={{ padding: '5px 10px', fontSize: 12, color: 'var(--text-3)', cursor: 'default', userSelect: 'none' }}>••••</span>
-            <button onClick={() => handleRevoke(k.id)} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red)', borderRadius: 6, cursor: 'pointer' }}>{t('apikeys:revoke')}</button>
+            <button onClick={() => handleRevoke(k)} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red)', borderRadius: 6, cursor: 'pointer' }}>{t('apikeys:revoke')}</button>
           </div>
         ))}
       </div>

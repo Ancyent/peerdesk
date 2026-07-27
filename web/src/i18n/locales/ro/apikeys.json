@@ -15,5 +15,16 @@
   "empty": "Nicio cheie API încă. Creează una mai sus pentru a începe desfășurarea agenților.",
   "lastUsed": "Ultima utilizare: {{date}}",
   "copyHint": "Copiază cheia când este creată prima dată",
-  "revoke": "Revocă"
+  "revoke": "Revocă",
+  "machineCount": "{{count}} mașini",
+  "machineCount_one": "1 mașină",
+  "machineCount_other": "{{count}} mașini",
+  "revokeConfirm": {
+    "title": "Revoci cheia?",
+    "withMachines": "«{{name}}» e folosită de {{count}} mașini. Vor pierde credențialul până le dai o cheie nouă.",
+    "withMachines_one": "«{{name}}» e folosită de 1 mașină. Va pierde credențialul până îi dai o cheie nouă.",
+    "withMachines_other": "«{{name}}» e folosită de {{count}} mașini. Vor pierde credențialul până le dai o cheie nouă.",
+    "noMachines": "«{{name}}» nu e folosită de nicio mașină.",
+    "action": "Revocă"
+  }
 }

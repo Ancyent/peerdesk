@@ -15,5 +15,16 @@
   "empty": "No API keys yet. Create one above to start deploying agents.",
   "lastUsed": "Last used: {{date}}",
   "copyHint": "Copy the key when first created",
-  "revoke": "Revoke"
+  "revoke": "Revoke",
+  "machineCount": "{{count}} machines",
+  "machineCount_one": "1 machine",
+  "machineCount_other": "{{count}} machines",
+  "revokeConfirm": {
+    "title": "Revoke this key?",
+    "withMachines": "«{{name}}» is used by {{count}} machines. They will lose their credential until you give them a new key.",
+    "withMachines_one": "«{{name}}» is used by 1 machine. It will lose its credential until you give it a new key.",
+    "withMachines_other": "«{{name}}» is used by {{count}} machines. They will lose their credential until you give them a new key.",
+    "noMachines": "«{{name}}» is not used by any machine.",
+    "action": "Revoke"
+  }
 }
