@@ -20,13 +20,17 @@ const PATH_TO_PAGE: Record<string, RoutablePage> = Object.fromEntries(
   Object.entries(PAGE_TO_PATH).map(([page, path]) => [path, page as RoutablePage]),
 ) as Record<string, RoutablePage>;
 
-export function parsePath(pathname: string): { page: RoutablePage; sub: string | null } {
+export function parsePath(
+  pathname: string,
+  search = '',
+): { page: RoutablePage; sub: string | null; params: Record<string, string> } {
+  const params = Object.fromEntries(new URLSearchParams(search));
   const clean = pathname.replace(/\/+$/, '');
-  if (clean === '') return { page: 'machines', sub: null };
+  if (clean === '') return { page: 'machines', sub: null, params };
   const segments = clean.split('/').filter(Boolean);
   const page = PATH_TO_PAGE['/' + segments[0]];
-  if (!page) return { page: 'machines', sub: null };
-  return { page, sub: segments.length > 1 ? segments[1] : null };
+  if (!page) return { page: 'machines', sub: null, params };
+  return { page, sub: segments.length > 1 ? segments[1] : null, params };
 }
 
 // Pages whose path carries a second segment (e.g. /downloads/windows,

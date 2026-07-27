@@ -33,5 +33,10 @@
     "connectSaved": "⚡ Conectează 🔑",
     "forgetPassword": "Uită parola salvată",
     "deleteMachine": "Șterge mașina"
+  },
+  "keyFilter": {
+    "showing": "Arăt mașinile unei singure chei API",
+    "clear": "Arată tot",
+    "unknown": "Cheia API nu are mașini aici — le arăt pe toate."
   }
 }

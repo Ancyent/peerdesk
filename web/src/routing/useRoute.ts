@@ -7,14 +7,16 @@ import { parsePath, pathFor, type RoutablePage } from './paths';
  * URL only (pushState for section changes, replaceState for OS sub-tab changes
  * within /downloads) — the caller updates React state.
  */
-export function useRoute(onPop: (page: RoutablePage, sub: string | null) => void) {
+export function useRoute(
+  onPop: (page: RoutablePage, sub: string | null, params: Record<string, string>) => void,
+) {
   const onPopRef = useRef(onPop);
   onPopRef.current = onPop;
 
   useEffect(() => {
     const handler = () => {
-      const { page, sub } = parsePath(window.location.pathname);
-      onPopRef.current(page, sub);
+      const { page, sub, params } = parsePath(window.location.pathname, window.location.search);
+      onPopRef.current(page, sub, params);
     };
     window.addEventListener('popstate', handler);
     return () => window.removeEventListener('popstate', handler);

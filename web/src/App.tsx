@@ -38,11 +38,14 @@ type FullPage = AppPage | 'login' | 'register' | 'connect' | 'viewer' | 'invite'
 export default function App() {
   const { t } = useTranslation(['dashboard', 'common']);
   const { user, loading, setSessionActive, accessToken, role } = useAuth();
-  const initialRoute = parsePath(window.location.pathname);
+  const initialRoute = parsePath(window.location.pathname, window.location.search);
   const [page, setPage] = useState<FullPage>(initialRoute.page);
   const [downloadsOs, setDownloadsOs] = useState<OsId>(coerceOs(initialRoute.sub));
   const [inviteToken, setInviteToken] = useState<string | null>(
     initialRoute.page === 'invite' ? initialRoute.sub : null,
+  );
+  const [machineKeyFilter, setMachineKeyFilter] = useState<string | undefined>(
+    initialRoute.params.key,
   );
   const [connectPeerId, setConnectPeerId] = useState('');
   const [connectMachineId, setConnectMachineId] = useState<string | null>(null);
@@ -69,7 +72,7 @@ export default function App() {
   const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
   const [sessionMode, setSessionMode] = useState<'gui' | 'terminal'>('gui');
 
-  const navigate = useRoute((p, sub) => {
+  const navigate = useRoute((p, sub, params) => {
     // Fix 1: tear down WebRTC session when navigating back from viewer or connect
     if (page === 'viewer' || page === 'connect') {
       webrtc.disconnect();
@@ -87,13 +90,24 @@ export default function App() {
     setPage(p);
     if (p === 'downloads') setDownloadsOs(coerceOs(sub));
     if (p === 'invite') setInviteToken(sub);
+    if (p === 'machines') setMachineKeyFilter(params.key);
   });
   const go = useCallback((p: RoutablePage, sub?: string) => {
     navigate(p, sub ?? null);
     setPage(p);
     if (p === 'downloads') setDownloadsOs(coerceOs(sub ?? null));
     if (p === 'invite') setInviteToken(sub ?? null);
+    if (p === 'machines') setMachineKeyFilter(undefined);
   }, [navigate]);
+
+  // Deep-link from ApiKeysPage's machine-count link: not a plain section
+  // change (pathFor has no notion of query strings), so it writes the URL
+  // itself rather than going through `navigate`.
+  const goToMachinesFilteredByKey = (keyId: string) => {
+    window.history.pushState({}, '', `/machines?key=${keyId}`);
+    setMachineKeyFilter(keyId);
+    setPage('machines');
+  };
 
   // After login, don't linger on /login or /register.
   useEffect(() => {
@@ -328,9 +342,9 @@ export default function App() {
 
   return (
     <AppShell page={shellPage} onNavigate={p => go(p)} contextPanel={orgPanel}>
-      {effectivePage === 'machines'      && <MachinesPage onConnect={handleDashboardConnect} />}
+      {effectivePage === 'machines'      && <MachinesPage onConnect={handleDashboardConnect} filterKeyId={machineKeyFilter} />}
       {effectivePage === 'organization'  && <OrganizationPage onConnect={handleDashboardConnect} orgNode={orgNode} />}
-      {effectivePage === 'api-keys'      && <ApiKeysPage />}
+      {effectivePage === 'api-keys'      && <ApiKeysPage onNavigateToMachines={goToMachinesFilteredByKey} />}
       {effectivePage === 'downloads'     && <DownloadsPage os={downloadsOs} onOsChange={(o) => go('downloads', o)} />}
       {effectivePage === 'branding'      && <BrandingPage onBack={() => go('machines')} />}
       {effectivePage === 'settings'      && <SettingsPage />}

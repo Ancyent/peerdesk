@@ -6,8 +6,14 @@ import { api, type ApiKeyListOut } from '../api/client';
 import { localizeError } from '../api/errors';
 import { copyText } from '../lib/clipboard';
 import { formatDate } from '../i18n/format';
+import { isPlainLeftClick } from '../routing/paths';
 
-export function ApiKeysPage() {
+interface Props {
+  /** Deep-links to /machines?key=<id>, filtered to that key's machines. */
+  onNavigateToMachines?: (keyId: string) => void;
+}
+
+export function ApiKeysPage({ onNavigateToMachines }: Props) {
   const { t } = useTranslation(['apikeys', 'common']);
   const { accessToken } = useAuth();
   const { notify } = useNotify();
@@ -151,12 +157,18 @@ export function ApiKeysPage() {
                 <code style={{ background: 'var(--bg-hover)', padding: '1px 4px', borderRadius: 3, color: 'var(--text-1)' }}>
                   {k.key_preview}
                 </code>
-                <span
+                <a
+                  href={`/machines?key=${k.id}`}
                   data-testid="key-machine-count"
-                  style={{ marginLeft: 8, color: 'var(--text-3)' }}
+                  onClick={(e) => {
+                    if (!isPlainLeftClick(e)) return;
+                    e.preventDefault();
+                    onNavigateToMachines?.(k.id);
+                  }}
+                  style={{ marginLeft: 8, color: 'var(--text-3)', textDecoration: 'none' }}
                 >
                   {t('apikeys:machineCount', { count: k.machine_count })}
-                </span>
+                </a>
                 {k.last_used_at && <span style={{ marginLeft: 8 }}>{t('apikeys:lastUsed', { date: formatDate(k.last_used_at) })}</span>}
               </div>
             </div>

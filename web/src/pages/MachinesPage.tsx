@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfirm, useNotify } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
@@ -9,9 +9,11 @@ import { formatDate } from '../i18n/format';
 
 interface Props {
   onConnect: (machine: MachineOut) => void;
+  /** api_key_id to filter the list by, e.g. from /machines?key=<id>. */
+  filterKeyId?: string;
 }
 
-export function MachinesPage({ onConnect }: Props) {
+export function MachinesPage({ onConnect, filterKeyId }: Props) {
   const { t } = useTranslation('machines');
   const { accessToken } = useAuth();
   const confirm = useConfirm();
@@ -21,6 +23,15 @@ export function MachinesPage({ onConnect }: Props) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<'active' | 'pending'>('active');
+  const [keyFilter, setKeyFilter] = useState(filterKeyId);
+  // Adjust state during render (React's documented pattern for deriving state
+  // from a changed prop) rather than in an effect, so a back/forward navigation
+  // that changes `filterKeyId` doesn't cost an extra render pass.
+  const [prevFilterKeyId, setPrevFilterKeyId] = useState(filterKeyId);
+  if (filterKeyId !== prevFilterKeyId) {
+    setPrevFilterKeyId(filterKeyId);
+    setKeyFilter(filterKeyId);
+  }
 
   const load = () => {
     if (!accessToken) return;
@@ -95,7 +106,22 @@ export function MachinesPage({ onConnect }: Props) {
     load();
   };
 
-  const filtered = machines
+  const matching = keyFilter ? machines.filter(m => m.api_key_id === keyFilter) : machines;
+  const filterMatchedNothing = !!keyFilter && matching.length === 0;
+  const shown = filterMatchedNothing ? machines : matching;
+
+  // Warn once when the filter matches nothing and fall back to the full list —
+  // an empty list would imply the key genuinely has no machines, which is not
+  // what happened here (the key may have been revoked, or its machines moved).
+  const warnedRef = useRef(false);
+  useEffect(() => {
+    if (filterMatchedNothing && !warnedRef.current) {
+      warnedRef.current = true;
+      notify.warning(t('machines:keyFilter.unknown'));
+    }
+  }, [filterMatchedNothing, notify, t]);
+
+  const filtered = shown
     .filter(m => m.name.toLowerCase().includes(search.toLowerCase()) || m.peer_id.includes(search))
     .sort((a, b) => Number(b.is_online) - Number(a.is_online));
 
@@ -130,6 +156,21 @@ export function MachinesPage({ onConnect }: Props) {
       {/* Active tab */}
       {!loading && tab === 'active' && (
         <>
+          {keyFilter && !filterMatchedNothing && (
+            <div data-testid="key-filter-chip" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', marginBottom: 8, background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, fontSize: 12, color: 'var(--text-2)' }}>
+              <span>{t('machines:keyFilter.showing')}</span>
+              <button
+                data-testid="key-filter-clear"
+                onClick={() => {
+                  setKeyFilter(undefined);
+                  window.history.replaceState({}, '', '/machines');
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, padding: 0 }}
+              >
+                {t('machines:keyFilter.clear')}
+              </button>
+            </div>
+          )}
           {filtered.length === 0 && (
             <div style={{ padding: 32, border: '1px dashed var(--border)', borderRadius: 8, textAlign: 'center', color: 'var(--text-3)' }}>
               {search ? t('machines:page.emptySearch') : t('machines:page.emptyNone')}

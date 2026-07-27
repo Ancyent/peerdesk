@@ -33,5 +33,10 @@
     "connectSaved": "⚡ Connect 🔑",
     "forgetPassword": "Forget saved password",
     "deleteMachine": "Delete machine"
+  },
+  "keyFilter": {
+    "showing": "Showing machines for one API key",
+    "clear": "Show all",
+    "unknown": "That API key has no machines here — showing all machines."
   }
 }
