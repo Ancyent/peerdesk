@@ -12,13 +12,18 @@ import httpx
 
 API_URL = os.environ.get("API_URL", "http://api:8000")
 
-# httpx applies a bare float to connect/read/write/pool independently rather
-# than as a total request budget, so a plain `timeout=3.0` can block a join for
-# connect(3) + read(3) = 6 seconds worst case. Splitting the budget keeps the
-# worst case (a slow connect followed by a slow read) at 3 seconds total: far
-# above a healthy same-network response, far below a delay a user would read as
-# a broken connection.
-RESOLVE_TIMEOUT_SECONDS = httpx.Timeout(2.0, connect=1.0)
+# httpx times connect, write, read, and pool as four SEPARATE, sequential
+# phases rather than one total budget — a bare float (or leaving any phase at
+# its default) multiplies instead of capping, since each phase gets the full
+# allowance on its own. To actually deliver the spec's 3-second bound, every
+# phase must be budgeted explicitly and the four numbers must SUM to at most
+# 3.0: connect 1.0 + read 1.0 + write 0.5 + pool 0.5 = 3.0. `GET /users/me` on
+# the internal Docker network answers in well under 100ms, so 1s of read is
+# generous; the request body is empty, so 0.5s of write is ample; and pool
+# acquisition is effectively free (a fresh AsyncClient per call, no
+# contention) but is still budgeted so the arithmetic stays complete rather
+# than relying on that staying true.
+RESOLVE_TIMEOUT = httpx.Timeout(connect=1.0, read=1.0, write=0.5, pool=0.5)
 
 
 class ViewerIdentity(TypedDict):
@@ -38,7 +43,7 @@ async def resolve_viewer(token: Optional[str]) -> Optional[ViewerIdentity]:
         return None
 
     try:
-        async with httpx.AsyncClient(timeout=RESOLVE_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=RESOLVE_TIMEOUT) as client:
             response = await client.get(
                 f"{API_URL}/users/me",
                 headers={"Authorization": f"Bearer {token}"},

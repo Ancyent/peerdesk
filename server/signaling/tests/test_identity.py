@@ -111,11 +111,12 @@ async def test_a_malformed_body_resolves_to_none():
 @pytest.mark.asyncio
 async def test_the_call_is_bounded_by_the_agreed_timeout():
     # Pins the spec's number: a hanging API must not stall a join by more than
-    # 3 seconds total. httpx applies a bare float separately to each phase
-    # (connect/read/write/pool) rather than as a total budget, so a naive
-    # `timeout=3.0` would actually allow connect(3) + read(3) = 6s worst case.
-    # This asserts the real Timeout object's connect and read budgets sum to
-    # no more than the agreed 3s bound.
+    # 3 seconds total. httpx times connect/read/write/pool as four SEPARATE,
+    # sequential phases rather than one total budget, so EVERY phase counts
+    # toward the worst case — checking only connect+read (as an earlier,
+    # buggy version of this test did) leaves write and pool unbounded and
+    # would let a regression like that slip through green. A None phase means
+    # "no timeout" for that phase, which would silently unbound it too.
     ctx, _ = _client_yielding(_response(200, {"id": "u-1", "name": "Maria"}))
 
     with patch.object(identity.httpx, "AsyncClient", return_value=ctx) as ctor:
@@ -123,4 +124,20 @@ async def test_the_call_is_bounded_by_the_agreed_timeout():
 
     timeout = ctor.call_args.kwargs["timeout"]
     assert isinstance(timeout, httpx.Timeout)
-    assert timeout.connect + timeout.read <= 3.0
+    phases = {
+        "connect": timeout.connect,
+        "read": timeout.read,
+        "write": timeout.write,
+        "pool": timeout.pool,
+    }
+    for name, value in phases.items():
+        assert value is not None, (
+            f"{name} timeout is None (unbounded) — httpx times each phase "
+            "separately, so every phase must have an explicit budget"
+        )
+    total = sum(phases.values())
+    assert total <= 3.0, (
+        f"phases sum to {total}s, exceeding the 3s bound "
+        f"({phases}) — httpx times connect/read/write/pool separately, so "
+        "the SUM of all four is the real worst-case delay, not just any two"
+    )
