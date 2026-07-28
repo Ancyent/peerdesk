@@ -9,7 +9,7 @@ from fastapi import WebSocket
 import redis.asyncio as aioredis
 import bcrypt
 
-from identity import resolve_viewer
+from identity import ViewerIdentity, resolve_viewer
 
 
 def compute_hmac_key(password: str) -> str:
@@ -40,7 +40,7 @@ class ConnectionState:
     # viewer_session_id → WebSocket for viewers awaiting approval
     viewer_pending: Dict[str, WebSocket] = field(default_factory=dict)
     # viewer_session_id → {"id": ..., "name": ...}; absent when unidentified
-    viewer_identity: Dict[str, dict] = field(default_factory=dict)
+    viewer_identity: Dict[str, ViewerIdentity] = field(default_factory=dict)
 
 
 async def register_agent(
@@ -125,7 +125,7 @@ async def handle_viewer_authenticated(
     peer_id: str,
     viewer_ws: WebSocket,
     remote_ip: str = "unknown",
-    identity: Optional[dict] = None,
+    identity: Optional[ViewerIdentity] = None,
 ) -> str:
     """Create viewer session and queue for agent approval. Returns viewer_session_id."""
     viewer_id = str(uuid.uuid4())

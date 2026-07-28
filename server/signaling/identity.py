@@ -12,9 +12,13 @@ import httpx
 
 API_URL = os.environ.get("API_URL", "http://api:8000")
 
-# Far above a healthy same-network response, far below a delay a user would read
-# as a broken connection.
-RESOLVE_TIMEOUT_SECONDS = 3.0
+# httpx applies a bare float to connect/read/write/pool independently rather
+# than as a total request budget, so a plain `timeout=3.0` can block a join for
+# connect(3) + read(3) = 6 seconds worst case. Splitting the budget keeps the
+# worst case (a slow connect followed by a slow read) at 3 seconds total: far
+# above a healthy same-network response, far below a delay a user would read as
+# a broken connection.
+RESOLVE_TIMEOUT_SECONDS = httpx.Timeout(2.0, connect=1.0)
 
 
 class ViewerIdentity(TypedDict):

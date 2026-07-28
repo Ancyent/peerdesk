@@ -58,8 +58,13 @@ async def test_no_token_resolves_to_none_without_calling_the_api():
 
 @pytest.mark.asyncio
 async def test_an_empty_token_resolves_to_none():
-    result = await identity.resolve_viewer("")
+    ctx, client = _client_yielding(_response(200, {"id": "u-1", "name": "Nobody"}))
+
+    with patch.object(identity.httpx, "AsyncClient", return_value=ctx):
+        result = await identity.resolve_viewer("")
+
     assert result is None
+    client.get.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -105,10 +110,17 @@ async def test_a_malformed_body_resolves_to_none():
 
 @pytest.mark.asyncio
 async def test_the_call_is_bounded_by_the_agreed_timeout():
-    # Pins the spec's number: a hanging API must not stall a join.
+    # Pins the spec's number: a hanging API must not stall a join by more than
+    # 3 seconds total. httpx applies a bare float separately to each phase
+    # (connect/read/write/pool) rather than as a total budget, so a naive
+    # `timeout=3.0` would actually allow connect(3) + read(3) = 6s worst case.
+    # This asserts the real Timeout object's connect and read budgets sum to
+    # no more than the agreed 3s bound.
     ctx, _ = _client_yielding(_response(200, {"id": "u-1", "name": "Maria"}))
 
     with patch.object(identity.httpx, "AsyncClient", return_value=ctx) as ctor:
         await identity.resolve_viewer("tok-abc")
 
-    assert ctor.call_args.kwargs["timeout"] == 3.0
+    timeout = ctor.call_args.kwargs["timeout"]
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.connect + timeout.read <= 3.0
