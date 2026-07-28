@@ -300,3 +300,40 @@ async def test_reapproving_the_same_viewer_does_not_displace_it():
     sent = [json.loads(c.args[0])["type"] for c in viewer_ws.send_text.call_args_list]
     assert "session_taken_over" not in sent
     assert state.agent_to_viewer["123456789"] == "same"
+
+
+@pytest.mark.asyncio
+async def test_the_takeover_message_names_the_new_viewer():
+    state = ConnectionState()
+    old_ws, new_ws = AsyncMock(), AsyncMock()
+    state.viewer_connections["old"] = old_ws
+    state.viewer_to_agent["old"] = "123456789"
+    state.agent_to_viewer["123456789"] = "old"
+    state.viewer_pending["new"] = new_ws
+    state.viewer_identity["new"] = {"id": "u-2", "name": "Maria Ionescu"}
+
+    await handle_approval(state, "123456789", "new", True)
+
+    sent = [json.loads(c.args[0]) for c in old_ws.send_text.call_args_list]
+    takeover = next(m for m in sent if m["type"] == "session_taken_over")
+    assert takeover["by_name"] == "Maria Ionescu"
+
+
+@pytest.mark.asyncio
+async def test_the_takeover_message_omits_the_name_when_unknown():
+    state = ConnectionState()
+    old_ws, new_ws = AsyncMock(), AsyncMock()
+    state.viewer_connections["old"] = old_ws
+    state.viewer_to_agent["old"] = "123456789"
+    state.agent_to_viewer["123456789"] = "old"
+    state.viewer_pending["new"] = new_ws
+    # No identity for "new" — an older client that sends no token.
+
+    await handle_approval(state, "123456789", "new", True)
+
+    sent = [json.loads(c.args[0]) for c in old_ws.send_text.call_args_list]
+    takeover = next(m for m in sent if m["type"] == "session_taken_over")
+    assert "by_name" not in takeover, (
+        "the client falls back on the key being absent; an empty string would "
+        "render as 'taken over by ' with a dangling name"
+    )

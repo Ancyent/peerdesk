@@ -223,8 +223,15 @@ async def handle_approval(
             state.viewer_to_agent.pop(displaced_id, None)
             state.viewer_identity.pop(displaced_id, None)
             if displaced_ws:
+                # Name the person taking over when we know it. The key is absent
+                # rather than empty when we do not, so the client has one
+                # fallback to handle instead of two.
+                payload = {"type": "session_taken_over"}
+                taker = state.viewer_identity.get(viewer_id)
+                if taker:
+                    payload["by_name"] = taker["name"]
                 try:
-                    await displaced_ws.send_text(json.dumps({"type": "session_taken_over"}))
+                    await displaced_ws.send_text(json.dumps(payload))
                 except Exception:
                     # A displaced socket that is already dead must not stop the
                     # new viewer from joining.
