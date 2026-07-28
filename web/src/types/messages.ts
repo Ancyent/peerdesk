@@ -1,6 +1,6 @@
 // web/src/types/messages.ts
 export type SignalingMessage =
-  | { type: 'join'; peer_id: string; password: string }
+  | { type: 'join'; peer_id: string; password: string; token?: string }
   | { type: 'joined'; viewer_id: string }
   | { type: 'offer'; sdp: string }
   | { type: 'answer'; sdp: string }
@@ -8,7 +8,7 @@ export type SignalingMessage =
   | { type: 'error'; code: string }
   | { type: 'registered'; peer_id: string }
   | { type: 'agent_disconnected' }
-  | { type: 'session_taken_over' }
+  | { type: 'session_taken_over'; by_name?: string }
   | { type: 'viewer_pending'; viewer_id: string; remote_ip: string }
   | { type: 'approved' }
   | { type: 'denied'; reason: string }

@@ -188,7 +188,13 @@ export default function App() {
       setErrMsg(msg.code === 'unauthorized' ? t('dashboard:viewer.errors.wrongCredentials') : t('dashboard:viewer.errors.machineNotFound')); setViewerState('error'); setPage('connect');
     }
     else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg(t('dashboard:viewer.errors.remoteDisconnected')); setViewerState('error'); go('machines'); }
-    else if (msg.type === 'session_taken_over') { webrtc.disconnect(); setErrMsg(t('dashboard:viewer.errors.takenOver')); setViewerState('error'); }
+    else if (msg.type === 'session_taken_over') {
+      webrtc.disconnect();
+      setErrMsg(msg.by_name
+        ? t('dashboard:viewer.errors.takenOverBy', { name: msg.by_name })
+        : t('dashboard:viewer.errors.takenOver'));
+      setViewerState('error');
+    }
     else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? t('dashboard:viewer.errors.connectionDenied')); setViewerState('error'); setPage('connect'); }
     else if (msg.type === 'session_mode')  { setSessionMode(msg.mode); }
     else if (msg.type === 'display_list')  {
@@ -208,7 +214,7 @@ export default function App() {
     pendingSaveRef.current = (remember && connectMachineId && peerId === connectPeerId)
       ? { machineId: connectMachineId, password } : null;
     autoSavedMachineRef.current = null;
-    send({ type: 'join', peer_id: peerId, password });
+    send({ type: 'join', peer_id: peerId, password, token: accessToken ?? undefined });
   };
 
   const handleDashboardConnect = async (machine: MachineOut) => {
@@ -222,7 +228,7 @@ export default function App() {
         pendingSaveRef.current = null;
         autoSavedMachineRef.current = machine.id;
         setViewerState('connecting'); setPage('viewer');
-        send({ type: 'join', peer_id: machine.peer_id, password });
+        send({ type: 'join', peer_id: machine.peer_id, password, token: accessToken ?? undefined });
         return;
       } catch { /* fall through to the manual form */ }
     }

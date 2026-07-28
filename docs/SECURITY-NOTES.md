@@ -37,3 +37,23 @@ recorded risk.
 Reveals are also not audited: nothing logs who called this endpoint or when,
 so a compromised admin session can exfiltrate every key in the account and
 leave no record of having done so.
+
+## The access token is sent over the signaling websocket
+
+**Status:** accepted, 2026-07-28.
+
+A viewer's access token is attached to the `join` message so the signaling
+server can resolve who is connecting. In production nginx terminates TLS and the
+signaling path is `wss`, so it is encrypted in transit, but the token now
+appears in a second channel rather than only on API calls.
+
+Signaling never stores the token and never holds `JWT_SECRET` — it forwards the
+token once to `GET /users/me` and keeps only the resulting id and name. A
+compromise of the signaling service therefore cannot forge tokens, though it
+could observe tokens presented to it while the compromise lasts.
+
+**What would remove it:** issue a short-lived, single-use ticket from the API
+and present that to signaling instead, so the access token never leaves the API
+connection. That was considered and set aside as more moving parts than the risk
+warranted; it remains the upgrade path if signaling ever runs somewhere less
+trusted than the API.

@@ -24,7 +24,8 @@
       "machineNotFound": "Mașina nu a fost găsită",
       "remoteDisconnected": "Mașina la distanță s-a deconectat",
       "connectionDenied": "Conexiune refuzată",
-      "takenOver": "Sesiunea a fost preluată în altă fereastră"
+      "takenOver": "Sesiunea a fost preluată în altă fereastră",
+      "takenOverBy": "Sesiunea a fost preluată de {{name}}"
     }
   }
 }
