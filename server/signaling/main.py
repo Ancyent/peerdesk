@@ -158,7 +158,8 @@ async def websocket_endpoint(ws: WebSocket):
                 elif msg_type == "join":
                     viewer_ip = _client_ip(ws)
                     viewer_id = await handle_join(
-                        state, redis_client, data["peer_id"], data["password"], ws, viewer_ip
+                        state, redis_client, data["peer_id"], data["password"], ws, viewer_ip,
+                        token=data.get("token"),
                     )
                     if viewer_id:
                         audit_log("connection_attempt", data["peer_id"], viewer_ip, "approved")
@@ -207,3 +208,4 @@ async def websocket_endpoint(ws: WebSocket):
                 state.agent_to_viewer.pop(agent_pid, None)
             state.viewer_connections.pop(viewer_id, None)
             state.viewer_pending.pop(viewer_id, None)
+            state.viewer_identity.pop(viewer_id, None)

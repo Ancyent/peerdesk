@@ -9,6 +9,8 @@ from fastapi import WebSocket
 import redis.asyncio as aioredis
 import bcrypt
 
+from identity import resolve_viewer
+
 
 def compute_hmac_key(password: str) -> str:
     return hmac_lib.new(b"peerdesk-v1", password.encode(), hashlib.sha256).hexdigest()
@@ -37,6 +39,8 @@ class ConnectionState:
     agent_to_viewer: Dict[str, str] = field(default_factory=dict)
     # viewer_session_id → WebSocket for viewers awaiting approval
     viewer_pending: Dict[str, WebSocket] = field(default_factory=dict)
+    # viewer_session_id → {"id": ..., "name": ...}; absent when unidentified
+    viewer_identity: Dict[str, dict] = field(default_factory=dict)
 
 
 async def register_agent(
@@ -111,6 +115,7 @@ async def unregister_agent(
                 pass
         state.viewer_to_agent.pop(viewer_id, None)
         state.viewer_connections.pop(viewer_id, None)
+        state.viewer_identity.pop(viewer_id, None)
     await redis.delete(f"agent:{peer_id}")
 
 
@@ -120,9 +125,12 @@ async def handle_viewer_authenticated(
     peer_id: str,
     viewer_ws: WebSocket,
     remote_ip: str = "unknown",
+    identity: Optional[dict] = None,
 ) -> str:
     """Create viewer session and queue for agent approval. Returns viewer_session_id."""
     viewer_id = str(uuid.uuid4())
+    if identity:
+        state.viewer_identity[viewer_id] = identity
     # Don't register yet — wait for agent approval
     await request_approval(state, peer_id, viewer_id, viewer_ws, remote_ip)
     return viewer_id
@@ -135,6 +143,7 @@ async def handle_join(
     password: str,
     viewer_ws: WebSocket,
     remote_ip: str = "unknown",
+    token: Optional[str] = None,
 ) -> Optional[str]:
     """Returns viewer_session_id on success, None on failure."""
     agent_data = await redis.hgetall(f"agent:{peer_id}")
@@ -151,7 +160,10 @@ async def handle_join(
         await viewer_ws.send_text(json.dumps({"type": "error", "code": "unauthorized"}))
         return None
 
-    return await handle_viewer_authenticated(state, redis, peer_id, viewer_ws, remote_ip)
+    identity = await resolve_viewer(token)
+    return await handle_viewer_authenticated(
+        state, redis, peer_id, viewer_ws, remote_ip, identity=identity
+    )
 
 
 async def request_approval(
@@ -208,6 +220,7 @@ async def handle_approval(
         if displaced_id and displaced_id != viewer_id:
             displaced_ws = state.viewer_connections.pop(displaced_id, None)
             state.viewer_to_agent.pop(displaced_id, None)
+            state.viewer_identity.pop(displaced_id, None)
             if displaced_ws:
                 try:
                     await displaced_ws.send_text(json.dumps({"type": "session_taken_over"}))
@@ -246,6 +259,7 @@ async def handle_approval(
             }))
         except Exception:
             pass
+        state.viewer_identity.pop(viewer_id, None)
 
 
 async def forward_to_peer(
