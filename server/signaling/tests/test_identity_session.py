@@ -13,6 +13,7 @@ from session import (
     handle_viewer_authenticated,
     handle_approval,
     unregister_agent,
+    request_approval,
 )
 
 IDENTITY = {"id": "u-1", "name": "Maria Ionescu"}
@@ -67,6 +68,24 @@ async def test_identity_is_dropped_when_the_agent_disconnects():
     redis.delete = AsyncMock()
 
     await unregister_agent(state, redis, "123456789")
+
+    assert "v-1" not in state.viewer_identity
+
+
+@pytest.mark.asyncio
+async def test_the_immediate_self_deny_leaves_no_identity_behind():
+    """`request_approval`'s own denial path (no agent connected, or a stale
+    agent socket) is symmetric with `handle_approval`'s denial branch — both
+    must drop the identity they never got to use.
+    """
+    state = ConnectionState()
+    state.viewer_pending["v-1"] = AsyncMock()
+    state.viewer_identity["v-1"] = IDENTITY
+    viewer_ws = AsyncMock()
+
+    # No agent registered for "123456789" — request_approval falls straight
+    # through to the immediate self-deny branch.
+    await request_approval(state, "123456789", "v-1", viewer_ws, "1.2.3.4")
 
     assert "v-1" not in state.viewer_identity
 

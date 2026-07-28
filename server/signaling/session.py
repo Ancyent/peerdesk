@@ -199,6 +199,7 @@ async def request_approval(
         "reason": "Host not connected",
     }))
     state.viewer_pending.pop(viewer_id, None)
+    state.viewer_identity.pop(viewer_id, None)
 
 
 async def handle_approval(

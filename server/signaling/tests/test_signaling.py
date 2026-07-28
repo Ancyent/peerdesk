@@ -183,6 +183,60 @@ def test_agent_can_reregister_after_password_change(monkeypatch):
     assert stored["hmac_key"] == "key-new"
 
 
+def test_viewer_identity_is_dropped_when_the_viewer_socket_closes(monkeypatch):
+    """End-to-end join -> approve -> close, exercising main.py's own cleanup.
+
+    The unit tests in test_identity_session.py call handle_viewer_authenticated
+    / handle_approval / unregister_agent directly and never touch main.py's
+    websocket endpoint, so they cannot catch a missing
+    `state.viewer_identity.pop(viewer_id, None)` in the `finally` block at the
+    bottom of websocket_endpoint. This test goes through the real endpoint —
+    an agent registers, a viewer joins with a token, the agent approves, and
+    only then does the viewer socket close — to prove that line actually runs.
+    """
+    import bcrypt
+    import session as session_module
+
+    main, fake, client = _ws_test_client(monkeypatch)
+
+    password = "s3cr3t-pw"
+    pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    fake.hgetall = AsyncMock(return_value={"password_hash": pw_hash})
+
+    identity = {"id": "u-1", "name": "Maria Ionescu"}
+    monkeypatch.setattr(session_module, "resolve_viewer", AsyncMock(return_value=identity))
+
+    with client.websocket_connect("/ws") as agent_ws:
+        agent_ws.send_json({
+            "type": "register",
+            "peer_id": "123456789",
+            "password_hash": pw_hash,
+            "hmac_key": "key-v1",
+        })
+        assert agent_ws.receive_json()["type"] == "registered"
+
+        with client.websocket_connect("/ws") as viewer_ws:
+            viewer_ws.send_json({
+                "type": "join",
+                "peer_id": "123456789",
+                "password": password,
+                "token": "tok-1",
+            })
+            pending = agent_ws.receive_json()
+            assert pending["type"] == "viewer_pending"
+            viewer_id = pending["viewer_id"]
+            assert main.state.viewer_identity[viewer_id] == identity
+
+            agent_ws.send_json({"type": "approve", "viewer_id": viewer_id})
+            assert viewer_ws.receive_json()["type"] == "joined"
+
+        # viewer_ws is now closed — main.py's `finally` block has run.
+        assert viewer_id not in main.state.viewer_identity, (
+            "the viewer socket closed but its identity entry survived — "
+            "this is the leak the whole feature must not create"
+        )
+
+
 @pytest.mark.asyncio
 async def test_a_second_viewer_displaces_the_first_with_a_reason():
     state = ConnectionState()
