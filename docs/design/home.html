@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en" data-direction="aurora" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PeerDesk design - Home (desktop)</title>
+<style>
+/* ==========================================================================
+   PeerDesk design mockup - the desktop window.
+
+   Drawn at 1000x700, the real size from desktop/src-tauri/tauri.conf.json, and
+   frameless, because the app sets decorations:false and paints its own title
+   bar. Judging desktop chrome at browser-window size would flatter it.
+
+   Token block is byte-identical across all five mockups.
+   ========================================================================== */
+/* --- A: Aurora Glass ---------------------------------------------------- */
+[data-direction="aurora"][data-theme="dark"]{
+  --bg-base:#0b111c; --bg-surface:#172131; --bg-raised:#1e2a3d; --bg-sidebar:#080d16;
+  --bg-hover:#24334a; --bg-active:#2b3d59;
+  --border:rgba(34,197,176,.24); --border-dim:rgba(148,176,200,.14);
+  --text-1:#f2f6fa; --text-2:#b9c7d8; --text-3:#8595aa;
+  --accent:#22c5b0; --accent-2:#3ba7f0; --accent-hover:#3ad9c4; --accent-ink:#04201d;
+  --green:#34d8a4; --green-bg:rgba(52,216,164,.14);
+  --red:#f87171;   --red-bg:rgba(248,113,113,.14);
+  --yellow:#fbbf24;--yellow-bg:rgba(251,191,36,.14);
+  /* Positioned to pass UNDER the content, not just along the edges. Glass with
+     nothing but flat base behind it is indistinguishable from a solid panel -
+     which is exactly what direction B already is, for free. */
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(34,197,176,.30), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%, rgba(59,167,240,.27), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(126,87,224,.25), transparent 65%);
+  --surface-bg:rgb(255 255 255 / .07);
+  --surface-border:1px solid rgb(255 255 255 / .13);
+  --surface-blur:blur(14px) saturate(160%);
+  --surface-shadow:inset 0 1px 0 0 rgb(255 255 255 / .15), 0 10px 30px -8px rgb(0 0 0 / .5);
+  --chrome-bg:rgb(255 255 255 / .04);
+  --chrome-blur:blur(18px) saturate(150%);
+  --radius:12px;
+}
+[data-direction="aurora"][data-theme="light"]{
+  --bg-base:#eef2f7; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#e7ecf3;
+  --bg-hover:#e2e8f0; --bg-active:#d3dce8;
+  --border:rgba(13,139,125,.30); --border-dim:rgba(15,30,50,.13);
+  --text-1:#0d1420; --text-2:#3d4b5c; --text-3:#64748b;
+  --accent:#0d8b7d; --accent-2:#1f6feb; --accent-hover:#0b7568; --accent-ink:#ffffff;
+  --green:#0f9d63; --green-bg:rgba(15,157,99,.12);
+  --red:#d64550;   --red-bg:rgba(214,69,80,.12);
+  --yellow:#b45309;--yellow-bg:rgba(180,83,9,.12);
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(13,139,125,.22), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%, rgba(31,111,235,.20), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(150,110,220,.18), transparent 65%);
+  --surface-bg:rgb(255 255 255 / .62);
+  /* Dark edge, not white: a white border on a white panel over a pale backdrop
+     is invisible. The inset highlight stays white - it is a specular effect. */
+  --surface-border:1px solid rgb(15 30 50 / .12);
+  --surface-blur:blur(16px) saturate(180%);
+  --surface-shadow:inset 0 1px 0 0 rgb(255 255 255 / .7), 0 10px 30px -10px rgb(15 30 50 / .18);
+  --chrome-bg:rgb(255 255 255 / .6);
+  --chrome-blur:blur(18px) saturate(150%);
+  --radius:12px;
+}
+
+/* --- B: Solid Slate ----------------------------------------------------- */
+[data-direction="slate"][data-theme="dark"]{
+  --bg-base:#12171f; --bg-surface:#1a2029; --bg-raised:#222933; --bg-sidebar:#0e131a;
+  --bg-hover:#232b36; --bg-active:#2b3543;
+  --border:#39424f; --border-dim:#2c343f;
+  --text-1:#eef2f7; --text-2:#aeb9c7; --text-3:#7d8899;
+  --accent:#35c9e0; --accent-2:#4f8ff7; --accent-hover:#52d6ea; --accent-ink:#062227;
+  --green:#3ecf8e; --green-bg:rgba(62,207,142,.13);
+  --red:#f2555a;   --red-bg:rgba(242,85,90,.13);
+  --yellow:#e3b341;--yellow-bg:rgba(227,179,65,.13);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(0 0 0 / .28);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:10px;
+}
+[data-direction="slate"][data-theme="light"]{
+  --bg-base:#f6f7f9; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#eceff3;
+  --bg-hover:#eef1f5; --bg-active:#e2e7ee;
+  --border:#c6ced8; --border-dim:#d8dde4;
+  --text-1:#131820; --text-2:#4b5563; --text-3:#727e8d;
+  --accent:#0e9384; --accent-2:#1d6ce0; --accent-hover:#0c7f72; --accent-ink:#ffffff;
+  --green:#0b8a57; --green-bg:rgba(11,138,87,.11);
+  --red:#c9333c;   --red-bg:rgba(201,51,60,.11);
+  --yellow:#9a5b06;--yellow-bg:rgba(154,91,6,.11);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(19 24 32 / .06);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:10px;
+}
+
+/* --- C: Light Studio ---------------------------------------------------- */
+[data-direction="studio"][data-theme="light"]{
+  --bg-base:#fbfbfd; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#f5f5f9;
+  --bg-hover:#f1f1f6; --bg-active:#ebebf6;
+  --border:#dcdce6; --border-dim:#e8e8f0;
+  --text-1:#14171f; --text-2:#4a5060; --text-3:#79808f;
+  --accent:#5b5bd6; --accent-2:#0ea5e9; --accent-hover:#4f4fc9; --accent-ink:#ffffff;
+  --green:#12855f; --green-bg:rgba(18,133,95,.10);
+  --red:#d03249;   --red-bg:rgba(208,50,73,.10);
+  --yellow:#9a6207;--yellow-bg:rgba(154,98,7,.10);
+  --page-image:none;
+  --surface-bg:#ffffff;
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(20 23 31 / .04), 0 10px 26px -14px rgb(20 23 31 / .16);
+  --chrome-bg:#ffffff;
+  --chrome-blur:none;
+  --radius:14px;
+}
+[data-direction="studio"][data-theme="dark"]{
+  --bg-base:#15161c; --bg-surface:#1d1f27; --bg-raised:#252832; --bg-sidebar:#111218;
+  --bg-hover:#252832; --bg-active:#2d3040;
+  --border:#353947; --border-dim:#2a2d37;
+  --text-1:#f4f5f8; --text-2:#b0b4c2; --text-3:#7f8494;
+  --accent:#7c7cf0; --accent-2:#38bdf8; --accent-hover:#8d8df4; --accent-ink:#0d0e14;
+  --green:#34d399; --green-bg:rgba(52,211,153,.13);
+  --red:#fb7185;   --red-bg:rgba(251,113,133,.13);
+  --yellow:#fbbf24;--yellow-bg:rgba(251,191,36,.13);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(0 0 0 / .3);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:14px;
+}
+
+/* --- shared ------------------------------------------------------------- */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg-base); color:var(--text-2);
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:var(--page-image);
+}
+
+/* The control bar keeps its own neutral colors in every direction, so it can
+   never be mistaken for part of the design being judged. */
+.devbar{
+  position:fixed; top:0; left:0; right:0; height:42px; z-index:200;
+  display:flex; align-items:center; gap:18px; padding:0 14px;
+  background:#0a0a0c; color:#d6d8de; border-bottom:1px solid #24262e;
+  font-size:12px;
+}
+.devbar b{color:#fff;font-size:12px;font-weight:600}
+.devbar .grp{display:flex;gap:5px;align-items:center}
+.devbar .lbl{color:#8a8f9c;font-size:11px}
+.devbar button{
+  font:inherit;font-size:11px;padding:4px 10px;border-radius:999px;cursor:pointer;
+  background:transparent;color:#c3c7d1;border:1px solid #34374211;border-color:#343742;
+}
+.devbar button[aria-pressed="true"]{background:#e8eaf0;color:#0a0a0c;border-color:#e8eaf0;font-weight:600}
+.devbar .hint{margin-left:auto;color:#6c7280;font-size:11px}
+
+/* the fake OS desktop behind the window, so the frameless edge is visible */
+.stage{
+  position:relative;z-index:1;height:calc(100vh - 42px);margin-top:42px;
+  display:grid;place-items:center;overflow:auto;padding:24px;
+  background:
+    radial-gradient(900px 600px at 20% 20%, #2c3444, transparent 60%),
+    radial-gradient(800px 600px at 80% 80%, #232a37, transparent 60%),
+    #1b202a;
+}
+.win{
+  width:1000px;height:700px;flex-shrink:0;border-radius:10px;overflow:hidden;
+  display:flex;flex-direction:column;
+  background:var(--bg-base);
+  box-shadow:0 30px 80px -20px rgb(0 0 0 / .7), 0 0 0 1px rgb(255 255 255 / .07);
+  position:relative;
+}
+.win::before{content:'';position:absolute;inset:0;background:var(--page-image);pointer-events:none}
+.win > *{position:relative;z-index:1}
+
+/* title bar - the app draws this itself (decorations:false) */
+.tb{
+  height:36px;flex-shrink:0;display:flex;align-items:center;gap:9px;padding:0 0 0 12px;
+  background:var(--chrome-bg);backdrop-filter:var(--chrome-blur);-webkit-backdrop-filter:var(--chrome-blur);
+  border-bottom:1px solid var(--border-dim);
+}
+.tb .mk{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:9px;font-weight:800;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--accent-ink)}
+.tb .ti{font-size:12px;font-weight:600;color:var(--text-2)}
+.tb .sp{flex:1}
+.wc{display:flex;height:100%}
+.wc button{
+  width:44px;height:100%;border:none;background:transparent;cursor:pointer;
+  color:var(--text-3);font-size:12px;line-height:1;transition:background .14s,color .14s;
+}
+.wc button:hover{background:var(--bg-hover);color:var(--text-1)}
+.wc button.x:hover{background:var(--red);color:#fff}
+
+/* tab bar */
+.tabs{
+  display:flex;align-items:stretch;gap:0;flex-shrink:0;padding:0 6px;
+  background:var(--chrome-bg);backdrop-filter:var(--chrome-blur);-webkit-backdrop-filter:var(--chrome-blur);
+  border-bottom:1px solid var(--border-dim);
+}
+.tab{
+  display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;
+  font-size:12px;color:var(--text-3);border-bottom:2px solid transparent;
+  transition:color .14s,border-color .14s,background .14s;
+}
+.tab:hover{color:var(--text-2);background:var(--bg-hover)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .cl{opacity:.5;font-size:13px}
+.tab .live{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.82)}}
+
+/* body: two panels */
+.panes{flex:1;display:flex;gap:12px;padding:14px;overflow:hidden}
+.pane{
+  flex:1;border-radius:var(--radius);padding:18px;overflow:auto;
+  background:var(--surface-bg);border:var(--surface-border);box-shadow:var(--surface-shadow);
+  backdrop-filter:var(--surface-blur);-webkit-backdrop-filter:var(--surface-blur);
+}
+.cap{font-size:9px;color:var(--text-3);letter-spacing:2px;font-weight:700;text-transform:uppercase;margin-bottom:14px}
+.pid{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:26px;font-weight:700;
+  color:var(--accent);letter-spacing:4px;margin-bottom:16px;
+}
+.lb{font-size:10px;color:var(--text-3);margin-bottom:5px}
+.pwrow{display:flex;align-items:center;gap:6px;margin-bottom:14px}
+.pw{flex:1;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:600;
+  color:var(--accent);letter-spacing:2px}
+.ib{
+  width:28px;height:28px;flex-shrink:0;display:grid;place-items:center;border-radius:6px;cursor:pointer;
+  background:var(--green-bg);border:1px solid var(--border);color:var(--accent);
+  transition:transform .14s ease-out,background .14s;
+}
+.ib:hover{transform:translateY(-1px);background:var(--bg-hover)}
+.ib:active{transform:scale(.94);transition-duration:90ms}
+.pills{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:600;padding:4px 9px;border-radius:12px}
+.pill.ok{color:var(--green);background:var(--green-bg)}
+.pill.srv{color:var(--accent);background:var(--green-bg)}
+.sel{
+  width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;cursor:pointer;
+  background:var(--bg-hover);border:1px solid var(--border-dim);color:var(--text-1);font-size:12px;
+}
+.sel .cv{margin-left:auto;color:var(--text-3);font-size:9px}
+
+.inp{
+  width:100%;padding:9px 12px;border-radius:8px;font:inherit;font-size:12px;margin-bottom:8px;
+  background:var(--bg-hover);border:1px solid var(--border-dim);color:var(--text-1);outline:none;
+  transition:border-color .14s,box-shadow .14s;
+}
+.inp::placeholder{color:var(--text-3)}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.btn{
+  width:100%;font:inherit;font-size:13px;font-weight:650;padding:9px;border-radius:8px;cursor:pointer;
+  border:1px solid transparent;background:var(--accent);color:var(--accent-ink);margin-bottom:18px;
+  transition:transform .14s ease-out,box-shadow .14s ease-out,background .14s;
+}
+.btn:hover{transform:translateY(-1px);background:var(--accent-hover);box-shadow:0 6px 16px -6px rgb(0 0 0 / .5)}
+.btn:active{transform:scale(.98);transition-duration:90ms;box-shadow:none}
+.rec{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:5px;
+  border:1px solid transparent;transition:background .14s,border-color .14s;
+}
+.rec:hover{background:var(--bg-hover);border-color:var(--border-dim)}
+.rec .ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-size:13px;
+  background:var(--bg-hover);border:1px solid var(--border-dim)}
+.rec .id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--text-1);letter-spacing:1px}
+.rec .nm{font-size:10px;color:var(--text-3);margin-top:1px}
+.rec .go{margin-left:auto;color:var(--text-3);font-size:11px}
+
+/* status bar */
+.sb{
+  height:26px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 12px;font-size:10px;
+  color:var(--text-3);border-top:1px solid var(--border-dim);
+  background:var(--chrome-bg);backdrop-filter:var(--chrome-blur);-webkit-backdrop-filter:var(--chrome-blur);
+}
+.sb .d{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px}
+.sb .r{margin-left:auto}
+
+/* The clash this screen exists to show: shared/ui components carry
+   var(--accent, #00c896) fallbacks, so in the real desktop app - which defines
+   no tokens at all - every dialog renders web green inside a cyan window. */
+.clash{
+  position:absolute;right:18px;bottom:40px;width:250px;padding:13px;border-radius:10px;z-index:5;
+  background:#1f2a3c;border:1px solid rgba(0,200,150,.20);box-shadow:0 20px 60px rgb(0 0 0 / .55);
+}
+.clash h4{margin:0 0 5px;font-size:12px;color:#fff;font-weight:600}
+.clash p{margin:0 0 10px;font-size:11px;color:#bccadb;line-height:1.45}
+.clash button{font:inherit;font-size:11px;font-weight:600;padding:5px 11px;border-radius:6px;border:none;
+  background:#00c896;color:#fff;cursor:pointer}
+.clash .tag{position:absolute;top:-9px;left:11px;font-size:8px;letter-spacing:.5px;padding:2px 7px;border-radius:9px;
+  background:#f87171;color:#2a0b0d;font-weight:700}
+.win[data-clash="0"] .clash{display:none}
+
+@media (prefers-reduced-motion:reduce){
+  .btn,.ib,.rec,.tab{transition:opacity .14s ease-out}
+  .btn:hover,.ib:hover{transform:none;box-shadow:none;opacity:.88}
+  .tab .live{animation:none}
+}
+[data-reduced="1"] .btn,[data-reduced="1"] .ib{transition:opacity .14s ease-out}
+[data-reduced="1"] .btn:hover,[data-reduced="1"] .ib:hover{transform:none;box-shadow:none;opacity:.88}
+[data-reduced="1"] .tab .live{animation:none}
+</style>
+</head>
+<body>
+
+<div class="devbar">
+  <b>Desktop &middot; Home</b>
+  <span class="grp"><span class="lbl">Direction</span>
+    <button data-dir="aurora" aria-pressed="true">A - Aurora Glass</button>
+    <button data-dir="slate"  aria-pressed="false">B - Solid Slate</button>
+    <button data-dir="studio" aria-pressed="false">C - Light Studio</button>
+  </span>
+  <span class="grp"><span class="lbl">Theme</span>
+    <button data-theme="dark"  aria-pressed="true">Dark</button>
+    <button data-theme="light" aria-pressed="false">Light</button>
+  </span>
+  <span class="grp">
+    <button data-reduced aria-pressed="false">Reduced motion</button>
+    <button id="clash" aria-pressed="true">Show today's shared/ui clash</button>
+  </span>
+  <span class="hint">1000x700, frameless &middot; keys: 1 2 3 &middot; d / l</span>
+</div>
+
+<div class="stage">
+  <div class="win" id="win" data-clash="1">
+    <div class="tb">
+      <div class="mk">P</div><div class="ti">PeerDesk</div>
+      <div class="sp"></div>
+      <div class="wc">
+        <button title="Minimize">&#9472;</button>
+        <button title="Maximize">&#9633;</button>
+        <button class="x" title="Close">&#10005;</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab on">&#127968; Home</div>
+      <div class="tab">&#9881;&#65039; Settings</div>
+      <div class="tab"><span class="live"></span> 482 913 007 <span class="cl">&#10005;</span></div>
+    </div>
+
+    <div class="panes">
+      <div class="pane">
+        <div class="cap">This device</div>
+        <div class="pid">771 204 559</div>
+
+        <div class="lb">Password</div>
+        <div class="pwrow">
+          <div class="pw">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div>
+          <button class="ib" title="Show">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="ib" title="Copy">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="ib" title="Reset">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
+        </div>
+
+        <div class="pills">
+          <span class="pill ok">&#9679; Approved</span>
+          <span class="pill srv">app.peerdesk.eu</span>
+        </div>
+
+        <div class="lb">Access mode</div>
+        <div class="sel">&#128274; Ask for confirmation <span class="cv">&#9660;</span></div>
+      </div>
+
+      <div class="pane">
+        <div class="cap">Connect to remote</div>
+        <input class="inp" placeholder="Enter partner ID" value="482 913 007">
+        <button class="btn">Connect</button>
+
+        <div class="cap" style="margin-bottom:8px">Recent</div>
+        <div class="rec"><div class="ic">&#129482;</div><div><div class="id">482 913 007</div><div class="nm">DESKTOP-PROD-01</div></div><span class="go">&#8250;</span></div>
+        <div class="rec"><div class="ic">&#127822;</div><div><div class="id">771 204 559</div><div class="nm">mac-studio-design</div></div><span class="go">&#8250;</span></div>
+        <div class="rec"><div class="ic">&#128039;</div><div><div class="id">335 908 112</div><div class="nm">ubuntu-build-02</div></div><span class="go">&#8250;</span></div>
+      </div>
+    </div>
+
+    <div class="sb">
+      <span><span class="d"></span> Agent running</span>
+      <span>Relay: eu-west</span>
+      <span class="r">v0.4.11</span>
+    </div>
+
+    <div class="clash">
+      <span class="tag">TODAY'S BUG</span>
+      <h4>Disconnect session?</h4>
+      <p>This dialog comes from shared/ui, which hardcodes the web palette as a fallback. Desktop defines no tokens, so it is always green.</p>
+      <button>Disconnect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Controls. Plain script, no modules - ES modules hit CORS restrictions when
+   the page is opened over file://, which is the whole point of this file. */
+var root = document.documentElement;
+function press(sel, attr, val){
+  var all = document.querySelectorAll(sel);
+  for (var i = 0; i < all.length; i++){
+    all[i].setAttribute('aria-pressed', String(all[i].getAttribute(attr) === val));
+  }
+}
+function setDir(v){ root.setAttribute('data-direction', v); press('[data-dir]', 'data-dir', v);
+  /* Studio is a light-first direction; landing in its dark variant first would
+     misrepresent it. */
+  if (v === 'studio' && root.getAttribute('data-theme') === 'dark') setTheme('light');
+}
+function setTheme(v){ root.setAttribute('data-theme', v); press('[data-theme]', 'data-theme', v); }
+
+document.addEventListener('click', function(e){
+  var t = e.target.closest ? e.target.closest('button') : null;
+  if (!t) return;
+  if (t.hasAttribute('data-dir'))   setDir(t.getAttribute('data-dir'));
+  if (t.hasAttribute('data-theme')) setTheme(t.getAttribute('data-theme'));
+  if (t.hasAttribute('data-reduced')){
+    var on = root.getAttribute('data-reduced') === '1';
+    root.setAttribute('data-reduced', on ? '0' : '1');
+    t.setAttribute('aria-pressed', String(!on));
+  }
+});
+/* Addressable, so a specific combination can be sent as a link rather than as
+   a list of clicks to reproduce: machines.html?dir=slate&theme=light */
+var q = new URLSearchParams(location.search);
+if (['aurora','slate','studio'].indexOf(q.get('dir')) >= 0) setDir(q.get('dir'));
+if (['dark','light'].indexOf(q.get('theme')) >= 0) setTheme(q.get('theme'));
+
+document.addEventListener('keydown', function(e){
+  if (e.key === '1') setDir('aurora');
+  if (e.key === '2') setDir('slate');
+  if (e.key === '3') setDir('studio');
+  if (e.key === 'd' || e.key === 'D') setTheme('dark');
+  if (e.key === 'l' || e.key === 'L') setTheme('light');
+});
+document.getElementById('clash').addEventListener('click', function(){
+  var w = document.getElementById('win');
+  var on = w.getAttribute('data-clash') === '1';
+  w.setAttribute('data-clash', on ? '0' : '1');
+  this.setAttribute('aria-pressed', String(!on));
+});
+</script>
+</body>
+</html>

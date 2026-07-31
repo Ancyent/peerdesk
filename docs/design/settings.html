@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en" data-direction="aurora" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PeerDesk design - Settings (web)</title>
+<style>
+/* ==========================================================================
+   PeerDesk design mockup - settings.
+
+   The form-density screen. Inputs, selects, toggles and destructive actions in
+   one place, because that is the context in which the single input primitive
+   has to hold up - today the app declares three different ones
+   (InvitePage.tsx:14, SettingsPage.tsx:10, BrandingPage.tsx:90).
+   ========================================================================== */
+/* --- A: Aurora Glass ---------------------------------------------------- */
+[data-direction="aurora"][data-theme="dark"]{
+  --bg-base:#0b111c; --bg-surface:#172131; --bg-raised:#1e2a3d; --bg-sidebar:#080d16;
+  --bg-hover:#24334a; --bg-active:#2b3d59;
+  --border:rgba(34,197,176,.24); --border-dim:rgba(148,176,200,.14);
+  --text-1:#f2f6fa; --text-2:#b9c7d8; --text-3:#8595aa;
+  --accent:#22c5b0; --accent-2:#3ba7f0; --accent-hover:#3ad9c4; --accent-ink:#04201d;
+  --green:#34d8a4; --green-bg:rgba(52,216,164,.14);
+  --red:#f87171;   --red-bg:rgba(248,113,113,.14);
+  --yellow:#fbbf24;--yellow-bg:rgba(251,191,36,.14);
+  /* Positioned to pass UNDER the content, not just along the edges. Glass with
+     nothing but flat base behind it is indistinguishable from a solid panel -
+     which is exactly what direction B already is, for free. */
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(34,197,176,.30), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%, rgba(59,167,240,.27), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(126,87,224,.25), transparent 65%);
+  --surface-bg:rgb(255 255 255 / .07);
+  --surface-border:1px solid rgb(255 255 255 / .13);
+  --surface-blur:blur(14px) saturate(160%);
+  --surface-shadow:inset 0 1px 0 0 rgb(255 255 255 / .15), 0 10px 30px -8px rgb(0 0 0 / .5);
+  --chrome-bg:rgb(255 255 255 / .04);
+  --chrome-blur:blur(18px) saturate(150%);
+  --radius:12px;
+}
+[data-direction="aurora"][data-theme="light"]{
+  --bg-base:#eef2f7; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#e7ecf3;
+  --bg-hover:#e2e8f0; --bg-active:#d3dce8;
+  --border:rgba(13,139,125,.30); --border-dim:rgba(15,30,50,.13);
+  --text-1:#0d1420; --text-2:#3d4b5c; --text-3:#64748b;
+  --accent:#0d8b7d; --accent-2:#1f6feb; --accent-hover:#0b7568; --accent-ink:#ffffff;
+  --green:#0f9d63; --green-bg:rgba(15,157,99,.12);
+  --red:#d64550;   --red-bg:rgba(214,69,80,.12);
+  --yellow:#b45309;--yellow-bg:rgba(180,83,9,.12);
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(13,139,125,.22), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%, rgba(31,111,235,.20), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(150,110,220,.18), transparent 65%);
+  --surface-bg:rgb(255 255 255 / .62);
+  /* Dark edge, not white: a white border on a white panel over a pale backdrop
+     is invisible. The inset highlight stays white - it is a specular effect. */
+  --surface-border:1px solid rgb(15 30 50 / .12);
+  --surface-blur:blur(16px) saturate(180%);
+  --surface-shadow:inset 0 1px 0 0 rgb(255 255 255 / .7), 0 10px 30px -10px rgb(15 30 50 / .18);
+  --chrome-bg:rgb(255 255 255 / .6);
+  --chrome-blur:blur(18px) saturate(150%);
+  --radius:12px;
+}
+
+/* --- B: Solid Slate ----------------------------------------------------- */
+[data-direction="slate"][data-theme="dark"]{
+  --bg-base:#12171f; --bg-surface:#1a2029; --bg-raised:#222933; --bg-sidebar:#0e131a;
+  --bg-hover:#232b36; --bg-active:#2b3543;
+  --border:#39424f; --border-dim:#2c343f;
+  --text-1:#eef2f7; --text-2:#aeb9c7; --text-3:#7d8899;
+  --accent:#35c9e0; --accent-2:#4f8ff7; --accent-hover:#52d6ea; --accent-ink:#062227;
+  --green:#3ecf8e; --green-bg:rgba(62,207,142,.13);
+  --red:#f2555a;   --red-bg:rgba(242,85,90,.13);
+  --yellow:#e3b341;--yellow-bg:rgba(227,179,65,.13);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(0 0 0 / .28);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:10px;
+}
+[data-direction="slate"][data-theme="light"]{
+  --bg-base:#f6f7f9; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#eceff3;
+  --bg-hover:#eef1f5; --bg-active:#e2e7ee;
+  --border:#c6ced8; --border-dim:#d8dde4;
+  --text-1:#131820; --text-2:#4b5563; --text-3:#727e8d;
+  --accent:#0e9384; --accent-2:#1d6ce0; --accent-hover:#0c7f72; --accent-ink:#ffffff;
+  --green:#0b8a57; --green-bg:rgba(11,138,87,.11);
+  --red:#c9333c;   --red-bg:rgba(201,51,60,.11);
+  --yellow:#9a5b06;--yellow-bg:rgba(154,91,6,.11);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(19 24 32 / .06);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:10px;
+}
+
+/* --- C: Light Studio ---------------------------------------------------- */
+[data-direction="studio"][data-theme="light"]{
+  --bg-base:#fbfbfd; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#f5f5f9;
+  --bg-hover:#f1f1f6; --bg-active:#ebebf6;
+  --border:#dcdce6; --border-dim:#e8e8f0;
+  --text-1:#14171f; --text-2:#4a5060; --text-3:#79808f;
+  --accent:#5b5bd6; --accent-2:#0ea5e9; --accent-hover:#4f4fc9; --accent-ink:#ffffff;
+  --green:#12855f; --green-bg:rgba(18,133,95,.10);
+  --red:#d03249;   --red-bg:rgba(208,50,73,.10);
+  --yellow:#9a6207;--yellow-bg:rgba(154,98,7,.10);
+  --page-image:none;
+  --surface-bg:#ffffff;
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(20 23 31 / .04), 0 10px 26px -14px rgb(20 23 31 / .16);
+  --chrome-bg:#ffffff;
+  --chrome-blur:none;
+  --radius:14px;
+}
+[data-direction="studio"][data-theme="dark"]{
+  --bg-base:#15161c; --bg-surface:#1d1f27; --bg-raised:#252832; --bg-sidebar:#111218;
+  --bg-hover:#252832; --bg-active:#2d3040;
+  --border:#353947; --border-dim:#2a2d37;
+  --text-1:#f4f5f8; --text-2:#b0b4c2; --text-3:#7f8494;
+  --accent:#7c7cf0; --accent-2:#38bdf8; --accent-hover:#8d8df4; --accent-ink:#0d0e14;
+  --green:#34d399; --green-bg:rgba(52,211,153,.13);
+  --red:#fb7185;   --red-bg:rgba(251,113,133,.13);
+  --yellow:#fbbf24;--yellow-bg:rgba(251,191,36,.13);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(0 0 0 / .3);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:14px;
+}
+
+/* --- shared ------------------------------------------------------------- */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg-base); color:var(--text-2);
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:var(--page-image);
+}
+
+/* The control bar keeps its own neutral colors in every direction, so it can
+   never be mistaken for part of the design being judged. */
+.devbar{
+  position:fixed; top:0; left:0; right:0; height:42px; z-index:200;
+  display:flex; align-items:center; gap:18px; padding:0 14px;
+  background:#0a0a0c; color:#d6d8de; border-bottom:1px solid #24262e;
+  font-size:12px;
+}
+.devbar b{color:#fff;font-size:12px;font-weight:600}
+.devbar .grp{display:flex;gap:5px;align-items:center}
+.devbar .lbl{color:#8a8f9c;font-size:11px}
+.devbar button{
+  font:inherit;font-size:11px;padding:4px 10px;border-radius:999px;cursor:pointer;
+  background:transparent;color:#c3c7d1;border:1px solid #34374211;border-color:#343742;
+}
+.devbar button[aria-pressed="true"]{background:#e8eaf0;color:#0a0a0c;border-color:#e8eaf0;font-weight:600}
+.devbar .hint{margin-left:auto;color:#6c7280;font-size:11px}
+
+.app{position:relative;z-index:1;display:flex;height:calc(100vh - 42px);margin-top:42px;overflow:hidden}
+.side{
+  width:220px;flex-shrink:0;display:flex;flex-direction:column;
+  background:var(--chrome-bg);backdrop-filter:var(--chrome-blur);-webkit-backdrop-filter:var(--chrome-blur);
+  border-right:1px solid var(--border-dim);
+}
+.brand{display:flex;align-items:center;gap:12px;padding:16px;min-height:64px;border-bottom:1px solid var(--border-dim)}
+.mark{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:15px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--accent-ink)}
+.brand .nm{font-size:16px;font-weight:700;color:var(--text-1);letter-spacing:-.3px}
+nav{flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:1px}
+.nav{position:relative;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;
+  color:var(--text-2);font-size:13px;font-weight:500;transition:background .18s,color .18s}
+.nav:hover{background:var(--bg-hover)}
+.nav.on{background:var(--bg-active);color:var(--text-1)}
+.nav.on::before{content:'';position:absolute;left:0;top:22%;bottom:22%;width:3px;border-radius:0 3px 3px 0;
+  background:linear-gradient(180deg,var(--accent),var(--accent-2))}
+.nav .ic{width:22px;text-align:center;font-size:16px}
+.sep{height:1px;background:var(--border-dim);margin:8px 4px}
+
+main{flex:1;overflow:auto;padding:24px 28px 48px}
+h1{font-size:21px;font-weight:650;color:var(--text-1);margin:0 0 20px;letter-spacing:-.3px}
+.sec{
+  max-width:660px;margin-bottom:16px;padding:20px 22px;border-radius:var(--radius);
+  background:var(--surface-bg);border:var(--surface-border);box-shadow:var(--surface-shadow);
+  backdrop-filter:var(--surface-blur);-webkit-backdrop-filter:var(--surface-blur);
+}
+.sec > h2{font-size:14px;font-weight:650;color:var(--text-1);margin:0 0 3px}
+.sec > .sub{font-size:12px;color:var(--text-3);margin:0 0 18px}
+.f{margin-bottom:15px}
+.f:last-child{margin-bottom:0}
+label{display:block;font-size:12px;color:var(--text-3);margin-bottom:6px}
+.inp,.selx{
+  width:100%;padding:9px 12px;border-radius:8px;font:inherit;font-size:14px;
+  background:var(--bg-hover);border:1px solid var(--border-dim);color:var(--text-1);outline:none;
+  transition:border-color .14s,box-shadow .14s;
+}
+.inp::placeholder{color:var(--text-3)}
+.inp:focus,.selx:focus{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.inp:disabled{opacity:.5;cursor:not-allowed}
+.inp.bad{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
+.msg{font-size:12px;color:var(--red);margin-top:6px}
+.help{font-size:12px;color:var(--text-3);margin-top:6px}
+
+.tg{display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid var(--border-dim)}
+.tg:first-of-type{border-top:none}
+.tg .tx{flex:1}
+.tg .t1{font-size:13px;color:var(--text-1);font-weight:500}
+.tg .t2{font-size:12px;color:var(--text-3);margin-top:2px}
+.sw{
+  width:40px;height:23px;border-radius:999px;flex-shrink:0;cursor:pointer;position:relative;
+  background:var(--bg-active);border:1px solid var(--border-dim);transition:background .18s,border-color .18s;
+}
+.sw::after{
+  content:'';position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;
+  background:var(--text-3);transition:transform .18s ease-out,background .18s;
+}
+.sw.on{background:var(--accent);border-color:transparent}
+.sw.on::after{transform:translateX(17px);background:var(--accent-ink)}
+
+.btn{
+  font:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:9px;cursor:pointer;
+  border:1px solid transparent;background:var(--accent);color:var(--accent-ink);
+  transition:transform .14s ease-out,box-shadow .14s ease-out,background .14s;
+}
+.btn:hover{transform:translateY(-1px);background:var(--accent-hover);box-shadow:0 6px 16px -6px rgb(0 0 0 / .45)}
+.btn:active{transform:scale(.97);transition-duration:90ms;box-shadow:none}
+.btn.ghost{background:transparent;color:var(--text-2);border-color:var(--border-dim)}
+.btn.ghost:hover{background:var(--bg-hover);color:var(--text-1)}
+.btn.danger{background:var(--red);color:#fff}
+.acts{display:flex;gap:9px;margin-top:4px}
+.sec.danger{border-color:var(--red)}
+.sec.danger h2{color:var(--red)}
+
+@media (prefers-reduced-motion:reduce){
+  .btn,.sw,.sw::after{transition:opacity .14s}
+  .btn:hover{transform:none;box-shadow:none;opacity:.88}
+}
+[data-reduced="1"] .btn,[data-reduced="1"] .sw::after{transition:opacity .14s}
+[data-reduced="1"] .btn:hover{transform:none;box-shadow:none;opacity:.88}
+</style>
+</head>
+<body>
+
+<div class="devbar">
+  <b>Settings</b>
+  <span class="grp"><span class="lbl">Direction</span>
+    <button data-dir="aurora" aria-pressed="true">A - Aurora Glass</button>
+    <button data-dir="slate"  aria-pressed="false">B - Solid Slate</button>
+    <button data-dir="studio" aria-pressed="false">C - Light Studio</button>
+  </span>
+  <span class="grp"><span class="lbl">Theme</span>
+    <button data-theme="dark"  aria-pressed="true">Dark</button>
+    <button data-theme="light" aria-pressed="false">Light</button>
+  </span>
+  <span class="grp"><button data-reduced aria-pressed="false">Reduced motion</button></span>
+  <span class="hint">keys: 1 2 3 &middot; d / l</span>
+</div>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="mark">P</div><div class="nm">PeerDesk</div></div>
+    <nav>
+      <a class="nav"><span class="ic">&#128187;</span> Machines</a>
+      <a class="nav"><span class="ic">&#127970;</span> Organization</a>
+      <a class="nav"><span class="ic">&#128273;</span> API Keys</a>
+      <a class="nav"><span class="ic">&#128230;</span> Downloads</a>
+      <a class="nav on"><span class="ic">&#9881;&#65039;</span> Settings</a>
+      <div class="sep"></div>
+      <a class="nav"><span class="ic">&#127912;</span> Branding</a>
+      <a class="nav"><span class="ic">&#128101;</span> Team</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>Settings</h1>
+
+    <div class="sec">
+      <h2>Profile</h2>
+      <p class="sub">How you appear to others in your organization.</p>
+      <div class="f"><label>Display name</label><input class="inp" value="Andrei Pop"></div>
+      <div class="f"><label>Email</label><input class="inp" value="andrei@northwind.ro" disabled>
+        <div class="help">Managed by your identity provider.</div></div>
+      <div class="f"><label>Language</label>
+        <select class="selx"><option>English</option><option>Romana</option></select></div>
+      <div class="acts"><button class="btn">Save changes</button><button class="btn ghost">Cancel</button></div>
+    </div>
+
+    <div class="sec">
+      <h2>Security</h2>
+      <p class="sub">Applies to every session started from this account.</p>
+      <div class="tg"><div class="tx"><div class="t1">Two-factor authentication</div>
+        <div class="t2">Require a code from your authenticator app at sign in.</div></div>
+        <div class="sw on" data-sw></div></div>
+      <div class="tg"><div class="tx"><div class="t1">Ask before unattended access</div>
+        <div class="t2">Prompt on the remote machine even when a password is saved.</div></div>
+        <div class="sw on" data-sw></div></div>
+      <div class="tg"><div class="tx"><div class="t1">Allow clipboard sync</div>
+        <div class="t2">Share clipboard contents in both directions during a session.</div></div>
+        <div class="sw" data-sw></div></div>
+      <div class="tg"><div class="tx"><div class="t1">Allow file transfer</div>
+        <div class="t2">Let viewers send and receive files.</div></div>
+        <div class="sw on" data-sw></div></div>
+    </div>
+
+    <div class="sec">
+      <h2>Session defaults</h2>
+      <p class="sub">Starting values for every new connection.</p>
+      <div class="f"><label>Quality preset</label>
+        <select class="selx"><option>Balanced</option><option>Sharp</option><option>Smooth</option></select></div>
+      <div class="f"><label>Idle timeout (minutes)</label>
+        <input class="inp bad" value="0" aria-invalid="true">
+        <div class="msg">Must be between 1 and 240 minutes.</div></div>
+    </div>
+
+    <div class="sec danger">
+      <h2>Danger zone</h2>
+      <p class="sub">These actions cannot be undone.</p>
+      <div class="acts">
+        <button class="btn danger">Delete account</button>
+        <button class="btn ghost">Revoke all sessions</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* Controls. Plain script, no modules - ES modules hit CORS restrictions when
+   the page is opened over file://, which is the whole point of this file. */
+var root = document.documentElement;
+function press(sel, attr, val){
+  var all = document.querySelectorAll(sel);
+  for (var i = 0; i < all.length; i++){
+    all[i].setAttribute('aria-pressed', String(all[i].getAttribute(attr) === val));
+  }
+}
+function setDir(v){ root.setAttribute('data-direction', v); press('[data-dir]', 'data-dir', v);
+  /* Studio is a light-first direction; landing in its dark variant first would
+     misrepresent it. */
+  if (v === 'studio' && root.getAttribute('data-theme') === 'dark') setTheme('light');
+}
+function setTheme(v){ root.setAttribute('data-theme', v); press('[data-theme]', 'data-theme', v); }
+
+document.addEventListener('click', function(e){
+  var t = e.target.closest ? e.target.closest('button') : null;
+  if (!t) return;
+  if (t.hasAttribute('data-dir'))   setDir(t.getAttribute('data-dir'));
+  if (t.hasAttribute('data-theme')) setTheme(t.getAttribute('data-theme'));
+  if (t.hasAttribute('data-reduced')){
+    var on = root.getAttribute('data-reduced') === '1';
+    root.setAttribute('data-reduced', on ? '0' : '1');
+    t.setAttribute('aria-pressed', String(!on));
+  }
+});
+/* Addressable, so a specific combination can be sent as a link rather than as
+   a list of clicks to reproduce: machines.html?dir=slate&theme=light */
+var q = new URLSearchParams(location.search);
+if (['aurora','slate','studio'].indexOf(q.get('dir')) >= 0) setDir(q.get('dir'));
+if (['dark','light'].indexOf(q.get('theme')) >= 0) setTheme(q.get('theme'));
+
+document.addEventListener('keydown', function(e){
+  if (e.key === '1') setDir('aurora');
+  if (e.key === '2') setDir('slate');
+  if (e.key === '3') setDir('studio');
+  if (e.key === 'd' || e.key === 'D') setTheme('dark');
+  if (e.key === 'l' || e.key === 'L') setTheme('light');
+});
+document.addEventListener('click', function(e){
+  var s = e.target.closest ? e.target.closest('[data-sw]') : null;
+  if (s) s.classList.toggle('on');
+});
+</script>
+</body>
+</html>

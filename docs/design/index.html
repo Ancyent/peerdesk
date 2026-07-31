@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" data-direction="slate" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PeerDesk design mockups</title>
+<style>
+:root{
+  --bg:#101016; --panel:#191a22; --line:#272932;
+  --t1:#f2f3f7; --t2:#a9adba; --t3:#767b8a;
+  --a:#22c5b0; --b:#35c9e0; --c:#7c7cf0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--t2);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  -webkit-font-smoothing:antialiased;line-height:1.55;
+}
+.wrap{max-width:860px;margin:0 auto;padding:56px 24px 80px}
+h1{font-size:26px;color:var(--t1);margin:0 0 6px;letter-spacing:-.4px;font-weight:650}
+.lede{font-size:15px;color:var(--t2);margin:0 0 8px}
+.note{font-size:13px;color:var(--t3);margin:0 0 34px}
+h2{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--t3);margin:36px 0 14px;font-weight:700}
+a.card{
+  display:block;text-decoration:none;padding:16px 18px;margin-bottom:9px;border-radius:11px;
+  background:var(--panel);border:1px solid var(--line);
+  transition:transform .14s ease-out,border-color .14s ease-out;
+}
+a.card:hover{transform:translateY(-2px);border-color:#3a3d4a}
+a.card .t{font-size:15px;color:var(--t1);font-weight:600;margin-bottom:3px}
+a.card .d{font-size:13px;color:var(--t2)}
+a.card .q{font-size:12px;color:var(--t3);margin-top:7px}
+.dirs{display:grid;gap:9px}
+.dir{padding:15px 17px;border-radius:11px;background:var(--panel);border:1px solid var(--line);border-left-width:3px}
+.dir.a{border-left-color:var(--a)} .dir.b{border-left-color:var(--b)} .dir.c{border-left-color:var(--c)}
+.dir .t{font-size:14px;color:var(--t1);font-weight:600;margin-bottom:3px}
+.dir .d{font-size:13px}
+kbd{
+  font:inherit;font-size:11px;padding:1px 6px;border-radius:5px;background:#22242d;
+  border:1px solid var(--line);color:var(--t1);
+}
+.box{padding:15px 17px;border-radius:11px;background:#15161d;border:1px solid var(--line);font-size:13px}
+.box b{color:var(--t1)}
+ul{margin:8px 0 0;padding-left:19px}
+li{margin-bottom:5px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--t1)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PeerDesk design mockups</h1>
+  <p class="lede">Five screens, three directions, both themes. Open any file directly &mdash; no server, no npm.</p>
+  <p class="note">
+    Each page has the same control bar: switch direction with <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>,
+    theme with <kbd>d</kbd> / <kbd>l</kbd>. Combinations are addressable, e.g.
+    <code>machines.html?dir=slate&amp;theme=light</code>.
+    These files are a decision aid and get deleted once a direction wins &mdash; nothing in the app imports them.
+  </p>
+
+  <h2>Screens</h2>
+  <a class="card" href="machines.html">
+    <div class="t">Machines &mdash; web dashboard</div>
+    <div class="d">Sidebar, filters and eight machine cards in mixed states.</div>
+    <div class="q">The densest screen. If the token set holds here, it holds everywhere.</div>
+  </a>
+  <a class="card" href="home.html">
+    <div class="t">Home &mdash; desktop window</div>
+    <div class="d">Drawn at the real 1000&times;700, frameless, with its own title bar.</div>
+    <div class="q">Also shows today's bug: a shared/ui dialog rendering web green inside a cyan window.</div>
+  </a>
+  <a class="card" href="viewer.html">
+    <div class="t">Viewer &mdash; active session</div>
+    <div class="d">Overlay controls and stats over a moving stand-in for the stream.</div>
+    <div class="q">Carries the capability probe and a live FPS counter. Open this one in the Tauri window.</div>
+  </a>
+  <a class="card" href="login.html">
+    <div class="t">Login</div>
+    <div class="d">Rest and error states side by side.</div>
+    <div class="q">Error styling gets reinvented per page otherwise.</div>
+  </a>
+  <a class="card" href="settings.html">
+    <div class="t">Settings</div>
+    <div class="d">Inputs, selects, toggles and a danger zone.</div>
+    <div class="q">Where the single input primitive has to replace today's three.</div>
+  </a>
+
+  <h2>Directions</h2>
+  <div class="dirs">
+    <div class="dir a"><div class="t">A &mdash; Aurora Glass</div>
+      <div class="d">Aurora backdrop, translucent panels, teal-cyan accent splitting the difference between web's
+        <code>#00c896</code> and desktop's <code>#26c6da</code>. The only direction that depends on
+        <code>backdrop-filter</code>.</div></div>
+    <div class="dir b"><div class="t">B &mdash; Solid Slate</div>
+      <div class="d">Same token discipline, zero glass. Opaque surfaces, firmer borders. No technical risk:
+        works on any engine, costs nothing in the viewer.</div></div>
+    <div class="dir c"><div class="t">C &mdash; Light Studio</div>
+      <div class="d">Light-first, soft shadows instead of borders, indigo accent. Deliberately questions the teal
+        as well &mdash; the only way to find out whether it is brand or inheritance.</div></div>
+  </div>
+
+  <h2>What to decide</h2>
+  <div class="box">
+    <ul>
+      <li><b>Does A earn its cost?</b> Toggle between A and B on the same screen. If the difference is small,
+        B gives you the same win with none of the risk.</li>
+      <li><b>Does the Tauri window support it?</b> Open <code>viewer.html</code> inside
+        <code>npm run tauri dev</code> and read the probe. WebKitGTK ships
+        <code>backdrop-filter</code> prefixed; if both lines say NO, A is dead on desktop.</li>
+      <li><b>Is light mode a real product or a checkbox?</b> Every direction has one. C is the only one
+        designed for it first.</li>
+      <li><b>Is the accent teal, cyan or something else?</b> The two apps disagree today.
+        C proposes a third answer on purpose.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
