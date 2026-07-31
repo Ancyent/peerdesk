@@ -25,3 +25,9 @@ graphify-out/
 *.log
 *.pid
 docs/superpowers/
+no-push/
+
+# Backups of .env made before edits — same secrets as the original, so they
+# must never be stageable.
+.env.bak-*
+*.env.bak-*
