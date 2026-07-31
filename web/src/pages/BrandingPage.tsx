@@ -94,7 +94,7 @@ export function BrandingPage({ onBack }: Props) {
   };
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 600, margin: '0 auto', padding: '24px 16px', background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 600, margin: '0 auto', padding: '24px 16px', minHeight: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28, paddingBottom: 16, borderBottom: '1px solid var(--border-dim)' }}>
         <button onClick={onBack} title={t('branding:back')} aria-label={t('branding:back')}

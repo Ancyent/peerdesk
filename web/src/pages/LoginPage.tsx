@@ -33,7 +33,7 @@ export function LoginPage({ onGoRegister }: Props) {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:16, fontFamily:'sans-serif', background:'var(--bg-base)' }}>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:16, fontFamily:'sans-serif' }}>
       {/* A white-labelled deployment keeps its own logo, or its own name as
           text. The PeerDesk wordmark is only for un-branded deployments —
           putting it above someone else's product name would be wrong. */}

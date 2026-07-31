@@ -31,7 +31,7 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', height: '100vh',
-      background: 'var(--bg-base)', fontFamily: 'system-ui, sans-serif',
+      fontFamily: 'system-ui, sans-serif',
     }}>
       <div style={{
         background: 'var(--bg-surface)',

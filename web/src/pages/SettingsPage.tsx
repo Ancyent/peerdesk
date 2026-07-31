@@ -68,7 +68,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: 500, background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div style={{ padding: '24px', maxWidth: 500, minHeight: '100%' }}>
       <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('settings:title')}</h2>
       <Section title={t('settings:theme.title')}>
         <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>{t('settings:theme.label')}</label>

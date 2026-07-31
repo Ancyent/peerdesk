@@ -12,10 +12,15 @@
 html, body, #root {
   margin: 0;
   padding: 0;
+  min-height: 100vh;
+}
+
+/* Only html and body carry the base colour. #root deliberately does not: it
+   sits above the aurora layer below, and an opaque fill there would hide it. */
+html, body {
   /* Was hardcoded #182030, which duplicated --bg-base and would have kept the
      page dark in the light theme. */
   background: var(--bg-base);
-  min-height: 100vh;
 }
 
 /* The aurora wash. Static gradients, so this costs nothing to composite - but
@@ -28,6 +33,19 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background: var(--page-image);
+}
+
+/* The other half of the recipe, and easy to miss: body::before is positioned,
+   so without this it paints ABOVE #root's in-flow content rather than behind
+   it. The page still looked roughly right that way - the gradients are subtle
+   enough to read as a backdrop either way, and a pixel diff put the difference
+   at 0.2% - but the glass in the main region was not refracting anything, only
+   being tinted from on top. The sidebar was already correct, being
+   position: relative, which is how the two ended up behaving differently on
+   the same screen. */
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 /* --- dark (default) ---------------------------------------------------- */

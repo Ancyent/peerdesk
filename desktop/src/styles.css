@@ -22,7 +22,21 @@ body,
   margin: 0;
   padding: 0;
   height: 100%;
+}
+
+/* Only html and body carry the base colour. #root must not: it sits above the
+   aurora layer, and an opaque fill there would hide it. */
+html,
+body {
   background: var(--bg-base);
+}
+
+/* Pairs with body::before below. Without a stacking position here that layer,
+   being fixed, paints above #root's in-flow content instead of behind it.
+   See web/src/branding.css for the full rationale. */
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 body {

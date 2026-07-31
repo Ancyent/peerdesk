@@ -91,7 +91,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif', background: 'var(--bg-base)' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif' }}>
       {/* Sidebar wrapper — overflow:visible so toggle isn't clipped */}
       <div style={{ width: collapsed ? 64 : 220, flexShrink: 0, position: 'relative', transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)' }}>
         {/* Toggle button outside overflow:hidden */}
@@ -200,7 +200,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
       )}
 
       {/* Main */}
-      <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg-base)' }}>
+      <div style={{ flex: 1, overflow: 'auto' }}>
         {children}
       </div>
     </div>

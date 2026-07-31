@@ -140,7 +140,7 @@ export function MachinesPage({ onConnect, filterKeyId }: Props) {
     .sort((a, b) => Number(b.is_online) - Number(a.is_online));
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 900, background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', maxWidth: 900, minHeight: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('machines:page.title')}</h2>
         <span style={{ fontSize: 12, color: 'var(--green)', background: 'var(--green-bg)', border: '1px solid var(--green-glow)', padding: '2px 8px', borderRadius: 10 }}>

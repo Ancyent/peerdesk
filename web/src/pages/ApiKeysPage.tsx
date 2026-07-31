@@ -122,7 +122,7 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
   };
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 700, background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', maxWidth: 700, minHeight: '100%' }}>
       <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('apikeys:title')}</h2>
       <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
         {t('apikeys:subtitle')}
