@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { surfaceStyle } from './Surface';
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -142,7 +143,12 @@ export function Modal({ open, onClose, labelledBy, children, width = 380, initia
       onClick={onOverlayClick}
       style={{
         position: 'fixed', inset: 0, zIndex: 1200,
-        background: 'rgba(5, 8, 13, 0.72)', backdropFilter: 'blur(2px)',
+        background: 'rgba(5, 8, 13, 0.72)',
+        // Written twice because nothing in the toolchain adds vendor prefixes,
+        // and WebKitGTK - the engine behind the desktop window - only ships the
+        // prefixed property. Unprefixed alone, the blur vanished silently there
+        // while looking correct in Chromium.
+        backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
       }}
     >
@@ -156,11 +162,13 @@ export function Modal({ open, onClose, labelledBy, children, width = 380, initia
         onMouseDown={onDialogMouseDown}
         onKeyDown={onKeyDown}
         style={{
+          // The var(--token, #fallback) pairs that used to be here existed only
+          // because desktop defined no tokens at all, so shared components fell
+          // back to a hardcoded copy of the web palette and rendered green
+          // inside a cyan window. Both apps declare the set now.
+          ...surfaceStyle('panel'),
           width, maxWidth: '100%',
-          background: 'var(--bg-surface, #1f2a3c)',
-          border: '1px solid var(--border, rgba(0,200,150,0.20))',
-          borderRadius: 12, padding: 22,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
+          padding: 22,
           animation: 'pd-modal-pop 140ms ease-out',
         }}
       >

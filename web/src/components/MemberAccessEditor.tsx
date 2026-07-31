@@ -120,7 +120,7 @@ export function MemberAccessEditor({ membershipId }: Props) {
           disabled={!dirty || saving}
           style={{
             padding: '6px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 6,
-            background: 'var(--accent)', color: '#fff', cursor: dirty && !saving ? 'pointer' : 'default',
+            background: 'var(--accent)', color: 'var(--accent-ink)', cursor: dirty && !saving ? 'pointer' : 'default',
             opacity: dirty && !saving ? 1 : 0.5,
           }}
         >

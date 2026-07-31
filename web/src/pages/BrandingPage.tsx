@@ -201,7 +201,7 @@ export function BrandingPage({ onBack }: Props) {
             onClick={handleSave}
             disabled={saving}
             style={{
-              flex: 1, padding: '10px 0', background: 'var(--accent)', color: '#fff',
+              flex: 1, padding: '10px 0', background: 'var(--accent)', color: 'var(--accent-ink)',
               border: 'none', borderRadius: 6, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer',
               fontWeight: 500, opacity: saving ? 0.7 : 1,
             }}

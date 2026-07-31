@@ -22,7 +22,7 @@ const cardStyle = {
 };
 
 const buttonStyle = (busy: boolean) => ({
-  padding: 10, fontSize: 15, borderRadius: 6, background: 'var(--accent)', color: '#fff',
+  padding: 10, fontSize: 15, borderRadius: 6, background: 'var(--accent)', color: 'var(--accent-ink)',
   border: 'none', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1,
 });
 

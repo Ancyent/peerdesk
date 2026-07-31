@@ -116,7 +116,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <TreePicker value={placement} onChange={setPlacement} disabled={!accessToken} />
               <button onClick={generate} disabled={generating || !accessToken}
-                style={{ padding: '8px 18px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: accessToken ? 'pointer' : 'not-allowed', opacity: accessToken ? 1 : 0.5 }}>
+                style={{ padding: '8px 18px', background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: accessToken ? 'pointer' : 'not-allowed', opacity: accessToken ? 1 : 0.5 }}>
                 {generating ? t('downloads:page.generating') : t('downloads:page.generateToken')}
               </button>
             </div>

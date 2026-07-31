@@ -1,6 +1,17 @@
-/* PeerDesk desktop — global reset + theme.
-   Without this the browser default body margin shows as white edges and the
-   100% app overflows the viewport, producing a stray scrollbar. */
+/* PeerDesk desktop — design tokens + global reset.
+ *
+ * Until now this file defined ZERO custom properties, which is why shared/ui
+ * components fell back to their hardcoded web palette and rendered green inside
+ * a cyan window. The token set below is the same one web/src/branding.css uses,
+ * with the same names, so a shared component finally renders the same in both.
+ *
+ * ONE deliberate difference: --surface-blur is none and --surface-bg is opaque.
+ * WebKitGTK, which is what the Tauri window actually runs, ships
+ * backdrop-filter prefixed and has not been probed yet. The aurora background
+ * stays - it is static and works on any engine. If docs/design/viewer.html
+ * reports -webkit-backdrop-filter as supported in the real window, flipping
+ * those two variables (in both blocks) is the entire change needed. */
+
 * {
   box-sizing: border-box;
 }
@@ -11,14 +22,117 @@ body,
   margin: 0;
   padding: 0;
   height: 100%;
-  background: #0d1117;
+  background: var(--bg-base);
 }
 
 body {
   overflow: hidden; /* the app manages its own scroll regions */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #e6edf3;
+  color: var(--text-2);
   -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--page-image);
+}
+
+/* --- dark (default) ---------------------------------------------------- */
+:root {
+  color-scheme: dark;
+
+  --bg-base:    #0b111c;
+  --bg-surface: #172131;
+  --bg-sidebar: #080d16;
+  --bg-hover:   #24334a;
+  --bg-active:  #2b3d59;
+  --bg-raised:  #1e2a3d;
+
+  --border:     rgba(34, 197, 176, 0.24);
+  --border-dim: rgba(148, 176, 200, 0.14);
+
+  --text-1: #f2f6fa;
+  --text-2: #b9c7d8;
+  --text-3: #8595aa;
+
+  --accent:       #22c5b0;
+  --accent-2:     #3ba7f0;
+  --accent-hover: #3ad9c4;
+
+  --accent-ink: #04201d;
+  --danger-ink: #2a0b0d;
+
+  --green:      #34d8a4;
+  --green-bg:   rgba(52, 216, 164, 0.14);
+  --green-glow: rgba(52, 216, 164, 0.28);
+  --red:        #f87171;
+  --red-bg:     rgba(248, 113, 113, 0.14);
+  --yellow:     #fbbf24;
+
+  --radius: 12px;
+
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(34, 197, 176, 0.30), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%,  rgba(59, 167, 240, 0.27), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(126, 87, 224, 0.25), transparent 65%);
+
+  --surface-bg:     var(--bg-surface);
+  --surface-border: 1px solid var(--border-dim);
+  --surface-blur:   none;
+  --surface-shadow: 0 10px 30px -8px rgb(0 0 0 / 0.5);
+  --chrome-bg:      var(--bg-sidebar);
+  --chrome-blur:    none;
+}
+
+/* --- light -------------------------------------------------------------- */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-base:    #eef2f7;
+  --bg-surface: #ffffff;
+  --bg-sidebar: #e7ecf3;
+  --bg-hover:   #e2e8f0;
+  --bg-active:  #d3dce8;
+  --bg-raised:  #ffffff;
+
+  --border:     rgba(13, 139, 125, 0.30);
+  --border-dim: rgba(15, 30, 50, 0.13);
+
+  --text-1: #0d1420;
+  --text-2: #3d4b5c;
+  --text-3: #64748b;
+
+  --accent:       #0d8b7d;
+  --accent-2:     #1f6feb;
+  --accent-hover: #0b7568;
+
+  --accent-ink: #ffffff;
+  --danger-ink: #ffffff;
+
+  --green:      #0f9d63;
+  --green-bg:   rgba(15, 157, 99, 0.12);
+  --green-glow: rgba(15, 157, 99, 0.22);
+  --red:        #d64550;
+  --red-bg:     rgba(214, 69, 80, 0.12);
+  --yellow:     #b45309;
+
+  --radius: 12px;
+
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(13, 139, 125, 0.22), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%,  rgba(31, 111, 235, 0.20), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(150, 110, 220, 0.18), transparent 65%);
+
+  --surface-bg:     var(--bg-surface);
+  --surface-border: 1px solid var(--border-dim);
+  --surface-blur:   none;
+  --surface-shadow: 0 10px 30px -10px rgb(15 30 50 / 0.18);
+  --chrome-bg:      var(--bg-sidebar);
+  --chrome-blur:    none;
 }
 
 /* Dark, slim scrollbars for the inner scroll areas (panels, settings, etc.) */
@@ -30,9 +144,9 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #283040;
+  background: var(--bg-hover);
   border-radius: 5px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #38465c;
+  background: var(--bg-active);
 }

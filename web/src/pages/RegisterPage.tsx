@@ -48,7 +48,7 @@ export function RegisterPage({ onGoLogin }: Props) {
         <input type="password" placeholder={t('auth:fields.passwordMin')} value={password} onChange={e => setPassword(e.target.value)}
           style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid var(--border-dim)', background:'var(--bg-surface)', color:'var(--text-1)' }} minLength={8} required />
         <button type="submit" disabled={loading}
-          style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+          style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color: 'var(--accent-ink)', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? t('auth:register.submitting') : t('auth:register.submit')}
         </button>
       </form>

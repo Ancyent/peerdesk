@@ -12,6 +12,24 @@
     <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>web</title>
+    <script>
+      // Runs before the bundle so a light-theme user never sees a dark frame.
+      // Kept inline and dependency-free on purpose; the same logic lives in
+      // shared/ui/theme.ts for everything after first paint.
+      (function () {
+        try {
+          var t = localStorage.getItem('pd-theme') || 'system';
+          if (t === 'system') {
+            t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {
+          // Storage can throw; the stylesheet's bare :root is dark, so doing
+          // nothing here is already the correct fallback.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

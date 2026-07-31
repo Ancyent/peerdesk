@@ -45,7 +45,9 @@ export function ConnectForm({ onConnect, error, initialPeerId, canSave }: Props)
             ? <img src={logo_data_url} alt={brand_name} style={{ height: 40, objectFit: 'contain', maxWidth: 160 }} />
             : <div style={{
                 fontSize: 22, fontWeight: 700,
-                background: 'linear-gradient(90deg, #67e8c8, #7dd3fc)',
+                // Same fix as AppShell.tsx:132 - the literal pair was tuned for
+                // a dark backdrop and turned near-invisible in the light theme.
+                background: 'linear-gradient(90deg, var(--accent), var(--accent-2))',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               }}>{brand_name || 'PeerDesk'}</div>
           }

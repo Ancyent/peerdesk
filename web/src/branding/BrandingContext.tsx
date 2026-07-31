@@ -1,12 +1,11 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { api, type BrandingConfig } from '../api/client';
-import { applyBranding } from '../hooks/useBranding';
+import { applyBranding, DEFAULT_BRANDING as DEFAULT } from '../hooks/useBranding';
 
-const DEFAULT: BrandingConfig = {
-  brand_name: 'PeerDesk',
-  logo_data_url: null,
-  accent_color: '#2563eb',
-};
+// The default used to be declared a second time right here, and the two copies
+// had already drifted apart in accent colour. applyBranding now compares the
+// incoming accent against this exact object to decide whether to override the
+// theme, so a second copy would silently break that check.
 
 export const BrandingContext = createContext<BrandingConfig>(DEFAULT);
 

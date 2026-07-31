@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button, applyTheme, getStoredTheme, setStoredTheme } from '@pd/ui';
+import type { Theme } from '@pd/ui';
 import { useAuth } from '../auth/useAuth';
 import { api } from '../api/client';
 import { localizeError } from '../api/errors';
@@ -34,6 +36,15 @@ export function SettingsPage() {
   const [pwMsg, setPwMsg] = useState('');
   const [profileErr, setProfileErr] = useState('');
   const [pwErr, setPwErr] = useState('');
+  const [theme, setTheme] = useState<Theme>(() => getStoredTheme());
+
+  // Applied immediately and persisted; there is no server round-trip because a
+  // theme is per-device, unlike the language preference below it.
+  const chooseTheme = (next: Theme) => {
+    setTheme(next);
+    setStoredTheme(next);
+    applyTheme(next);
+  };
 
   const saveProfile = async () => {
     if (!accessToken) return;
@@ -59,6 +70,21 @@ export function SettingsPage() {
   return (
     <div style={{ padding: '24px', maxWidth: 500, background: 'var(--bg-base)', minHeight: '100%' }}>
       <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('settings:title')}</h2>
+      <Section title={t('settings:theme.title')}>
+        <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>{t('settings:theme.label')}</label>
+        <div role="radiogroup" aria-label={t('settings:theme.label')} style={{ display: 'flex', gap: 8 }}>
+          {(['system', 'light', 'dark'] as const).map(opt => (
+            <Button
+              key={opt}
+              variant={theme === opt ? 'primary' : 'secondary'}
+              onClick={() => chooseTheme(opt)}
+              style={{ fontSize: 13, padding: '8px 14px' }}
+            >
+              {t(`settings:theme.${opt}`)}
+            </Button>
+          ))}
+        </div>
+      </Section>
       <Section title={t('settings:language.title')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div>
@@ -88,7 +114,7 @@ export function SettingsPage() {
           <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{t('settings:profile.email')}</label><input style={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} /></div>
           {profileErr && <p style={{ color: 'var(--red)', fontSize: 12, margin: 0 }}>{profileErr}</p>}
           {profileMsg && <p style={{ color: 'var(--green)', fontSize: 12, margin: 0 }}>{profileMsg}</p>}
-          <button onClick={saveProfile} style={{ padding: 8, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>{t('common:save')}</button>
+          <Button onClick={saveProfile} style={{ fontSize: 13 }}>{t('common:save')}</Button>
         </div>
       </Section>
       <Section title={t('settings:password.title')}>
@@ -98,7 +124,7 @@ export function SettingsPage() {
           <div><label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{t('settings:password.confirm')}</label><input style={inp} type="password" value={confPw} onChange={e => setConfPw(e.target.value)} /></div>
           {pwErr && <p style={{ color: 'var(--red)', fontSize: 12, margin: 0 }}>{pwErr}</p>}
           {pwMsg && <p style={{ color: 'var(--green)', fontSize: 12, margin: 0 }}>{pwMsg}</p>}
-          <button onClick={changePw} style={{ padding: 8, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>{t('settings:password.submit')}</button>
+          <Button onClick={changePw} style={{ fontSize: 13 }}>{t('settings:password.submit')}</Button>
         </div>
       </Section>
     </div>
