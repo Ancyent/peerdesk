@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSI definition for the PeerDesk viewer, built with wixl on Linux.
+
+  We own this because the Tauri CLI will not bundle for Windows from a Linux
+  host: its "bundles" flag offers only deb, rpm and appimage there, and its
+  "target" flag changes the compile target, not the package formats. wixl
+  builds a real MSI natively, with no Wine.
+
+  wixl supports a subset of WiX v3: MediaTemplate is not in it, so Media is
+  spelled out, and every Component carries an explicit Guid.
+
+  UpgradeCode must never change between versions - it is what tells Windows
+  that v2 replaces v1 rather than installing beside it.
+
+  Not here yet: the WebView2 bootstrapper. Without it the viewer will not start
+  on a clean Windows that has never had Edge WebView2 installed. This is the
+  first follow-up after Stage A, and it needs its own decision about embedding
+  the installer versus downloading it at install time.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="PeerDesk"
+           Language="1033"
+           Version="$(var.Version)"
+           Manufacturer="PeerDesk"
+           UpgradeCode="6f1b3c4e-9a2d-4d5e-8b7a-1c2d3e4f5a6b">
+
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="A newer version of PeerDesk is already installed." />
+
+    <Media Id="1" Cabinet="peerdesk.cab" EmbedCab="yes" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="PeerDesk">
+          <Component Id="MainExecutable" Guid="8a7b6c5d-4e3f-4a2b-9c8d-7e6f5a4b3c2d" Win64="yes">
+            <File Id="PeerDeskExe" Name="peerdesk-desktop.exe"
+                  Source="peerdesk-desktop.exe" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="AppMenuFolder" Name="PeerDesk">
+          <Component Id="StartMenuShortcut" Guid="2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e">
+            <Shortcut Id="AppShortcut" Name="PeerDesk"
+                      Target="[INSTALLFOLDER]peerdesk-desktop.exe"
+                      WorkingDirectory="INSTALLFOLDER" />
+            <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />
+            <RegistryValue Root="HKCU" Key="Software\PeerDesk" Name="installed"
+                           Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <Feature Id="Complete" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+  </Product>
+</Wix>
