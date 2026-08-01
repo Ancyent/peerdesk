@@ -73,7 +73,7 @@ ASYNCPG_DSN = f"postgresql://{PG_USER}:{PG_PASSWORD}@localhost:{HOST_PORT}/{PG_D
 SCOPED_TABLES = ["machines", "companies", "api_keys", "registration_tokens", "branding"]
 
 # The expected Alembic head. Bump this in the task that adds a migration.
-HEAD_REVISION = "0020"
+HEAD_REVISION = "0021"
 
 
 def _docker_available() -> bool:
@@ -709,3 +709,141 @@ def test_access_grant_created_at_is_not_nullable(pg):
         "WHERE table_name = 'access_grants' AND column_name = 'created_at'"
     ))
     assert is_nullable == "NO"
+
+
+# --- 0021: branding.accent_color pre-Aurora default backfill ----------------
+
+def _seed_account_branding(account_id: str, accent_color: str) -> None:
+    """Creates one account and one branding row for it with the given
+    accent_color. Assumes the schema is at 0020 or later (branding.account_id
+    is NOT NULL and UNIQUE by then)."""
+    _run(_execute(
+        "INSERT INTO accounts (id, name, created_at) VALUES ($1, $2, NOW())",
+        account_id, f"Acct {account_id}",
+    ))
+    _run(_execute(
+        "INSERT INTO branding (account_id, brand_name, accent_color) "
+        "VALUES ($1, 'Co', $2)",
+        account_id, accent_color,
+    ))
+
+
+def _accent_color(account_id: str):
+    return _run(_fetchval(
+        "SELECT accent_color FROM branding WHERE account_id = $1", account_id
+    ))
+
+
+def test_accent_color_old_default_backfilled_to_new_default(pg):
+    """The core case: a row still holding the pre-Aurora default '#2563eb'
+    (lowercase, the value every row was created with -- see models.py's own
+    Branding.accent_color default) must come out of the migration as the new
+    default '#22c5b0', or applyBranding() keeps reading it as a deliberate
+    customisation and pins the old blue over the new stylesheet forever."""
+    _upgrade("0020")
+    _seed_account_branding("acct-accent-1", "#2563eb")
+
+    _upgrade("head")  # must not raise
+
+    version = _run(_fetchval("SELECT version_num FROM alembic_version"))
+    assert version == HEAD_REVISION
+    assert _accent_color("acct-accent-1") == "#22c5b0"
+
+
+def test_accent_color_old_default_matched_case_insensitively(pg):
+    """accent_color is a plain String(7) with no normalisation anywhere in
+    the write path, so the old default can be stored as '#2563EB' (or any
+    other casing) and still mean exactly the pre-Aurora default. The
+    migration must match it regardless of case, and must write the new value
+    in lowercase -- applyBranding() lowercases both sides before comparing,
+    so an uppercase repair would just move the mismatch rather than fix it."""
+    _upgrade("0020")
+    _seed_account_branding("acct-accent-2", "#2563EB")
+
+    _upgrade("head")
+
+    assert _accent_color("acct-accent-2") == "#22c5b0"
+
+
+def test_accent_color_genuinely_different_color_left_untouched(pg):
+    """A row holding a colour that was never the default -- an admin who
+    actually picked a brand colour -- must survive the migration byte for
+    byte. This is the whole reason the migration matches on the old default
+    specifically instead of overwriting every row."""
+    _upgrade("0020")
+    _seed_account_branding("acct-accent-3", "#ff6b6b")
+
+    _upgrade("head")
+
+    assert _accent_color("acct-accent-3") == "#ff6b6b"
+
+
+def test_accent_color_already_new_default_is_unchanged_and_idempotent(pg):
+    """A row already holding the new default ('#22c5b0', e.g. the live
+    production row this migration's author fixed by hand ahead of time)
+    must not be touched -- the WHERE clause matches the *old* default only.
+    Re-running the same repair a second time (simulating an operator
+    re-applying it, or a future migration reusing the same UPDATE) must also
+    be a no-op: that is what makes the repair idempotent rather than merely
+    "runs once without error"."""
+    _upgrade("0020")
+    _seed_account_branding("acct-accent-4", "#22c5b0")
+
+    _upgrade("head")
+    assert _accent_color("acct-accent-4") == "#22c5b0"
+
+    # Re-run the exact repair a second time directly; an already-correct row
+    # must not move.
+    _run(_execute(
+        "UPDATE branding SET accent_color = '#22c5b0' "
+        "WHERE LOWER(accent_color) = '#2563eb'"
+    ))
+    assert _accent_color("acct-accent-4") == "#22c5b0"
+
+
+def test_accent_color_migration_runs_cleanly_with_zero_branding_rows(pg):
+    """0013 aborted mid-run on exactly this shape once: an install where
+    GET /branding had been called (so a branding row could exist) before
+    anyone had registered. This reproduces the simpler, more common version
+    of that shape for 0021 -- a database with zero branding rows at all,
+    e.g. a fresh install that has not called GET /branding yet. The UPDATE
+    must be a no-op that succeeds, not an error about a missing row."""
+    _upgrade("0020")
+    assert _run(_fetchval("SELECT COUNT(*) FROM branding")) == 0
+
+    _upgrade("head")  # must not raise
+
+    version = _run(_fetchval("SELECT version_num FROM alembic_version"))
+    assert version == HEAD_REVISION
+    assert _run(_fetchval("SELECT COUNT(*) FROM branding")) == 0
+
+
+def test_accent_color_downgrade_is_a_documented_noop(pg):
+    """0021's downgrade is a deliberate no-op, not a symmetric reverse: by
+    the time anyone downgrades, a row holding '#22c5b0' is far more likely to
+    be a legitimate customer who wants the new teal (now the shipped
+    default) than one of the handful this migration just repaired, and a
+    symmetric downgrade can't tell those apart either -- the same ambiguity
+    that justifies the upgrade, mirrored.
+
+    This asserts that shape directly: one row the upgrade *did* touch (it
+    started at the old default and was repaired to the new one) and one row
+    that was never subject to the repair at all (a genuinely different
+    custom colour). Downgrading to 0020 must leave both exactly as the
+    upgrade left them -- the repaired row must not be reverted to the old
+    blue, and the untouched row must not be touched now either."""
+    _upgrade("0020")
+    _seed_account_branding("acct-accent-5", "#2563eb")  # will be repaired
+    _seed_account_branding("acct-accent-6", "#ff6b6b")  # never matches
+
+    _upgrade("head")
+    assert _accent_color("acct-accent-5") == "#22c5b0"
+    assert _accent_color("acct-accent-6") == "#ff6b6b"
+
+    _downgrade("0020")
+
+    # A row this migration should still leave alone (repaired row: no
+    # revert to '#2563eb').
+    assert _accent_color("acct-accent-5") == "#22c5b0"
+    # A row this migration should never have touched in the first place.
+    assert _accent_color("acct-accent-6") == "#ff6b6b"
