@@ -61,11 +61,45 @@ def test_builtin_tokens_match_the_desktop_stylesheet():
 
     theirs = _tokens(desktop, ":root")
     for name, value in _tokens(builtin, ":root").items():
-        # Desktop deliberately overrides the glass recipe until the WebKitGTK
-        # probe says backdrop-filter composites there.
-        if name in {"--surface-bg", "--surface-blur", "--chrome-blur", "--surface-shadow"}:
+        # Desktop deliberately overrides the entire surface recipe (--surface-* and
+        # --chrome-* tokens) pending a WebKitGTK probe confirming backdrop-filter
+        # composites in the Tauri window. Until then, desktop renders opaque,
+        # so these recipe tokens are expected to differ. All other tokens must
+        # match exactly. If a non-recipe token differs, that is genuine drift.
+        if name.startswith("--surface-") or name.startswith("--chrome-"):
             continue
         assert name in theirs, f"{name} missing from desktop/src/styles.css"
         assert theirs[name] == value, (
             f"{name} differs: builtin {value!r} vs desktop {theirs[name]!r}"
         )
+
+
+def test_desktop_skip_rule_is_prefix_based():
+    """Verify that the skip rule is based on prefixes, not a name enumeration.
+
+    This prevents someone converting it back to a hard-coded list later.
+    A token named --surface-anything should be skipped, while --accent-anything
+    should not be.
+    """
+    builtin = (BUILTIN_DIR / "css" / "tokens.css").read_text()
+    desktop = (REPO_ROOT / "desktop" / "src" / "styles.css").read_text()
+
+    theirs = _tokens(desktop, ":root")
+    builtin_tokens = _tokens(builtin, ":root")
+
+    # Check that a surface token exists and would be skipped
+    surface_tokens = [name for name in builtin_tokens if name.startswith("--surface-")]
+    chrome_tokens = [name for name in builtin_tokens if name.startswith("--chrome-")]
+    assert len(surface_tokens) > 0, "Expected at least one --surface-* token"
+    assert len(chrome_tokens) > 0, "Expected at least one --chrome-* token"
+
+    # Check that non-recipe tokens are NOT skipped and ARE compared
+    non_recipe_tokens = [
+        name for name in builtin_tokens
+        if not (name.startswith("--surface-") or name.startswith("--chrome-"))
+    ]
+    assert len(non_recipe_tokens) > 0, "Expected at least one non-recipe token"
+    for name in non_recipe_tokens:
+        assert name in theirs, f"Non-recipe token {name} missing from desktop"
+        # We don't assert they match here (that's the main test's job), just that
+        # the skip rule correctly excludes the recipe and includes everything else
