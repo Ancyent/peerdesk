@@ -36,3 +36,5 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { ConfirmProvider, useConfirm } from './ConfirmProvider';
 
 export { InlineError } from './InlineError';
+
+export { CRITICAL_COMPONENT_FILES, PUBLISHED_HOOKS } from './themeSurface';
