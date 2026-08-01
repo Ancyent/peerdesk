@@ -1,12 +1,12 @@
 """SVG is XML, and XML that a stranger wrote.
 
-Two separate problems. The parser itself must not be talked into fetching a
-local file or expanding an entity bomb, which is why defusedxml replaces the
-standard parser. Then the document must not carry script, event handlers, or
-references off-origin, which is what the allowlists below are for.
-
-An allowlist, not a blocklist: the set of SVG features is large and grows, and a
-blocklist is a promise to have thought of everything.
+Three separate problems:
+1. The parser itself must not be talked into fetching a local file or expanding
+   an entity bomb. defusedxml replaces the standard parser.
+2. Dangerous elements and attributes (script, event handlers, external references)
+   must be rejected, not silently stripped, so the admin learns about the attack.
+3. Harmless unknown elements and attributes (metadata, editor namespaces) are
+   silently stripped to allow real SVGs from Inkscape, Illustrator, Figma etc.
 """
 import re
 from xml.etree import ElementTree as ET
@@ -32,6 +32,13 @@ ALLOWED_ATTRS = frozenset({
     "offset", "stop-color", "stop-opacity", "gradientUnits", "gradientTransform",
     "font-family", "font-size", "font-weight", "text-anchor",
     "id", "class", "xmlns", "version", "preserveAspectRatio",
+})
+
+# Elements that are dangerous and must cause rejection
+DANGEROUS_TAGS = frozenset({
+    "script", "foreignObject", "iframe", "embed", "object", "handler",
+    "animate", "animateTransform", "animateMotion", "set",
+    "a", "use",
 })
 
 
@@ -94,15 +101,77 @@ def _is_safe_url_value(value: str) -> bool:
     return True
 
 
+def _check_dangerous(element: ET.Element, filename: str) -> list[ThemeIssue]:
+    """Check for dangerous elements and attributes.
+
+    Returns a list of ThemeIssue objects for each danger found. If the list is
+    non-empty, the caller should raise ThemeRejected(issues).
+
+    Dangerous items include:
+    - Elements: script, foreignObject, iframe, embed, object, handler,
+                animate, animateTransform, animateMotion, set, a, use
+    - Attributes: on* (event handlers), href, xlink:href
+    - Attribute values: off-origin url() references
+    """
+    issues: list[ThemeIssue] = []
+
+    def check_element(el: ET.Element) -> None:
+        tag_name = _local(el.tag)
+
+        # Check if element itself is dangerous
+        if tag_name in DANGEROUS_TAGS:
+            issues.append(ThemeIssue(
+                file=filename, code="svg_script",
+                message=f"element <{tag_name}> is not allowed in themes",
+            ))
+            return  # Don't check children of dangerous elements
+
+        # Check attributes for dangerous names and values
+        for attr_name, attr_value in el.attrib.items():
+            local_name = _local(attr_name)
+
+            # Check for event handlers (on*)
+            if local_name.startswith("on"):
+                issues.append(ThemeIssue(
+                    file=filename, code="svg_event_handler",
+                    message=f"attribute {local_name} is an event handler and not allowed",
+                ))
+                continue
+
+            # Check for href/xlink:href (both local name and prefixed forms)
+            if local_name in ("href", "xlink:href") or attr_name.endswith("}href"):
+                issues.append(ThemeIssue(
+                    file=filename, code="svg_external_reference",
+                    message=f"attribute {local_name if local_name != attr_name else attr_name} references external content and is not allowed",
+                ))
+                continue
+
+            # Check for off-origin url() in allowed attributes
+            if local_name in ALLOWED_ATTRS and not _is_safe_url_value(attr_value):
+                issues.append(ThemeIssue(
+                    file=filename, code="svg_external_reference",
+                    message=f"attribute {local_name} contains an off-origin url() reference and is not allowed",
+                ))
+                continue
+
+        # Recursively check children
+        for child in el:
+            check_element(child)
+
+    check_element(element)
+    return issues
+
+
 def _clean(element: ET.Element) -> None:
+    """Silently remove non-allowed elements and attributes.
+
+    This runs only after _check_dangerous has verified there are no dangerous items.
+    Non-allowed but harmless items (metadata, editor namespaces, unknown attributes)
+    are removed without reporting.
+    """
     for name in list(element.attrib):
         if _local(name) not in ALLOWED_ATTRS:
             del element.attrib[name]
-        else:
-            # Check attribute value for unsafe url() references (case-insensitive)
-            value = element.attrib[name]
-            if not _is_safe_url_value(value):
-                del element.attrib[name]
 
     for child in list(element):
         if _local(child.tag) not in ALLOWED_TAGS:
@@ -112,6 +181,20 @@ def _clean(element: ET.Element) -> None:
 
 
 def sanitize_svg(data: bytes, filename: str) -> bytes:
+    """Sanitize SVG by rejecting dangerous elements/attributes and removing harmless unknowns.
+
+    Raises ThemeRejected if the SVG contains:
+    - Script or interactive elements (script, foreignObject, iframe, embed, etc.)
+    - Animation elements that can retarget attributes (animate, animateTransform, etc.)
+    - Reference elements (a, use)
+    - Event handler attributes (on*)
+    - href/xlink:href attributes
+    - Off-origin url() references in attribute values
+
+    All other non-allowed elements and attributes are silently stripped.
+
+    Returns the re-serialised SVG as bytes.
+    """
     try:
         root = defused_fromstring(data)
     except DefusedXmlException as exc:
@@ -129,6 +212,12 @@ def sanitize_svg(data: bytes, filename: str) -> bytes:
             file=filename, code="not_svg", message="root element must be <svg>",
         )])
 
+    # Check for dangerous elements and attributes
+    issues = _check_dangerous(root, filename)
+    if issues:
+        raise ThemeRejected(issues)
+
+    # Safe to proceed: silently strip non-allowed elements and attributes
     _clean(root)
     ET.register_namespace("", SVG_NS)
     return ET.tostring(root, encoding="utf-8")
