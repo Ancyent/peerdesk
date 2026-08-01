@@ -11,24 +11,24 @@ def codes(source: str) -> set[str]:
 
 
 def test_accepts_custom_properties_on_root():
-    out = filter_css(":root { --accent: #22c5b0; --radius: 12px; }", "css/tokens.css")
+    out = filter_css(":root { --accent: #22c5b0; --radius: 12px; }", "css/tokens.css").css
     assert "--accent" in out
     assert "#22c5b0" in out
 
 
 def test_accepts_the_light_theme_block():
-    out = filter_css(":root[data-theme='light'] { --accent: #0d8b7d; }", "css/tokens.css")
+    out = filter_css(":root[data-theme='light'] { --accent: #0d8b7d; }", "css/tokens.css").css
     assert "--accent" in out
 
 
 def test_accepts_a_published_selector_with_allowed_properties():
-    out = filter_css("[data-pd-btn] { border-radius: 2px; text-transform: uppercase; }", "css/web.css")
+    out = filter_css("[data-pd-btn] { border-radius: 2px; text-transform: uppercase; }", "css/web.css").css
     assert "border-radius" in out
 
 
 def test_accepts_layout_properties_on_a_published_selector():
     # Deliberately generous: a bigger, squarer button is a legitimate request.
-    out = filter_css("[data-pd-btn] { width: 200px; height: 48px; margin: 4px; display: flex; }", "css/web.css")
+    out = filter_css("[data-pd-btn] { width: 200px; height: 48px; margin: 4px; display: flex; }", "css/web.css").css
     for prop in ("width", "height", "margin", "display"):
         assert prop in out
 
@@ -83,7 +83,7 @@ def test_rejects_a_data_url_because_it_bypasses_the_asset_checks():
 
 
 def test_accepts_a_relative_url_pointing_into_the_archive():
-    out = filter_css('[data-pd-btn] { background-image: url("images/tile.png"); }', "css/web.css")
+    out = filter_css('[data-pd-btn] { background-image: url("images/tile.png"); }', "css/web.css").css
     assert "images/tile.png" in out
 
 
@@ -125,7 +125,7 @@ def test_rejects_a_media_query_wrapping_an_unpublished_selector():
 
 
 def test_accepts_a_media_query_wrapping_a_published_selector():
-    out = filter_css("@media (min-width: 600px) { [data-pd-btn] { width: 100px; } }", "css/web.css")
+    out = filter_css("@media (min-width: 600px) { [data-pd-btn] { width: 100px; } }", "css/web.css").css
     assert "min-width" in out
 
 
@@ -174,7 +174,7 @@ def test_rejects_bad_url_tokens():
 
 
 def test_accepts_unquoted_relative_url():
-    out = filter_css('[data-pd-btn] { background-image: url(images/tile.png); }', "css/web.css")
+    out = filter_css('[data-pd-btn] { background-image: url(images/tile.png); }', "css/web.css").css
     assert "images/tile.png" in out
 
 
@@ -200,7 +200,7 @@ def test_rejects_url_buried_three_functions_deep():
 
 def test_accepts_url_buried_three_functions_deep_with_relative_path():
     # Same structure but with relative path should be accepted
-    out = filter_css('[data-pd-btn] { background-image: foo(bar(baz(url(images/a.png)))); }', "css/web.css")
+    out = filter_css('[data-pd-btn] { background-image: foo(bar(baz(url(images/a.png)))); }', "css/web.css").css
     assert "images/a.png" in out
 
 
@@ -211,11 +211,228 @@ def test_rejects_mixed_relative_and_external_urls_in_functions():
 
 def test_accepts_calc_without_url():
     # Functions without URLs should pass through unchanged
-    out = filter_css('[data-pd-btn] { width: calc(100% - 10px); }', "css/web.css")
+    out = filter_css('[data-pd-btn] { width: calc(100% - 10px); }', "css/web.css").css
     assert "calc" in out and "100%" in out
 
 
 def test_accepts_linear_gradient_without_url():
     # Complex function without URLs should pass through
-    out = filter_css('[data-pd-btn] { background: linear-gradient(to right, red, blue); }', "css/web.css")
+    out = filter_css('[data-pd-btn] { background: linear-gradient(to right, red, blue); }', "css/web.css").css
     assert "linear-gradient" in out and "red" in out
+
+
+# --- C1: the token channel is an allowlist, not an open door ----------------
+
+
+def test_accepts_a_token_the_app_actually_reads():
+    # The whole point of a theme. --text-1: transparent is a terrible theme and
+    # still a legitimate one; the format does not police taste.
+    out = filter_css(":root { --text-1: transparent; }", "css/tokens.css").css
+    assert "--text-1" in out
+
+
+def test_rejects_a_token_the_app_does_not_read():
+    with pytest.raises(ThemeRejected) as e:
+        filter_css(":root { --not-a-real-token: red; }", "css/tokens.css")
+    issue = next(i for i in e.value.issues if i.code == "token_not_settable")
+    # Unknown and reserved are different author mistakes and must read
+    # differently: one is a typo, the other is a refusal.
+    assert "not a token this app reads" in issue.message
+
+
+def test_rejects_a_reserved_token_and_says_it_is_reserved():
+    with pytest.raises(ThemeRejected) as e:
+        filter_css(":root { --pd-sys-text: red; }", "css/tokens.css")
+    issue = next(i for i in e.value.issues if i.code == "token_not_settable")
+    assert "reserved" in issue.message
+
+
+def test_a_theme_cannot_blank_the_confirm_dialog_through_reserved_tokens():
+    """The archive that motivated the token allowlist, one rule at a time.
+
+    Every token the confirm dialog now reads must be refused. Before this, all
+    of them were accepted on :root and the dialog rendered transparent on
+    transparent without a single selector naming it.
+    """
+    for token in (
+        "--pd-sys-text-1", "--pd-sys-text-2", "--pd-sys-accent",
+        "--pd-sys-danger", "--pd-sys-border", "--pd-sys-surface-bg",
+        "--pd-sys-surface-border", "--pd-sys-surface-shadow", "--pd-sys-overlay",
+    ):
+        with pytest.raises(ThemeRejected) as e:
+            filter_css(f":root {{ {token}: transparent; }}", "css/tokens.css")
+        assert any(i.code == "token_not_settable" for i in e.value.issues), token
+
+
+def test_a_reserved_token_is_refused_outside_a_token_block_too():
+    assert "token_outside_root" in codes("[data-pd-btn] { --pd-sys-accent: red; }")
+
+
+# --- I8: selectors are parsed, not string-compared --------------------------
+
+
+def test_accepts_an_ordinary_selector_group():
+    out = filter_css("[data-pd-btn],[data-pd-input]{ color: red; }", "css/web.css").css
+    assert "data-pd-btn" in out and "data-pd-input" in out
+
+
+def test_accepts_a_state_pseudo_class_on_a_published_selector():
+    for state in (":hover", ":focus-visible", ":active", ":disabled"):
+        out = filter_css(f"[data-pd-btn]{state}{{ opacity: 0.5; }}", "css/web.css").css
+        assert state in out
+
+
+def test_accepts_the_light_token_block_however_it_is_spelled():
+    for spelling in (
+        ":root[data-theme=light]",
+        ":root[data-theme='light']",
+        ':root[data-theme="light"]',
+        ":root[data-theme = 'light']",
+    ):
+        out = filter_css(f"{spelling}{{ --accent: #0d8b7d; }}", "css/tokens.css").css
+        assert "--accent" in out, spelling
+
+
+def test_rejects_a_state_that_is_not_a_state():
+    # A plain pseudo-class the grammar can read, but not one of the four.
+    assert "state_not_allowed" in codes("[data-pd-btn]:visited { color: red; }")
+    assert "state_not_allowed" in codes("[data-pd-btn]:root { color: red; }")
+
+
+def test_rejects_a_functional_pseudo_class_outright():
+    # :nth-child(2) selects by position rather than by published hook, so it
+    # falls outside the grammar entirely rather than being a disallowed state.
+    assert "selector_not_published" in codes("[data-pd-btn]:nth-child(2) { color: red; }")
+    assert "selector_not_published" in codes("[data-pd-btn]:not([disabled]) { color: red; }")
+
+
+def test_rejects_a_state_on_a_token_block():
+    assert "state_not_allowed" in codes(":root:hover { --accent: red; }")
+
+
+def test_rejects_a_descendant_selector_under_a_published_hook():
+    # A theme may style the button, not everything inside every button.
+    assert "selector_not_published" in codes("[data-pd-btn] span { color: red; }")
+
+
+def test_rejects_a_group_where_only_one_member_is_published():
+    assert "selector_not_published" in codes("[data-pd-btn],.sidebar { color: red; }")
+
+
+def test_rejects_an_attribute_value_prefix_match():
+    # The exfiltration selector: input[value^='a'] leaks typed characters one
+    # request at a time. Only = is a match operator this grammar describes.
+    assert "selector_not_published" in codes("[data-pd-input^='a'] { color: red; }")
+
+
+def test_rejects_a_group_mixing_a_token_block_with_a_component():
+    assert "selector_group_mixed" in codes(":root,[data-pd-btn] { --accent: red; }")
+
+
+def test_rejects_a_pseudo_element():
+    assert "selector_not_published" in codes("[data-pd-btn]::before { content: 'x'; }")
+
+
+# --- I4: @font-face is a declaration block ----------------------------------
+
+
+def test_accepts_a_font_face_referencing_a_shipped_font():
+    result = filter_css(
+        "@font-face{ font-family:'Inter'; src:url(../fonts/inter.woff2) format('woff2');"
+        " font-weight:400; font-style:normal; font-display:swap; }",
+        "css/web.css",
+    )
+    assert "font-family" in result.css
+    assert result.urls == frozenset({"fonts/inter.woff2"})
+
+
+def test_rejects_a_font_face_loading_from_another_host():
+    assert "external_url" in codes(
+        "@font-face{ font-family:'X'; src:url(https://attacker.invalid/x.woff2); }"
+    )
+
+
+def test_rejects_a_property_that_does_not_belong_in_font_face():
+    assert "property_not_allowed" in codes(
+        "@font-face{ font-family:'X'; behavior:url(x.htc); }"
+    )
+
+
+def test_rejects_an_at_rule_that_is_not_media_supports_or_font_face():
+    issues_codes = codes("@keyframes spin { from { opacity: 0; } }")
+    assert "at_rule_not_allowed" in issues_codes
+
+
+def test_rejects_an_unknown_at_rule_by_name():
+    with pytest.raises(ThemeRejected) as e:
+        filter_css("@page { margin: 0; }", "css/web.css")
+    issue = next(i for i in e.value.issues if i.code == "at_rule_not_allowed")
+    assert "@page" in issue.message
+
+
+# --- I2: url() must resolve inside the archive ------------------------------
+
+
+def test_rejects_a_traversing_url():
+    for hostile in (
+        "url(../../../../etc/passwd)",
+        'url("../../other-account/theme/css/tokens.css")',
+        "url(../../../x.png)",
+    ):
+        assert "external_url" in codes(f"[data-pd-btn]{{ background-image: {hostile} }}"), hostile
+
+
+def test_rejects_a_traversing_url_in_a_token_value():
+    assert "external_url" in codes(":root{ --page-image: url(../../../x.png) }")
+
+
+def test_rejects_percent_encoded_traversal():
+    # The browser decodes this before fetching, so the check has to refuse the
+    # encoded form too. It does, because % is not a legal entry-name character.
+    assert "external_url" in codes("[data-pd-btn]{ background-image: url(%2e%2e/%2e%2e/x.png) }")
+
+
+def test_a_url_resolves_relative_to_the_stylesheet_that_holds_it():
+    # Exactly what the browser will do once the theme is served from
+    # /themes/<account>/<theme>/css/, so what validates is what renders.
+    result = filter_css("[data-pd-btn]{ background-image: url(tile.png) }", "css/web.css")
+    assert result.urls == frozenset({"css/tile.png"})
+
+    result = filter_css("[data-pd-btn]{ background-image: url(../images/tile.png) }", "css/web.css")
+    assert result.urls == frozenset({"images/tile.png"})
+
+
+def test_the_accepted_urls_are_reported_to_the_caller():
+    result = filter_css(
+        "[data-pd-btn]{ background-image: url(../images/a.png) }\n"
+        "[data-pd-input]{ background-image: image-set(url(../images/b.png) 1x) }\n",
+        "css/web.css",
+    )
+    assert result.urls == frozenset({"images/a.png", "images/b.png"})
+
+
+def test_a_url_with_a_query_or_fragment_is_refused():
+    # Neither names a file in the archive, and both would be served as-is.
+    assert "external_url" in codes("[data-pd-btn]{ background-image: url(../images/a.png?v=2) }")
+    assert "external_url" in codes("[data-pd-btn]{ background-image: url(../images/a.png#x) }")
+
+
+def test_whitespace_inside_a_quoted_url_is_not_mistaken_for_a_path():
+    result = filter_css('[data-pd-btn]{ background-image: url( "../images/a.png" ) }', "css/web.css")
+    assert result.urls == frozenset({"images/a.png"})
+
+
+# --- I6: issue collection is bounded ----------------------------------------
+
+
+def test_issue_collection_stops_at_the_cap_and_says_so(monkeypatch):
+    from themes import limits
+    monkeypatch.setattr(limits, "MAX_ISSUES", 5)
+
+    source = "\n".join(f".sel{i} {{ color: red; }}" for i in range(500))
+    with pytest.raises(ThemeRejected) as e:
+        filter_css(source, "css/web.css")
+
+    assert len(e.value.issues) == 6  # the cap, plus the note that it was hit
+    assert e.value.issues[-1].code == "issues_truncated"
+    assert "more problems were found" in e.value.issues[-1].message

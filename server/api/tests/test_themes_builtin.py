@@ -36,20 +36,56 @@ def _tokens(css: str, block: str) -> dict[str, str]:
     }
 
 
+def is_desktop_recipe_token(name: str) -> bool:
+    """Whether a token is part of the surface recipe desktop overrides.
+
+    Desktop deliberately replaces the whole recipe (--surface-* and --chrome-*)
+    pending a WebKitGTK probe confirming backdrop-filter composites in the Tauri
+    window. Until then desktop renders opaque, so those values are expected to
+    differ while every other token must match exactly.
+
+    A function rather than an inline condition so the rule itself can be
+    tested. Inlined, converting it back to a hard-coded name list — the exact
+    regression its own test names — changed nothing that any test could see.
+    """
+    return name.startswith("--surface-") or name.startswith("--chrome-")
+
+
+def _settable(tokens: dict[str, str]) -> dict[str, str]:
+    """Drop the reserved tokens, which a theme package deliberately lacks.
+
+    --pd-sys-* exists in the app stylesheets and must never exist in a theme:
+    the validator rejects any package that declares one. So they are expected
+    to be present on one side of the comparison only.
+    """
+    return {k: v for k, v in tokens.items() if not k.startswith("--pd-sys-")}
+
+
 def test_builtin_tokens_match_the_web_stylesheet():
     """The built-in theme and web/src/branding.css must not drift.
 
     They are separate files because the API image cannot see web/. This test
     runs in the repo, never in the image, and is the only thing keeping them
     honest.
+
+    Compared as sets in both directions. One-directional comparison let
+    branding.css grow a token the built-in theme lacked, which is drift that
+    matters twice over now: SETTABLE_TOKENS is derived from the built-in theme,
+    so a token only branding.css knows about is one no theme may set.
     """
     builtin = (BUILTIN_DIR / "css" / "tokens.css").read_text()
     web = (REPO_ROOT / "web" / "src" / "branding.css").read_text()
 
     for block in (":root", ":root[data-theme='light']"):
-        theirs = _tokens(web, block)
-        for name, value in _tokens(builtin, block).items():
-            assert name in theirs, f"{name} missing from branding.css {block}"
+        theirs = _settable(_tokens(web, block))
+        ours = _tokens(builtin, block)
+
+        assert set(ours) == set(theirs), (
+            f"{block} token sets differ: only in the built-in theme "
+            f"{sorted(set(ours) - set(theirs))}, only in branding.css "
+            f"{sorted(set(theirs) - set(ours))}"
+        )
+        for name, value in ours.items():
             assert theirs[name] == value, (
                 f"{name} differs in {block}: builtin {value!r} vs branding.css {theirs[name]!r}"
             )
@@ -59,47 +95,86 @@ def test_builtin_tokens_match_the_desktop_stylesheet():
     builtin = (BUILTIN_DIR / "css" / "tokens.css").read_text()
     desktop = (REPO_ROOT / "desktop" / "src" / "styles.css").read_text()
 
-    theirs = _tokens(desktop, ":root")
-    for name, value in _tokens(builtin, ":root").items():
-        # Desktop deliberately overrides the entire surface recipe (--surface-* and
-        # --chrome-* tokens) pending a WebKitGTK probe confirming backdrop-filter
-        # composites in the Tauri window. Until then, desktop renders opaque,
-        # so these recipe tokens are expected to differ. All other tokens must
-        # match exactly. If a non-recipe token differs, that is genuine drift.
-        if name.startswith("--surface-") or name.startswith("--chrome-"):
+    theirs = _settable(_tokens(desktop, ":root"))
+    ours = _tokens(builtin, ":root")
+
+    assert set(ours) == set(theirs), (
+        f"token sets differ: only in the built-in theme {sorted(set(ours) - set(theirs))}, "
+        f"only in desktop/src/styles.css {sorted(set(theirs) - set(ours))}"
+    )
+    for name, value in ours.items():
+        if is_desktop_recipe_token(name):
             continue
-        assert name in theirs, f"{name} missing from desktop/src/styles.css"
         assert theirs[name] == value, (
             f"{name} differs: builtin {value!r} vs desktop {theirs[name]!r}"
         )
 
 
-def test_desktop_skip_rule_is_prefix_based():
-    """Verify that the skip rule is based on prefixes, not a name enumeration.
+def test_the_desktop_skip_rule_is_a_prefix_rule():
+    """The skip rule itself, exercised as the implementation it is.
 
-    This prevents someone converting it back to a hard-coded list later.
-    A token named --surface-anything should be skipped, while --accent-anything
-    should not be.
+    The previous version of this test re-derived the rule locally, so
+    converting the real skip to a hard-coded name list — the regression its own
+    docstring named — left it green.
     """
-    builtin = (BUILTIN_DIR / "css" / "tokens.css").read_text()
-    desktop = (REPO_ROOT / "desktop" / "src" / "styles.css").read_text()
+    assert is_desktop_recipe_token("--surface-bg")
+    assert is_desktop_recipe_token("--chrome-blur")
+    # The point of a prefix: a token nobody has written yet is covered too.
+    assert is_desktop_recipe_token("--surface-anything-at-all")
+    assert is_desktop_recipe_token("--chrome-anything-at-all")
 
-    theirs = _tokens(desktop, ":root")
-    builtin_tokens = _tokens(builtin, ":root")
+    assert not is_desktop_recipe_token("--accent")
+    assert not is_desktop_recipe_token("--accent-hover")
+    assert not is_desktop_recipe_token("--text-1")
 
-    # Check that a surface token exists and would be skipped
-    surface_tokens = [name for name in builtin_tokens if name.startswith("--surface-")]
-    chrome_tokens = [name for name in builtin_tokens if name.startswith("--chrome-")]
-    assert len(surface_tokens) > 0, "Expected at least one --surface-* token"
-    assert len(chrome_tokens) > 0, "Expected at least one --chrome-* token"
 
-    # Check that non-recipe tokens are NOT skipped and ARE compared
-    non_recipe_tokens = [
-        name for name in builtin_tokens
-        if not (name.startswith("--surface-") or name.startswith("--chrome-"))
-    ]
-    assert len(non_recipe_tokens) > 0, "Expected at least one non-recipe token"
-    for name in non_recipe_tokens:
-        assert name in theirs, f"Non-recipe token {name} missing from desktop"
-        # We don't assert they match here (that's the main test's job), just that
-        # the skip rule correctly excludes the recipe and includes everything else
+def test_the_skip_rule_covers_tokens_that_exist_and_spares_the_rest():
+    builtin_tokens = _tokens((BUILTIN_DIR / "css" / "tokens.css").read_text(), ":root")
+    skipped = [n for n in builtin_tokens if is_desktop_recipe_token(n)]
+    compared = [n for n in builtin_tokens if not is_desktop_recipe_token(n)]
+    # Neither side may be empty, or the rule would be doing no work in one
+    # direction and the comparison above would be vacuous in the other.
+    assert len(skipped) >= 4
+    assert len(compared) >= 10
+
+
+def test_the_app_stylesheets_declare_the_reserved_tokens_in_both_themes():
+    """Security-critical UI must still follow light and dark.
+
+    The reserved tokens stop following the *theme*, not the appearance, which
+    only holds if both blocks of both stylesheets declare the same set.
+    """
+    for path in (
+        REPO_ROOT / "web" / "src" / "branding.css",
+        REPO_ROOT / "desktop" / "src" / "styles.css",
+    ):
+        source = path.read_text()
+        dark = {k for k in _tokens(source, ":root") if k.startswith("--pd-sys-")}
+        light = {k for k in _tokens(source, ":root[data-theme='light']") if k.startswith("--pd-sys-")}
+        assert dark, f"{path.name} declares no reserved tokens"
+        assert dark == light, (
+            f"{path.name} reserved tokens differ between themes: "
+            f"dark only {sorted(dark - light)}, light only {sorted(light - dark)}"
+        )
+
+
+def test_no_reserved_token_is_defined_in_terms_of_a_settable_one():
+    """A var() reference would hand the whole guarantee back.
+
+    --pd-sys-text-1: var(--text-1) looks tidy and means a theme setting
+    --text-1 blanks the confirm dialog through the indirection, which is the
+    finding this reserved set exists to close.
+    """
+    for path in (
+        REPO_ROOT / "web" / "src" / "branding.css",
+        REPO_ROOT / "desktop" / "src" / "styles.css",
+    ):
+        source = path.read_text()
+        for block in (":root", ":root[data-theme='light']"):
+            for name, value in _tokens(source, block).items():
+                if not name.startswith("--pd-sys-"):
+                    continue
+                assert "var(" not in value, (
+                    f"{path.name} {block} {name} is defined as {value!r}; "
+                    f"a reserved token must hold a literal value"
+                )

