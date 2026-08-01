@@ -54,6 +54,21 @@ def _checksum(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _parse_manifest_safe(manifest_data: bytes) -> tuple[Manifest | None, ThemeIssue | None]:
+    """Parse manifest, converting any exception to a ThemeIssue.
+
+    Returns (manifest, issue). If manifest is not None, the parse succeeded and issue is None.
+    If manifest is None, issue describes why the parse failed.
+    """
+    try:
+        return parse_manifest(manifest_data), None
+    except Exception:
+        return None, ThemeIssue(
+            file=MANIFEST_NAME, code="bad_manifest",
+            message="theme.json could not be parsed as valid JSON",
+        )
+
+
 def validate_archive(path: Path) -> ValidatedTheme:
     entries = inspect(path)
     names = {e.name for e in entries}
@@ -64,60 +79,104 @@ def validate_archive(path: Path) -> ValidatedTheme:
             message="theme.json must be present at the archive root",
         )])
 
-    with zipfile.ZipFile(path) as zf:
-        manifest_data, read_issue = _read_entry(zf, MANIFEST_NAME)
-        if manifest_data is None:
-            raise ThemeRejected([read_issue])
+    try:
+        with zipfile.ZipFile(path) as zf:
+            manifest_data, read_issue = _read_entry(zf, MANIFEST_NAME)
+            if manifest_data is None:
+                raise ThemeRejected([read_issue])
 
-        manifest = parse_manifest(manifest_data)
+            manifest, parse_issue = _parse_manifest_safe(manifest_data)
+            if manifest is None:
+                raise ThemeRejected([parse_issue])
 
-        # Reject if the manifest references itself (prevents bypassing validation).
-        referenced = manifest.referenced_paths()
-        if MANIFEST_NAME in referenced:
-            raise ThemeRejected([ThemeIssue(
-                file=MANIFEST_NAME, code="bad_manifest",
-                message="theme.json cannot be referenced as an asset",
-            )])
+            # Reject if the manifest references itself (prevents bypassing validation).
+            referenced = manifest.referenced_paths()
+            if MANIFEST_NAME in referenced:
+                raise ThemeRejected([ThemeIssue(
+                    file=MANIFEST_NAME, code="bad_manifest",
+                    message="theme.json cannot be referenced as an asset",
+                )])
 
-        preview_paths = {p.src for p in manifest.preview}
-        expected = {MANIFEST_NAME} | referenced
-        expected |= {name for name in CSS_FILES if name in names}
-        expected |= {n for n in names if n.startswith("fonts/")}
+            preview_paths = {p.src for p in manifest.preview}
+            expected = {MANIFEST_NAME} | referenced
+            expected |= {name for name in CSS_FILES if name in names}
+            expected |= {n for n in names if n.startswith("fonts/")}
 
-        issues: list[ThemeIssue] = []
-        files: dict[str, bytes] = {MANIFEST_NAME: manifest_data}
+            issues: list[ThemeIssue] = []
+            files: dict[str, bytes] = {MANIFEST_NAME: manifest_data}
 
-        for name in sorted(expected - {MANIFEST_NAME}):
-            if name not in names:
-                issues.append(ThemeIssue(
-                    file=name, code="missing_asset",
-                    message="referenced by theme.json but not present in the archive",
-                ))
-                continue
-
-            data, read_issue = _read_entry(zf, name)
-            if data is None:
-                issues.append(read_issue)
-                continue
-
-            if name in CSS_FILES:
-                try:
-                    files[name] = filter_css(data.decode("utf-8"), name).encode("utf-8")
-                except ThemeRejected as rejected:
-                    issues.extend(rejected.issues)
-                except UnicodeDecodeError:
+            for name in sorted(expected - {MANIFEST_NAME}):
+                if name not in names:
                     issues.append(ThemeIssue(
-                        file=name, code="bad_css", message="stylesheet must be UTF-8",
+                        file=name, code="missing_asset",
+                        message="referenced by theme.json but not present in the archive",
                     ))
-                except RecursionError:
-                    issues.append(ThemeIssue(
-                        file=name, code="bad_css",
-                        message="stylesheet is too deeply nested or complex to parse",
-                    ))
-                continue
+                    continue
 
-            # Previews must be raster; check before probing so we reject SVG and WOFF2 early.
-            if name in preview_paths:
+                data, read_issue = _read_entry(zf, name)
+                if data is None:
+                    issues.append(read_issue)
+                    continue
+
+                if name in CSS_FILES:
+                    try:
+                        files[name] = filter_css(data.decode("utf-8"), name).encode("utf-8")
+                    except ThemeRejected as rejected:
+                        issues.extend(rejected.issues)
+                    except UnicodeDecodeError:
+                        issues.append(ThemeIssue(
+                            file=name, code="bad_css", message="stylesheet must be UTF-8",
+                        ))
+                    except RecursionError:
+                        issues.append(ThemeIssue(
+                            file=name, code="bad_css",
+                            message="stylesheet is too deeply nested or complex to parse",
+                        ))
+                    continue
+
+                # Previews must be raster; check before probing so we reject SVG and WOFF2 early.
+                if name in preview_paths:
+                    try:
+                        info = probe(data)
+                    except RecursionError:
+                        issues.append(ThemeIssue(
+                            file=name, code="bad_asset",
+                            message="asset is too complex to analyze",
+                        ))
+                        continue
+
+                    if info is None:
+                        issues.append(ThemeIssue(
+                            file=name, code="bad_asset_type",
+                            message="not a PNG, JPEG, WebP, SVG or WOFF2 by content",
+                        ))
+                        continue
+
+                    if info.kind not in RASTER_KINDS:
+                        issues.append(ThemeIssue(
+                            file=name, code="bad_asset_type",
+                            message=f"previews must be PNG, JPEG or WebP, not {info.kind}",
+                        ))
+                        continue
+
+                    if len(data) > limits.MAX_PREVIEW_BYTES:
+                        issues.append(ThemeIssue(
+                            file=name, code="preview_too_large",
+                            message=f"{len(data)} bytes; at most {limits.MAX_PREVIEW_BYTES} allowed",
+                        ))
+                        continue
+
+                    if max(info.width, info.height) > limits.MAX_PREVIEW_EDGE_PX:
+                        issues.append(ThemeIssue(
+                            file=name, code="preview_too_large",
+                            message=f"{info.width}x{info.height}; long edge must be at most {limits.MAX_PREVIEW_EDGE_PX}px",
+                        ))
+                        continue
+
+                    files[name] = data
+                    continue
+
+                # Non-preview assets: probe, sanitize SVG if needed, and add.
                 try:
                     info = probe(data)
                 except RecursionError:
@@ -134,67 +193,36 @@ def validate_archive(path: Path) -> ValidatedTheme:
                     ))
                     continue
 
-                if info.kind not in RASTER_KINDS:
-                    issues.append(ThemeIssue(
-                        file=name, code="bad_asset_type",
-                        message=f"previews must be PNG, JPEG or WebP, not {info.kind}",
-                    ))
-                    continue
-
-                if len(data) > limits.MAX_PREVIEW_BYTES:
-                    issues.append(ThemeIssue(
-                        file=name, code="preview_too_large",
-                        message=f"{len(data)} bytes; at most {limits.MAX_PREVIEW_BYTES} allowed",
-                    ))
-                    continue
-
-                if max(info.width, info.height) > limits.MAX_PREVIEW_EDGE_PX:
-                    issues.append(ThemeIssue(
-                        file=name, code="preview_too_large",
-                        message=f"{info.width}x{info.height}; long edge must be at most {limits.MAX_PREVIEW_EDGE_PX}px",
-                    ))
+                if info.kind == "svg":
+                    try:
+                        files[name] = sanitize_svg(data, name)
+                    except ThemeRejected as rejected:
+                        issues.extend(rejected.issues)
+                    except RecursionError:
+                        issues.append(ThemeIssue(
+                            file=name, code="bad_asset",
+                            message="SVG is too complex to sanitize",
+                        ))
                     continue
 
                 files[name] = data
-                continue
 
-            # Non-preview assets: probe, sanitize SVG if needed, and add.
-            try:
-                info = probe(data)
-            except RecursionError:
-                issues.append(ThemeIssue(
-                    file=name, code="bad_asset",
-                    message="asset is too complex to analyze",
-                ))
-                continue
+            if issues:
+                raise ThemeRejected(issues)
 
-            if info is None:
-                issues.append(ThemeIssue(
-                    file=name, code="bad_asset_type",
-                    message="not a PNG, JPEG, WebP, SVG or WOFF2 by content",
-                ))
-                continue
-
-            if info.kind == "svg":
-                try:
-                    files[name] = sanitize_svg(data, name)
-                except ThemeRejected as rejected:
-                    issues.extend(rejected.issues)
-                except RecursionError:
-                    issues.append(ThemeIssue(
-                        file=name, code="bad_asset",
-                        message="SVG is too complex to sanitize",
-                    ))
-                continue
-
-            files[name] = data
-
-    if issues:
-        raise ThemeRejected(issues)
-
-    return ValidatedTheme(
-        manifest=manifest,
-        files=files,
-        ignored=sorted(names - set(files)),
-        checksum=_checksum(path),
-    )
+            return ValidatedTheme(
+                manifest=manifest,
+                files=files,
+                ignored=sorted(names - set(files)),
+                checksum=_checksum(path),
+            )
+    except ThemeRejected:
+        # Re-raise genuine validation findings without modification.
+        raise
+    except Exception as e:
+        # Catch any other exception and convert to ThemeRejected.
+        # This is the outer net that ensures NO exception escapes.
+        raise ThemeRejected([ThemeIssue(
+            file="", code="validator_error",
+            message=f"validation failed with {type(e).__name__}: {str(e)[:100]}",
+        )])

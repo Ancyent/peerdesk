@@ -206,27 +206,19 @@ def test_read_errors_dont_hide_other_issues(tmp_path, monkeypatch):
     assert "missing_asset" in codes
 
 
-def test_deeply_nested_css_is_rejected_not_recursion_error(tmp_path, monkeypatch):
-    """Deeply nested CSS (or other parser pathologies) trigger RecursionError.
+def test_deeply_nested_css_is_rejected_not_recursion_error(tmp_path):
+    """Real deeply nested CSS (500+ levels) triggers RecursionError in the parser.
 
     The validator must catch it and convert to ThemeRejected, not let it escape.
     """
-    from themes import validate
-
-    # Mock filter_css to raise RecursionError, simulating what happens with
-    # deeply nested calc() (2000+ levels) or similar CSS parser pathology.
-    original_filter_css = validate.filter_css
-
-    def filter_css_that_recurses(source, filename):
-        if "deep" in source:
-            raise RecursionError("parser depth limit exceeded")
-        return original_filter_css(source, filename)
-
-    monkeypatch.setattr(validate, "filter_css", filter_css_that_recurses)
+    # Build a CSS function nesting that triggers RecursionError in tinycss2.
+    # 500 levels of calc() exceeds the parser's stack depth without hitting
+    # the archive expansion_ratio check (which happens around 1000 levels).
+    nested = "calc(" * 500 + "1" + ")" * 500
+    css = f":root {{ --deep: {nested}; }}"
 
     with pytest.raises(ThemeRejected) as e:
-        # Use a marker in the CSS that will trigger the mock to raise.
-        validate_archive(build(tmp_path, {"css/tokens.css": ":root { --deep: calc(1); }"}))
+        validate_archive(build(tmp_path, {"css/tokens.css": css}))
 
     # The RecursionError must be caught and converted to a ThemeIssue.
     assert any(i.code == "bad_css" for i in e.value.issues)
@@ -254,13 +246,15 @@ def test_deeply_nested_svg_is_rejected_not_recursion_error(tmp_path):
 
 
 def test_deeply_nested_image_metadata_is_rejected_not_recursion_error(tmp_path, monkeypatch):
-    """Deeply nested image metadata (e.g., in PNG chunks) can trigger RecursionError.
+    """Deeply nested image metadata (hypothetically) can trigger RecursionError.
 
     The validator must catch it during probe and convert to ThemeRejected.
+    Note: imageprobe is iterative and bounded by design, so no genuine recursion
+    path exists; this test verifies the guard works if one did.
     """
     from themes import validate
 
-    # Mock the probe function to raise RecursionError for a test image.
+    # Mock the probe function to simulate RecursionError on complex metadata.
     def raise_recursion_on_complex_image(data):
         # Raise only for images we explicitly mark as complex (larger than typical).
         # The manifest (JSON) is small, so it won't hit this.
@@ -279,3 +273,89 @@ def test_deeply_nested_image_metadata_is_rejected_not_recursion_error(tmp_path, 
         validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/complex.png": test_image}, manifest))
 
     assert any(i.code == "bad_asset" for i in e.value.issues)
+
+
+def test_deeply_nested_json_manifest_triggers_recursion_error(tmp_path):
+    """Deeply nested JSON (10,000+ array levels) in theme.json triggers RecursionError.
+
+    The parse_manifest guard must catch and convert to ThemeRejected.
+    """
+    # Build a manifest with ~10,000 levels of nested arrays.
+    # Store uncompressed so expansion_ratio check doesn't catch it first.
+    nested_json = "[" * 10000 + '{"schema": 1}' + "]" * 10000
+    path = tmp_path / "theme.zip"
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as z:
+        z.writestr("theme.json", nested_json)
+        z.writestr("css/tokens.css", ":root{}")
+
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(path)
+
+    # Must be caught and reported as bad_manifest, not propagate RecursionError.
+    assert any(i.code == "bad_manifest" for i in e.value.issues)
+    # Ensure we're not swallowing genuine ThemeRejected as validator_error.
+    assert not any(i.code == "validator_error" for i in e.value.issues)
+
+
+def test_deeply_nested_json_manifest_with_smaller_depth_also_rejected(tmp_path):
+    """Deeply nested JSON is rejected regardless of depth.
+
+    Test with a smaller depth to ensure the guard works across different sizes.
+    """
+    # Build a manifest with ~2,000 levels of nested arrays.
+    nested_json = "[" * 2000 + '{"schema": 1}' + "]" * 2000
+    path = tmp_path / "theme.zip"
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as z:
+        z.writestr("theme.json", nested_json)
+        z.writestr("css/tokens.css", ":root{}")
+
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(path)
+
+    # Must be caught as bad_manifest.
+    assert any(i.code == "bad_manifest" for i in e.value.issues)
+
+
+def test_validator_outer_net_catches_unexpected_exception(tmp_path, monkeypatch):
+    """The outer net catches ANY exception and converts to ThemeRejected.
+
+    This ensures no exception from any module escapes validate_archive.
+    """
+    from themes import validate
+
+    # Mock one of the called modules to raise an unusual exception.
+    original_probe = validate.probe
+
+    def probe_that_fails(*args, **kwargs):
+        raise MemoryError("simulated memory failure")
+
+    monkeypatch.setattr(validate, "probe", probe_that_fails)
+
+    # Reference an asset so probe gets called.
+    manifest = {**MANIFEST, "logo": "images/test.svg"}
+    svg_data = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/test.svg": svg_data}, manifest))
+
+    # The outer net should catch it with validator_error code.
+    codes = {i.code for i in e.value.issues}
+    assert "validator_error" in codes
+    # Verify the exception type is mentioned in the message.
+    error_issue = next(i for i in e.value.issues if i.code == "validator_error")
+    assert "MemoryError" in error_issue.message
+
+
+def test_genuine_theme_rejected_is_not_swallowed_by_outer_net(tmp_path):
+    """Genuine ThemeRejected raised deep inside is re-raised unchanged.
+
+    The outer net must not convert real findings to validator_error.
+    """
+    # Create a valid archive with a CSS property violation.
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/web.css": "[data-pd-btn] { position: fixed; }"}))
+
+    # Should have the real issue, not validator_error.
+    codes = {i.code for i in e.value.issues}
+    assert "refused_property" in codes
+    assert "validator_error" not in codes
