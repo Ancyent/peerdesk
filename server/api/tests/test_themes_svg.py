@@ -310,3 +310,77 @@ def test_rejects_xlink_href_attribute():
             FILE
         )
     assert any(i.code == "svg_external_reference" for i in e.value.issues)
+    # Verify message mentions xlink:href, not just href
+    assert any("xlink:href" in i.message for i in e.value.issues)
+
+
+# Tests for case-sensitivity bypass fixes (Critical fix round 5)
+def test_rejects_uppercase_script_element():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><SCRIPT>attack()</SCRIPT></svg>'.encode(), FILE)
+    assert any(i.code == "svg_script" for i in e.value.issues)
+
+
+def test_rejects_mixed_case_script_element():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><Script>attack()</Script></svg>'.encode(), FILE)
+    assert any(i.code == "svg_script" for i in e.value.issues)
+
+
+def test_rejects_uppercase_foreignobject_element():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><FOREIGNOBJECT/></svg>'.encode(), FILE)
+    assert any(i.code == "svg_script" for i in e.value.issues)
+
+
+def test_rejects_mixed_case_use_element():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><Use href="https://attacker.invalid/x"/></svg>'.encode(), FILE)
+    assert any(i.code == "svg_script" for i in e.value.issues)
+
+
+def test_rejects_uppercase_a_element():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><A href="javascript:alert(1)"><path d="M0 0"/></A></svg>'.encode(), FILE)
+    assert any(i.code == "svg_script" for i in e.value.issues)
+
+
+def test_rejects_uppercase_onload_event_handler():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><path d="M0 0" ONLOAD="alert(1)"/></svg>'.encode(), FILE)
+    assert any(i.code == "svg_event_handler" for i in e.value.issues)
+
+
+def test_rejects_mixed_case_onclick_event_handler():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><path d="M0 0" OnClick="alert(1)"/></svg>'.encode(), FILE)
+    assert any(i.code == "svg_event_handler" for i in e.value.issues)
+
+
+def test_rejects_mixed_case_onload_event_handler():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><path d="M0 0" onLOAD="alert(1)"/></svg>'.encode(), FILE)
+    assert any(i.code == "svg_event_handler" for i in e.value.issues)
+
+
+def test_rejects_uppercase_href_attribute():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><path d="M0 0" HREF="https://attacker.invalid/x"/></svg>'.encode(), FILE)
+    assert any(i.code == "svg_external_reference" for i in e.value.issues)
+
+
+def test_case_insensitive_rejection_preserves_original_spelling():
+    """Verify that error messages preserve the original spelling of dangerous elements/attributes."""
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><SCRIPT>attack()</SCRIPT></svg>'.encode(), FILE)
+    # The message should mention SCRIPT (as written) not script (normalized)
+    message = next(i.message for i in e.value.issues if i.code == "svg_script")
+    assert "SCRIPT" in message
+
+
+def test_case_insensitive_event_handler_preserves_original_spelling():
+    """Verify that error messages preserve the original spelling of event handlers."""
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(f'<svg {NS}><path d="M0 0" ONLOAD="alert(1)"/></svg>'.encode(), FILE)
+    message = next(i.message for i in e.value.issues if i.code == "svg_event_handler")
+    assert "ONLOAD" in message

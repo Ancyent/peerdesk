@@ -34,10 +34,10 @@ ALLOWED_ATTRS = frozenset({
     "id", "class", "xmlns", "version", "preserveAspectRatio",
 })
 
-# Elements that are dangerous and must cause rejection
+            # Elements that are dangerous and must cause rejection (stored lowercase for case-insensitive matching)
 DANGEROUS_TAGS = frozenset({
-    "script", "foreignObject", "iframe", "embed", "object", "handler",
-    "animate", "animateTransform", "animateMotion", "set",
+    "script", "foreignobject", "iframe", "embed", "object", "handler",
+    "animate", "animatetransform", "animatemotion", "set",
     "a", "use",
 })
 
@@ -118,8 +118,8 @@ def _check_dangerous(element: ET.Element, filename: str) -> list[ThemeIssue]:
     def check_element(el: ET.Element) -> None:
         tag_name = _local(el.tag)
 
-        # Check if element itself is dangerous
-        if tag_name in DANGEROUS_TAGS:
+        # Check if element itself is dangerous (case-insensitive)
+        if tag_name.lower() in DANGEROUS_TAGS:
             issues.append(ThemeIssue(
                 file=filename, code="svg_script",
                 message=f"element <{tag_name}> is not allowed in themes",
@@ -130,19 +130,25 @@ def _check_dangerous(element: ET.Element, filename: str) -> list[ThemeIssue]:
         for attr_name, attr_value in el.attrib.items():
             local_name = _local(attr_name)
 
-            # Check for event handlers (on*)
-            if local_name.startswith("on"):
+            # Check for event handlers (on*) case-insensitively
+            if local_name.lower().startswith("on"):
                 issues.append(ThemeIssue(
                     file=filename, code="svg_event_handler",
                     message=f"attribute {local_name} is an event handler and not allowed",
                 ))
                 continue
 
-            # Check for href/xlink:href (both local name and prefixed forms)
-            if local_name in ("href", "xlink:href") or attr_name.endswith("}href"):
+            # Check for href/xlink:href (both local name and prefixed forms) case-insensitively
+            if local_name.lower() in ("href", "xlink:href") or attr_name.lower().endswith("}href"):
+                # Construct display name for the message, preserving original spelling
+                if attr_name.lower().endswith("}href"):
+                    # Namespaced href (likely xlink:href)
+                    display_name = "xlink:href" if "xlink" in attr_name.lower() else attr_name
+                else:
+                    display_name = attr_name if ":" in attr_name else local_name
                 issues.append(ThemeIssue(
                     file=filename, code="svg_external_reference",
-                    message=f"attribute {local_name if local_name != attr_name else attr_name} references external content and is not allowed",
+                    message=f"attribute {display_name} references external content and is not allowed",
                 ))
                 continue
 
