@@ -1,6 +1,16 @@
 {
   "title": "Settings",
-  "language": { "title": "Language", "label": "Interface language" },
+  "theme": {
+    "title": "Appearance",
+    "label": "Theme",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "language": {
+    "title": "Language",
+    "label": "Interface language"
+  },
   "profile": {
     "title": "Profile",
     "name": "Name",

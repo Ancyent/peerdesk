@@ -94,7 +94,7 @@ export function BrandingPage({ onBack }: Props) {
   };
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 600, margin: '0 auto', padding: '24px 16px', background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 600, margin: '0 auto', padding: '24px 16px', minHeight: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28, paddingBottom: 16, borderBottom: '1px solid var(--border-dim)' }}>
         <button onClick={onBack} title={t('branding:back')} aria-label={t('branding:back')}
@@ -201,7 +201,7 @@ export function BrandingPage({ onBack }: Props) {
             onClick={handleSave}
             disabled={saving}
             style={{
-              flex: 1, padding: '10px 0', background: 'var(--accent)', color: '#fff',
+              flex: 1, padding: '10px 0', background: 'var(--accent)', color: 'var(--accent-ink)',
               border: 'none', borderRadius: 6, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer',
               fontWeight: 500, opacity: saving ? 0.7 : 1,
             }}

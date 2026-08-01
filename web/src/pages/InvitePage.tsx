@@ -22,7 +22,7 @@ const cardStyle = {
 };
 
 const buttonStyle = (busy: boolean) => ({
-  padding: 10, fontSize: 15, borderRadius: 6, background: 'var(--accent)', color: '#fff',
+  padding: 10, fontSize: 15, borderRadius: 6, background: 'var(--accent)', color: 'var(--accent-ink)',
   border: 'none', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1,
 });
 
@@ -66,7 +66,7 @@ export function InvitePage({ token }: Props) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', gap: 16, fontFamily: 'sans-serif', background: 'var(--bg-base)', padding: 16,
+      minHeight: '100vh', gap: 16, fontFamily: 'sans-serif', padding: 16,
     }}>
       {logo_data_url
         ? <img src={logo_data_url} alt={brand_name} style={{ height: 48, objectFit: 'contain', maxWidth: 200 }} />

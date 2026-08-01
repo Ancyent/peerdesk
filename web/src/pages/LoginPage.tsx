@@ -33,7 +33,7 @@ export function LoginPage({ onGoRegister }: Props) {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:16, fontFamily:'sans-serif', background:'var(--bg-base)' }}>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:16, fontFamily:'sans-serif' }}>
       {/* A white-labelled deployment keeps its own logo, or its own name as
           text. The PeerDesk wordmark is only for un-branded deployments —
           putting it above someone else's product name would be wrong. */}
@@ -55,7 +55,7 @@ export function LoginPage({ onGoRegister }: Props) {
           {t('auth:login.rememberMe')}
         </label>
         <button type="submit" disabled={loading}
-          style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+          style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color: 'var(--accent-ink)', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? t('auth:login.submitting') : t('auth:login.submit')}
         </button>
       </form>

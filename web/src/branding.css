@@ -1,36 +1,209 @@
-/* PeerDesk — design tokens + global keyframes */
+/* PeerDesk — design tokens + global keyframes.
+ *
+ * Two themes, keyed on an attribute rather than a media query, because the user
+ * can override the OS preference from Settings. shared/ui/theme.ts writes the
+ * attribute; an inline script in index.html sets it before first paint so the
+ * page never renders in the wrong theme and snaps.
+ *
+ * Token NAMES are unchanged from the previous single-theme set. That is
+ * deliberate: the 23 files already reading var(--...) keep working untouched,
+ * because this is a change of values, not of identifiers. */
 
 html, body, #root {
   margin: 0;
   padding: 0;
-  background: #182030;
   min-height: 100vh;
 }
 
+/* Only html and body carry the base colour. #root deliberately does not: it
+   sits above the aurora layer below, and an opaque fill there would hide it. */
+html, body {
+  /* Was hardcoded #182030, which duplicated --bg-base and would have kept the
+     page dark in the light theme. */
+  background: var(--bg-base);
+}
+
+/* The aurora wash. Static gradients, so this costs nothing to composite - but
+   it is what gives backdrop-filter something to refract. Over a flat base,
+   glass is indistinguishable from a plain opaque panel. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--page-image);
+}
+
+/* The other half of the recipe, and easy to miss: body::before is positioned,
+   so without this it paints ABOVE #root's in-flow content rather than behind
+   it. The page still looked roughly right that way - the gradients are subtle
+   enough to read as a backdrop either way, and a pixel diff put the difference
+   at 0.2% - but the glass in the main region was not refracting anything, only
+   being tinted from on top. The sidebar was already correct, being
+   position: relative, which is how the two ended up behaving differently on
+   the same screen. */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- dark (default) ---------------------------------------------------- */
 :root {
-  --bg-base:    #182030;
-  --bg-surface: #1f2a3c;
-  --bg-sidebar: #111824;
-  --bg-hover:   #253045;
-  --bg-active:  #223050;
+  color-scheme: dark;
 
-  --border:     rgba(0, 200, 150, 0.20);
-  --border-dim: rgba(0, 200, 150, 0.09);
+  --bg-base:    #0b111c;
+  --bg-surface: #172131;
+  --bg-sidebar: #080d16;
+  --bg-hover:   #24334a;
+  --bg-active:  #2b3d59;
+  --bg-raised:  #1e2a3d;
 
-  --text-1: #ffffff;
-  --text-2: #bccadb;
-  --text-3: #93a1b5;
+  --border:     rgba(34, 197, 176, 0.24);
+  --border-dim: rgba(148, 176, 200, 0.14);
 
-  --accent:       #00c896;
-  --accent-2:     #00a8ff;
-  --accent-hover: #00daa8;
+  --text-1: #f2f6fa;
+  --text-2: #b9c7d8;
+  --text-3: #8595aa;
 
-  --green:      #00e5a0;
-  --green-bg:   rgba(0, 229, 160, 0.10);
-  --green-glow: rgba(0, 229, 160, 0.25);
+  /* Splits the difference between the old web teal #00c896 and the desktop
+     cyan #26c6da, so both apps can land on one accent. */
+  --accent:       #22c5b0;
+  --accent-2:     #3ba7f0;
+  --accent-hover: #3ad9c4;
+
+  /* Text drawn ON a filled accent or danger button. The app hardcoded '#fff'
+     in 27 places; white on this teal is roughly 2:1 and fails. It has to be a
+     token because it flips with the theme - and useBranding.ts recomputes it
+     from luminance when a white-label accent is applied. */
+  --accent-ink: #04201d;
+  --danger-ink: #2a0b0d;
+
+  --green:      #34d8a4;
+  --green-bg:   rgba(52, 216, 164, 0.14);
+  --green-glow: rgba(52, 216, 164, 0.28);
   --red:        #f87171;
-  --red-bg:     rgba(248, 113, 113, 0.10);
+  --red-bg:     rgba(248, 113, 113, 0.14);
   --yellow:     #fbbf24;
+
+  --radius: 12px;
+
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(34, 197, 176, 0.30), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%,  rgba(59, 167, 240, 0.27), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(126, 87, 224, 0.25), transparent 65%);
+
+  /* The surface recipe as tokens, so a panel can move between glass and solid
+     without touching a component. Desktop ships the same set with --surface-blur
+     set to none until the WebKitGTK probe says otherwise. */
+  --surface-bg:     rgb(255 255 255 / 0.07);
+  --surface-border: 1px solid rgb(255 255 255 / 0.13);
+  --surface-blur:   blur(14px) saturate(160%);
+  --surface-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.15), 0 10px 30px -8px rgb(0 0 0 / 0.5);
+  --chrome-bg:      rgb(255 255 255 / 0.04);
+  --chrome-blur:    blur(18px) saturate(150%);
+
+  /* --- reserved: security-critical UI ---------------------------------- *
+   * The confirm dialog, the modal shell and the session-approval prompt
+   * render through these and nothing else. An uploaded theme may not declare
+   * a --pd-sys-* token — the validator rejects the whole package if it tries
+   * (RESERVED_TOKEN_PREFIX in server/api/themes/surface.py) — so no theme can
+   * blank the buttons on a prompt the user has to read to stay safe.
+   *
+   * The values are written out rather than referred to with var(--token).
+   * A var() reference to a settable token would hand the whole guarantee
+   * straight back: setting --text-1 would blank the dialog through the
+   * indirection. Duplication here is the point.
+   *
+   * They still follow light and dark, because they are declared in both
+   * blocks. They stop following the *theme*, not the appearance. */
+  --pd-sys-surface-bg:     rgb(255 255 255 / 0.07);
+  --pd-sys-surface-border: 1px solid rgb(255 255 255 / 0.13);
+  --pd-sys-surface-blur:   blur(14px) saturate(160%);
+  --pd-sys-surface-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.15), 0 10px 30px -8px rgb(0 0 0 / 0.5);
+  --pd-sys-radius:      12px;
+  --pd-sys-overlay:     rgba(5, 8, 13, 0.72);
+  --pd-sys-border:      rgba(34, 197, 176, 0.24);
+  --pd-sys-border-dim:  rgba(148, 176, 200, 0.14);
+  --pd-sys-text-1:      #f2f6fa;
+  --pd-sys-text-2:      #b9c7d8;
+  --pd-sys-text-3:      #8595aa;
+  --pd-sys-accent:      #22c5b0;
+  --pd-sys-accent-bg:   rgba(34, 197, 176, 0.14);
+  --pd-sys-accent-ink:  #04201d;
+  --pd-sys-danger:      #f87171;
+  --pd-sys-danger-ink:  #2a0b0d;
+}
+
+/* --- light -------------------------------------------------------------- */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-base:    #eef2f7;
+  --bg-surface: #ffffff;
+  --bg-sidebar: #e7ecf3;
+  --bg-hover:   #e2e8f0;
+  --bg-active:  #d3dce8;
+  --bg-raised:  #ffffff;
+
+  --border:     rgba(13, 139, 125, 0.30);
+  --border-dim: rgba(15, 30, 50, 0.13);
+
+  --text-1: #0d1420;
+  --text-2: #3d4b5c;
+  --text-3: #64748b;
+
+  /* Darker than the dark-theme accent so white ink clears 4.5:1 on the filled
+     button. Same hue, so the brand does not shift between themes. */
+  --accent:       #0d8b7d;
+  --accent-2:     #1f6feb;
+  --accent-hover: #0b7568;
+
+  --accent-ink: #ffffff;
+  --danger-ink: #ffffff;
+
+  --green:      #0f9d63;
+  --green-bg:   rgba(15, 157, 99, 0.12);
+  --green-glow: rgba(15, 157, 99, 0.22);
+  --red:        #d64550;
+  --red-bg:     rgba(214, 69, 80, 0.12);
+  --yellow:     #b45309;
+
+  --radius: 12px;
+
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(13, 139, 125, 0.22), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%,  rgba(31, 111, 235, 0.20), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(150, 110, 220, 0.18), transparent 65%);
+
+  /* Light glass is a different trick: a heavy white wash, a DARK outline, and a
+     real drop shadow. A white edge on a white panel over a pale backdrop is
+     invisible - blur cannot do the separating work here the way it does on dark.
+     The inset highlight stays white; it is a specular effect, not an edge. */
+  --surface-bg:     rgb(255 255 255 / 0.62);
+  --surface-border: 1px solid rgb(15 30 50 / 0.12);
+  --surface-blur:   blur(16px) saturate(180%);
+  --surface-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.7), 0 10px 30px -10px rgb(15 30 50 / 0.18);
+  --chrome-bg:      rgb(255 255 255 / 0.6);
+  --chrome-blur:    blur(18px) saturate(150%);
+
+  /* Reserved: see the dark block above for why these are literals. */
+  --pd-sys-surface-bg:     rgb(255 255 255 / 0.62);
+  --pd-sys-surface-border: 1px solid rgb(15 30 50 / 0.12);
+  --pd-sys-surface-blur:   blur(16px) saturate(180%);
+  --pd-sys-surface-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.7), 0 10px 30px -10px rgb(15 30 50 / 0.18);
+  --pd-sys-radius:      12px;
+  --pd-sys-overlay:     rgba(15, 30, 50, 0.45);
+  --pd-sys-border:      rgba(13, 139, 125, 0.30);
+  --pd-sys-border-dim:  rgba(15, 30, 50, 0.13);
+  --pd-sys-text-1:      #0d1420;
+  --pd-sys-text-2:      #3d4b5c;
+  --pd-sys-text-3:      #64748b;
+  --pd-sys-accent:      #0d8b7d;
+  --pd-sys-accent-bg:   rgba(13, 139, 125, 0.12);
+  --pd-sys-accent-ink:  #ffffff;
+  --pd-sys-danger:      #d64550;
+  --pd-sys-danger-ink:  #ffffff;
 }
 
 @keyframes pulse-dot {
@@ -48,15 +221,26 @@ html, body, #root {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Dark scrollbar global */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+  }
+  @keyframes slide-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}
+
+/* Scrollbars, on tokens rather than the literals that duplicated them. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #253045 transparent;
+  scrollbar-color: var(--bg-hover) transparent;
 }
 *::-webkit-scrollbar { width: 5px; height: 5px; }
 *::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: #253045; border-radius: 3px; }
-*::-webkit-scrollbar-thumb:hover { background: #2e3d55; }
+*::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--bg-active); }
 
 /* Focus ring consistent */
 *:focus-visible {

@@ -33,7 +33,7 @@ export function RegisterPage({ onGoLogin }: Props) {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:16, fontFamily:'sans-serif', background:'var(--bg-base)' }}>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:16, fontFamily:'sans-serif' }}>
       {logo_data_url
         ? <img src={logo_data_url} alt={brand_name} style={{ height: 48, objectFit: 'contain', maxWidth: 200 }} />
         : <h1 style={{ margin:0, color:'var(--text-1)' }}>{brand_name}</h1>
@@ -48,7 +48,7 @@ export function RegisterPage({ onGoLogin }: Props) {
         <input type="password" placeholder={t('auth:fields.passwordMin')} value={password} onChange={e => setPassword(e.target.value)}
           style={{ padding:'10px 12px', fontSize:15, borderRadius:6, border:'1px solid var(--border-dim)', background:'var(--bg-surface)', color:'var(--text-1)' }} minLength={8} required />
         <button type="submit" disabled={loading}
-          style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color:'#fff', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+          style={{ padding:10, fontSize:15, borderRadius:6, background:'var(--accent)', color: 'var(--accent-ink)', border:'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? t('auth:register.submitting') : t('auth:register.submit')}
         </button>
       </form>

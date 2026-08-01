@@ -1,6 +1,16 @@
 {
   "title": "Setări",
-  "language": { "title": "Limbă", "label": "Limba interfeței" },
+  "theme": {
+    "title": "Aspect",
+    "label": "Temă",
+    "system": "Sistem",
+    "light": "Luminoasă",
+    "dark": "Întunecată"
+  },
+  "language": {
+    "title": "Limbă",
+    "label": "Limba interfeței"
+  },
   "profile": {
     "title": "Profil",
     "name": "Nume",

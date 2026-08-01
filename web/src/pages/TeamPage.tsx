@@ -130,7 +130,7 @@ export function TeamPage() {
   const inviteLink = newInvite ? `${window.location.origin}/invite/${newInvite.token}` : '';
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 760, background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', maxWidth: 760, minHeight: '100%' }}>
       <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('team:title')}</h2>
       <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
         {t('team:subtitle')}
@@ -183,7 +183,7 @@ export function TeamPage() {
               onFocus={e => e.currentTarget.select()}
               style={{ flex: 1, padding: '6px 10px', background: 'rgba(0,229,160,0.15)', border: 'none', borderRadius: 4, fontSize: 12, fontFamily: 'monospace', color: 'var(--text-1)' }}
             />
-            <button onClick={() => handleCopy(inviteLink)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+            <button onClick={() => handleCopy(inviteLink)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
               {copied ? t('team:invite.copied') : t('team:invite.copy')}
             </button>
             <button onClick={() => setNewInvite(null)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--bg-hover)', color: 'var(--text-2)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>

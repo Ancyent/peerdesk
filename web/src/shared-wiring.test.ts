@@ -4,6 +4,6 @@ import { SHARED_UI_VERSION } from '@pd/ui';
 
 describe('shared/ui wiring', () => {
   it('resolves the @pd/ui alias from the web app', () => {
-    expect(SHARED_UI_VERSION).toBe(1);
+    expect(SHARED_UI_VERSION).toBe(2);
   });
 });

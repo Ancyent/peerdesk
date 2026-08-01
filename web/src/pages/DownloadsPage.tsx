@@ -91,7 +91,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
   );
 
   return (
-    <div style={{ padding: '24px', maxWidth: 760, background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div style={{ padding: '24px', maxWidth: 760, minHeight: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('downloads:page.title')}</h2>
         {release && (
@@ -116,7 +116,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <TreePicker value={placement} onChange={setPlacement} disabled={!accessToken} />
               <button onClick={generate} disabled={generating || !accessToken}
-                style={{ padding: '8px 18px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: accessToken ? 'pointer' : 'not-allowed', opacity: accessToken ? 1 : 0.5 }}>
+                style={{ padding: '8px 18px', background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: accessToken ? 'pointer' : 'not-allowed', opacity: accessToken ? 1 : 0.5 }}>
                 {generating ? t('downloads:page.generating') : t('downloads:page.generateToken')}
               </button>
             </div>

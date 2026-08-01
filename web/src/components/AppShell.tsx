@@ -91,7 +91,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif', background: 'var(--bg-base)' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, sans-serif' }}>
       {/* Sidebar wrapper — overflow:visible so toggle isn't clipped */}
       <div style={{ width: collapsed ? 64 : 220, flexShrink: 0, position: 'relative', transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)' }}>
         {/* Toggle button outside overflow:hidden */}
@@ -106,9 +106,10 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
         {/* Inner sidebar with overflow:hidden to clip labels */}
         <div style={{
           width: '100%', height: '100%',
-          background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border-dim)',
+          background: 'var(--chrome-bg)', backdropFilter: 'var(--chrome-blur)', WebkitBackdropFilter: 'var(--chrome-blur)',
+          borderRight: '1px solid var(--border-dim)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          boxShadow: '4px 0 24px rgba(0,0,0,0.2)',
+          boxShadow: '4px 0 24px rgb(0 0 0 / 0.2)',
         }}>
 
         {/* Logo */}
@@ -117,7 +118,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
             width: 34, height: 34, flexShrink: 0, borderRadius: 10,
             background: ownMark ? 'none' : 'linear-gradient(135deg, var(--accent), var(--accent-2))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, boxShadow: ownMark ? 'none' : '0 0 22px rgba(0,200,150,0.45)',
+            fontSize: 16, boxShadow: ownMark ? 'none' : '0 0 22px var(--green-glow)',
           }}>
             {/* Same rule as the login screen: our mark only stands in for an
                 un-branded deployment, never above someone else's name. */}
@@ -129,7 +130,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
           </div>
           <span style={{
             fontSize: 16, fontWeight: 700, letterSpacing: -0.3, whiteSpace: 'nowrap',
-            background: 'linear-gradient(90deg, #67e8c8, #7dd3fc)',
+            background: 'linear-gradient(90deg, var(--accent), var(--accent-2))',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             opacity: collapsed ? 0 : 1,
             transform: collapsed ? 'translateX(-12px)' : 'translateX(0)',
@@ -163,8 +164,8 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
                 width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
                 background: 'linear-gradient(135deg, var(--accent), var(--accent-2))',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: 13, color: '#111',
-                boxShadow: '0 0 12px rgba(0,200,150,0.4)',
+                fontWeight: 700, fontSize: 13, color: 'var(--accent-ink)',
+                boxShadow: '0 0 12px var(--green-glow)',
               }}>{user?.name?.[0]?.toUpperCase() ?? 'U'}</div>
               <div style={{ opacity: collapsed ? 0 : 1, transform: collapsed ? 'translateX(-8px)' : 'translateX(0)', transition: 'opacity 0.2s, transform 0.3s' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>{user?.name}</div>
@@ -175,7 +176,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
               <div style={{
                 position: 'absolute', bottom: 44, left: collapsed ? 48 : 12,
                 background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                borderRadius: 10, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                borderRadius: 10, minWidth: 160, boxShadow: 'var(--surface-shadow)',
                 zIndex: 100, animation: 'slide-in 0.15s ease',
               }}>
                 <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-dim)' }}>
@@ -199,7 +200,7 @@ export function AppShell({ page, onNavigate, contextPanel, children }: Props) {
       )}
 
       {/* Main */}
-      <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg-base)' }}>
+      <div style={{ flex: 1, overflow: 'auto' }}>
         {children}
       </div>
     </div>

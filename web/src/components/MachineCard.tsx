@@ -1,7 +1,29 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { Button, styleOnce, surfaceStyle } from '@pd/ui';
 import type { MachineOut } from '../api/client';
 import { pathFor, isPlainLeftClick } from '../routing/paths';
+
+/* Hover moved out of onMouseEnter/onMouseLeave handlers and into a real :hover
+ * rule. The imperative version wrote inline styles and then cleared them to '',
+ * which meant hover state could survive a re-render, and it had to repeat the
+ * colour logic in two places. */
+const CSS = `
+[data-pd-machine] {
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 180ms ease-out, border-color 180ms ease-out;
+}
+[data-pd-machine]:hover { transform: translateY(-3px); border-color: var(--border); }
+[data-pd-machine][data-offline='1'] { opacity: 0.55; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-pd-machine] { transition: border-color 180ms ease-out; }
+  [data-pd-machine]:hover { transform: none; }
+  [data-pd-scan] { animation: none; }
+}
+`;
 
 interface Props {
   machine: MachineOut;
@@ -10,11 +32,11 @@ interface Props {
   onForget?: (machine: MachineOut) => void;
 }
 
-function getOsConfig(os: string | null): { icon: string; bg: string } {
+function getOsIcon(os: string | null): string {
   const s = os?.toLowerCase() ?? '';
-  if (s.includes('windows')) return { icon: '🪟', bg: 'linear-gradient(135deg,#1a2540,#1e2d4a)' };
-  if (s.includes('mac'))     return { icon: '🍎', bg: 'linear-gradient(135deg,#1a2030,#202838)' };
-  return { icon: '🐧', bg: 'linear-gradient(135deg,#182538,#1c2e42)' };
+  if (s.includes('windows')) return '🪟';
+  if (s.includes('mac')) return '🍎';
+  return '🐧';
 }
 
 function formatLastSeen(ts: string | null, t: TFunction): string {
@@ -29,24 +51,31 @@ function formatLastSeen(ts: string | null, t: TFunction): string {
 
 export function MachineCard({ machine: m, onConnect, onDelete, onForget }: Props) {
   const { t } = useTranslation('machines');
-  const { icon, bg } = getOsConfig(m.os);
+  styleOnce('pd-machine-card', CSS);
+
+  const icon = getOsIcon(m.os);
   const online = m.is_online;
   const saved = m.has_saved_password;
 
   return (
-    <div
-      style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', opacity: online ? 1 : 0.55, transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1), border-color 0.25s, box-shadow 0.25s' }}
-      onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.transform = 'translateY(-3px)'; el.style.borderColor = online ? 'rgba(0,200,150,0.35)' : 'rgba(0,168,255,0.25)'; el.style.boxShadow = '0 12px 32px rgba(0,200,150,0.10)'; }}
-      onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.transform = ''; el.style.borderColor = ''; el.style.boxShadow = ''; }}
-    >
-      {/* Thumbnail */}
-      <div style={{ height: 110, background: bg, position: 'relative', overflow: 'hidden' }}>
+    <div data-pd-machine data-offline={online ? undefined : '1'} style={surfaceStyle('card')}>
+      {/* Thumbnail. The gradient was three hardcoded navy pairs, one per OS,
+          which stayed dark in the light theme; it reads off tokens now. */}
+      <div style={{ height: 110, position: 'relative', overflow: 'hidden', background: 'var(--bg-raised)' }}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 46, opacity: 0.15 }}>{icon}</div>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 30%, var(--bg-surface) 100%)' }} />
         {online && (
-          <div style={{ position: 'absolute', left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(0,200,150,0.5), transparent)', animation: 'scan-line 4s linear infinite' }} />
+          <div data-pd-scan style={{ position: 'absolute', left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, var(--accent), transparent)', animation: 'scan-line 4s linear infinite' }} />
         )}
-        <div style={{ position: 'absolute', top: 10, left: 12, background: 'rgba(17,24,36,0.8)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '3px 10px', fontSize: 10, fontWeight: 600, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{
+          position: 'absolute', top: 10, left: 12, borderRadius: 20, padding: '3px 10px',
+          fontSize: 10, fontWeight: 600, color: 'var(--text-2)',
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: 'var(--chrome-bg)',
+          border: '1px solid var(--border-dim)',
+          // Both spellings: WebKitGTK only ships the prefixed one.
+          backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+        }}>
           <div style={{ width: 5, height: 5, borderRadius: '50%', background: online ? 'var(--green)' : 'var(--text-3)', boxShadow: online ? '0 0 5px var(--green)' : 'none', animation: online ? 'pulse-dot 2s infinite' : 'none' }} />
           {online ? t('machines:card.online') : t('machines:card.offline')}
         </div>
@@ -75,14 +104,23 @@ export function MachineCard({ machine: m, onConnect, onDelete, onForget }: Props
           {m.os ?? t('machines:card.defaultOs')}{!online && m.last_seen_at ? ` · ${t('machines:card.offlineSince', { time: formatLastSeen(m.last_seen_at, t) })}` : online ? ` · ${t('machines:card.lastActivityNow')}` : ''}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button disabled={!online} onClick={() => online && onConnect(m)} style={{ flex: 1, padding: '8px 0', background: online ? 'linear-gradient(135deg, var(--accent), var(--accent-2))' : 'var(--bg-hover)', border: 'none', borderRadius: 8, color: online ? 'var(--text-1)' : 'var(--text-3)', fontSize: 12, fontWeight: 700, cursor: online ? 'pointer' : 'default', boxShadow: online ? '0 2px 12px rgba(0,200,150,0.38)' : 'none', transition: 'all 0.2s' }}>
+          <Button
+            variant="primary"
+            disabled={!online}
+            onClick={() => online && onConnect(m)}
+            style={{ flex: 1, fontSize: 12, padding: '8px 0' }}
+          >
             {online ? (saved ? t('machines:card.connectSaved') : t('machines:card.connect')) : t('machines:card.offline')}
-          </button>
+          </Button>
           {saved && onForget && (
-            <button onClick={() => onForget(m)} title={t('machines:card.forgetPassword')} aria-label={t('machines:card.forgetPassword')} style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>🔑✕</button>
+            <Button variant="secondary" onClick={() => onForget(m)}
+                    title={t('machines:card.forgetPassword')} aria-label={t('machines:card.forgetPassword')}
+                    style={{ fontSize: 12, padding: '8px 12px' }}>🔑✕</Button>
           )}
           {onDelete && (
-            <button onClick={() => onDelete(m.id)} title={t('machines:card.deleteMachine')} aria-label={t('machines:card.deleteMachine')} style={{ padding: '8px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: 8, color: 'var(--text-2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.18s' }}>···</button>
+            <Button variant="secondary" onClick={() => onDelete(m.id)}
+                    title={t('machines:card.deleteMachine')} aria-label={t('machines:card.deleteMachine')}
+                    style={{ fontSize: 12, padding: '8px 12px' }}>···</Button>
           )}
         </div>
       </div>

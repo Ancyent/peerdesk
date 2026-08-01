@@ -24,7 +24,9 @@ export function QualitySelector({ onChange }: { onChange: (q: QualitySettings) =
     fontSize: 12,
     fontWeight: active ? 600 : 400,
     background: active ? 'rgba(38,198,218,0.15)' : 'transparent',
-    color: active ? '#26c6da' : '#c9d3e0',
+    // Was #26c6da / #c9d3e0 - the desktop palette, copied into the web app
+    // along with this file. Both apps read one accent now.
+    color: active ? 'var(--accent)' : 'var(--text-2)',
     border: `1px solid ${active ? 'rgba(38,198,218,0.4)' : 'transparent'}`,
     width: '100%',
     whiteSpace: 'nowrap',

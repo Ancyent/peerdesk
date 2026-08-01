@@ -122,7 +122,7 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
   };
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 700, background: 'var(--bg-base)', minHeight: '100%' }}>
+    <div style={{ padding: '20px 24px', maxWidth: 700, minHeight: '100%' }}>
       <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{t('apikeys:title')}</h2>
       <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
         {t('apikeys:subtitle')}
@@ -160,7 +160,7 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
             <code style={{ flex: 1, padding: '6px 10px', background: 'rgba(0,229,160,0.15)', borderRadius: 4, fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-1)' }}>
               {newKey}
             </code>
-            <button onClick={() => handleCopy('new', newKey)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+            <button onClick={() => handleCopy('new', newKey)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
               {copiedId === 'new' ? t('apikeys:copied') : t('apikeys:copy')}
             </button>
             <button onClick={() => setNewKey(null)} style={{ padding: '6px 12px', fontSize: 12, background: 'var(--bg-hover)', color: 'var(--text-2)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
@@ -219,7 +219,7 @@ export function ApiKeysPage({ onNavigateToMachines }: Props) {
               </div>
             </div>
             {revealedKeys[k.id] ? (
-              <button onClick={() => handleCopy(k.id, revealedKeys[k.id])} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+              <button onClick={() => handleCopy(k.id, revealedKeys[k.id])} style={{ padding: '5px 10px', fontSize: 12, background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                 {copiedId === k.id ? t('apikeys:copied') : t('apikeys:copy')}
               </button>
             ) : (
