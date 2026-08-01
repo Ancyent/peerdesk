@@ -25,24 +25,57 @@ class ArchiveEntry:
 
 
 def is_safe_entry_name(name: str) -> bool:
-    # Empty name is not safe
-    if not name:
+    r"""Affirm that a ZIP entry name is safe to extract.
+
+    A name is safe if and only if ALL of these hold:
+    - non-empty and no longer than MAX_ENTRY_NAME_LENGTH bytes
+    - does not begin with / (absolute path)
+    - splits on / into at least one component
+    - each component is non-empty, not . or .., at most 255 bytes, and contains
+      only characters with code >= 0x20 (no control chars) and != 0x7F (DEL),
+      and does not contain \, :, or NUL
+    """
+    # Non-empty and length-bounded at the whole-name level
+    if not name or len(name) > limits.MAX_ENTRY_NAME_LENGTH:
         return False
-    # Absolute paths are not safe
+
+    # Absolute paths are rejected
     if name.startswith("/"):
         return False
-    # Backslashes (Windows-style separators) are not safe
-    if "\\" in name:
-        return False
-    # NUL bytes are not safe and can cause issues at file I/O
-    if "\x00" in name:
-        return False
-    # Split by forward slashes and check each part
+
+    # Split into components
     parts = name.split("/")
-    # "." and "" catch "./x" and doubled separators, which some tools emit and
-    # which normalise differently across platforms.
-    # ".." catches path traversal attempts.
-    return not any(p in ("..", ".", "") for p in parts)
+
+    # Must have at least one component (would be empty if name is just "/")
+    if not parts:
+        return False
+
+    # Every component must pass affirmative checks
+    for component in parts:
+        # Component must be non-empty
+        if not component:
+            return False
+
+        # Component must not be . or ..
+        if component in (".", ".."):
+            return False
+
+        # Component must be at most 255 bytes
+        if len(component) > 255:
+            return False
+
+        # Every character must be acceptable:
+        # - no control chars (below 0x20)
+        # - no DEL (0x7F)
+        # - no backslash (0x5C)
+        # - no colon (0x3A)
+        # - no NUL (0x00)
+        for char in component:
+            code = ord(char)
+            if code < 0x20 or code == 0x7F or char in ("\\", ":", "\x00"):
+                return False
+
+    return True
 
 
 def _is_symlink(info: zipfile.ZipInfo) -> bool:
@@ -59,7 +92,10 @@ def inspect(path: Path) -> list[ArchiveEntry]:
 
     try:
         zf = zipfile.ZipFile(path)
-    except zipfile.BadZipFile as exc:
+    except Exception as exc:
+        # Catch any failure to read the archive: BadZipFile, NotImplementedError,
+        # EOFError, struct.error, and others. All indicate the file cannot be safely
+        # read from the central directory and should be rejected.
         raise ThemeRejected([ThemeIssue(
             file=ARCHIVE, code="bad_archive", message=f"not a readable ZIP: {exc}",
         )]) from None

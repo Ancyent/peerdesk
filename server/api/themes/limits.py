@@ -11,6 +11,9 @@ MAX_ARCHIVE_BYTES = 20 * 1024 * 1024
 MAX_UNCOMPRESSED_BYTES = 60 * 1024 * 1024
 # A single entry expanding more than this is a zip bomb regardless of totals.
 MAX_EXPANSION_RATIO = 100
+# Per-component length limit for ZIP entry names (255 bytes per path component).
+# Whole-name limit is 4096 to allow nested directory structures.
+MAX_ENTRY_NAME_LENGTH = 4096
 
 # Preview screenshots.
 MAX_PREVIEWS = 8
