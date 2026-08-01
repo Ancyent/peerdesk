@@ -7,14 +7,31 @@ than after the damage.
 The order matters: validate, then extract. Reversed, the attacker's files are
 already on the volume by the time anything is checked.
 """
+import struct
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from . import limits
-from .errors import ThemeIssue, ThemeRejected
+from .errors import ARCHIVE, IssueList, ThemeIssue, ThemeRejected
 
-ARCHIVE = "<archive>"
+__all__ = [
+    "ARCHIVE", "ArchiveEntry", "declared_entry_count", "entry_name_problem",
+    "inspect", "is_safe_entry_name",
+]
+
+# The characters an entry name component may be built from. ASCII-only is
+# deliberate: it closes filename spoofing and normalisation collisions (RTLO,
+# zero-width joiners, C1 controls, Unicode line and paragraph separators,
+# combining marks, and every codepoint not yet assigned) in one clause. Theme
+# authors cannot name a file café.png, but a validator taking archives from
+# strangers cannot afford that risk.
+#
+# @ is here because icon@2x.png is an ordinary asset name; its earlier absence
+# was an unintended consequence of the ASCII rule rather than a decision.
+ALLOWED_NAME_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.+()@ "
+)
 
 
 @dataclass(frozen=True)
@@ -24,70 +41,112 @@ class ArchiveEntry:
     uncompressed: int
 
 
-def is_safe_entry_name(name: str) -> bool:
+def entry_name_problem(name: str) -> tuple[str, str] | None:
     r"""Affirm that a ZIP entry name is safe to extract.
 
+    Returns None if it is; otherwise (code, message) naming what is wrong. The
+    codes are distinct because the causes are: `images/logo@2x.png` and
+    `images/café.png` both being reported as "escapes the archive root or is
+    not a regular file" was one message doing three jobs badly.
+
     A name is safe if and only if ALL of these hold:
-    - non-empty and no longer than MAX_ENTRY_NAME_LENGTH bytes (which is ASCII, so bytes = chars)
-    - does not begin with / (absolute path)
-    - splits on / into at least one component
-    - each component is non-empty, not . or .., at most 255 bytes, and contains
-      only ASCII characters from the allowlist: a-z, A-Z, 0-9, - _ . + ( ), space
-
-    ASCII-only is deliberate. Restricting to ASCII closes filename spoofing and
-    normalisation collisions (RTLO, zero-width joiners, C1 controls, Unicode
-    line/paragraph separators, combining marks, and future codepoints) in one
-    clause. It is a reasonable cost to prevent these attacks and achieve
-    consistency across platforms — theme authors cannot name a file café.png,
-    but validators taking archives from strangers cannot afford that risk.
+    - non-empty and no longer than MAX_ENTRY_NAME_LENGTH characters (ASCII, so
+      characters = bytes)
+    - does not begin with / (absolute path) and contains no backslash (a path
+      separator on Windows, so traversal there)
+    - splits on / into components that are each non-empty, neither . nor .., at
+      most limits.MAX_ENTRY_COMPONENT_LENGTH characters, and built only from
+      ALLOWED_NAME_CHARS
     """
-    # Allowlist of acceptable ASCII characters (one per category to be explicit)
-    # Letters, digits, and punctuation/space that are safe across filesystems
-    ALLOWED_CHARS = set(
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.+() "
-    )
-
-    # Non-empty and length-bounded at the whole-name level
-    # Using len() on str is safe because we only accept ASCII (one char = one byte)
-    if not name or len(name) > limits.MAX_ENTRY_NAME_LENGTH:
-        return False
-
-    # Absolute paths are rejected
+    if not name:
+        return ("bad_entry_name", "entry name is empty")
+    # len() on str is byte-accurate only because non-ASCII is rejected below.
+    # A name that is over the cap in characters is over it in bytes too, so
+    # checking here first is safe.
+    if len(name) > limits.MAX_ENTRY_NAME_LENGTH:
+        return (
+            "bad_entry_name",
+            f"entry name is {len(name)} characters; at most "
+            f"{limits.MAX_ENTRY_NAME_LENGTH} allowed",
+        )
     if name.startswith("/"):
-        return False
+        return ("unsafe_entry", "entry name is an absolute path")
+    if "\\" in name:
+        return (
+            "unsafe_entry",
+            "entry name contains a backslash, which is a path separator on Windows",
+        )
 
-    # Split into components
-    parts = name.split("/")
-
-    # Must have at least one component (would be empty if name is just "/")
-    if not parts:
-        return False
-
-    # Every component must pass affirmative checks
-    for component in parts:
-        # Component must be non-empty
+    for component in name.split("/"):
         if not component:
-            return False
-
-        # Component must not be . or ..
+            return ("bad_entry_name", "entry name has an empty path component")
         if component in (".", ".."):
-            return False
-
-        # Component must be at most 255 bytes (256 ASCII chars max per component)
-        # len() counts characters; ASCII is one byte per character
-        if len(component) > 255:
-            return False
-
-        # Every character must be in the allowlist
+            return (
+                "unsafe_entry",
+                f"path component {component!r} escapes the archive root",
+            )
+        if len(component) > limits.MAX_ENTRY_COMPONENT_LENGTH:
+            return (
+                "bad_entry_name",
+                f"path component {component[:32]!r}... is {len(component)} characters; "
+                f"at most {limits.MAX_ENTRY_COMPONENT_LENGTH} allowed",
+            )
         for char in component:
-            if char not in ALLOWED_CHARS:
-                return False
+            if char not in ALLOWED_NAME_CHARS:
+                return (
+                    "bad_entry_name",
+                    f"character {char!r} (U+{ord(char):04X}) is not allowed in an entry "
+                    f"name; use ASCII letters, digits, or - _ . + ( ) @ and space",
+                )
 
-    return True
+    return None
+
+
+def is_safe_entry_name(name: str) -> bool:
+    """True when entry_name_problem finds nothing to report."""
+    return entry_name_problem(name) is None
 
 
 def _is_symlink(info: zipfile.ZipInfo) -> bool:
     return (info.external_attr >> 16) & 0xF000 == 0xA000
+
+
+def declared_entry_count(path: Path) -> int | None:
+    """Entry count from the end-of-central-directory record alone.
+
+    Constructing a ZipFile parses the entire central directory, so an archive
+    claiming 190,000 entries costs seconds and hundreds of megabytes to reject
+    for having too many entries. The EOCD record carries that count at a known
+    offset from the end of the file, so it can be had before any of that.
+
+    Returns None when the count cannot be read — a comment longer than the
+    window, a ZIP64 record out of reach, a truncated file. The caller then
+    falls back to counting infolist(), which applies the same cap.
+    """
+    size = path.stat().st_size
+    # The EOCD record is 22 bytes plus a comment of at most 0xFFFF bytes.
+    window = min(size, 22 + 0xFFFF)
+    if window < 22:
+        return None
+    with path.open("rb") as handle:
+        handle.seek(size - window)
+        tail = handle.read(window)
+
+    index = tail.rfind(b"PK\x05\x06")
+    if index == -1 or index + 22 > len(tail):
+        return None
+    (count,) = struct.unpack("<H", tail[index + 10:index + 12])
+    if count != 0xFFFF:
+        return count
+
+    # 0xFFFF means "see the ZIP64 record", which sits just before the ZIP64
+    # locator, which sits just before the EOCD — so inside the same window
+    # unless the comment is enormous.
+    index64 = tail.rfind(b"PK\x06\x06")
+    if index64 == -1 or index64 + 40 > len(tail):
+        return None
+    (count64,) = struct.unpack("<Q", tail[index64 + 32:index64 + 40])
+    return count64
 
 
 def inspect(path: Path) -> list[ArchiveEntry]:
@@ -96,6 +155,15 @@ def inspect(path: Path) -> list[ArchiveEntry]:
         raise ThemeRejected([ThemeIssue(
             file=ARCHIVE, code="archive_too_large",
             message=f"{size} bytes; at most {limits.MAX_ARCHIVE_BYTES} allowed",
+        )])
+
+    declared = declared_entry_count(path)
+    if declared is not None and declared > limits.MAX_ENTRIES:
+        # Rejected before ZipFile is constructed, because constructing it is
+        # the expensive half of the work this check exists to prevent.
+        raise ThemeRejected([ThemeIssue(
+            file=ARCHIVE, code="too_many_entries",
+            message=f"{declared} entries; at most {limits.MAX_ENTRIES} allowed",
         )])
 
     try:
@@ -108,7 +176,7 @@ def inspect(path: Path) -> list[ArchiveEntry]:
             file=ARCHIVE, code="bad_archive", message=f"not a readable ZIP: {exc}",
         )]) from None
 
-    issues: list[ThemeIssue] = []
+    issues = IssueList()
     entries: list[ArchiveEntry] = []
     total = 0
 
@@ -123,11 +191,16 @@ def inspect(path: Path) -> list[ArchiveEntry]:
         for info in infos:
             if info.is_dir():
                 continue
-            if _is_symlink(info) or not is_safe_entry_name(info.filename):
+            if _is_symlink(info):
                 issues.append(ThemeIssue(
-                    file=info.filename, code="unsafe_entry",
-                    message="entry name escapes the archive root or is not a regular file",
+                    file=info.filename, code="symlink_entry",
+                    message="entry is a symbolic link, not a regular file",
                 ))
+                continue
+            problem = entry_name_problem(info.filename)
+            if problem is not None:
+                code, message = problem
+                issues.append(ThemeIssue(file=info.filename, code=code, message=message))
                 continue
 
             total += info.file_size
@@ -148,5 +221,5 @@ def inspect(path: Path) -> list[ArchiveEntry]:
             ))
 
     if issues:
-        raise ThemeRejected(issues)
+        raise ThemeRejected(issues.finish())
     return entries

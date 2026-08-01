@@ -1,3 +1,4 @@
+import os
 import zipfile
 
 import pytest
@@ -59,7 +60,8 @@ def test_rejects_a_symlink_entry(tmp_path):
         # 0xA1FF: the symlink bit set in the external attributes.
         info.external_attr = 0xA1FF << 16
         z.writestr(info, "/etc/passwd")
-    assert "unsafe_entry" in codes(path)
+    # Its own code: a symlink is not a badly-named entry and not traversal.
+    assert "symlink_entry" in codes(path)
 
 
 def test_rejects_a_file_that_is_not_a_zip(tmp_path):
@@ -222,3 +224,99 @@ def test_is_safe_entry_name_accepts_all_allowed_punctuation():
     assert is_safe_entry_name("a(b")
     assert is_safe_entry_name("a)b")
     assert is_safe_entry_name("a b")
+
+
+# --- I9: one code per cause -------------------------------------------------
+
+
+def test_a_retina_suffix_is_an_ordinary_asset_name():
+    """icon@2x.png is a normal name, and rejecting it was collateral damage."""
+    assert is_safe_entry_name("images/logo@2x.png")
+    assert is_safe_entry_name("images/icon@3x.png")
+
+
+def test_a_bad_character_is_reported_as_a_bad_name_and_names_the_character():
+    from themes.archive import entry_name_problem
+    code, message = entry_name_problem("images/café.png")
+    assert code == "bad_entry_name"
+    # A retina suffix is not traversal and an accent is not a symlink; the
+    # message has to say which of the three it actually is.
+    assert "é" in message and "U+00E9" in message
+    assert "escape" not in message
+
+
+def test_traversal_and_bad_names_get_different_codes(tmp_path):
+    assert "unsafe_entry" in codes(build(tmp_path, {"../x.png": "x"}, name="a.zip"))
+    assert "bad_entry_name" in codes(build(tmp_path, {"images/café.png": "x"}, name="b.zip"))
+
+
+def test_an_overlong_component_is_a_bad_name_not_traversal():
+    from themes.archive import entry_name_problem
+    code, _ = entry_name_problem("a" * 256)
+    assert code == "bad_entry_name"
+
+
+# --- I6: the entry count is read before the central directory is parsed -----
+
+
+def test_too_many_entries_is_decided_without_constructing_zipfile(tmp_path, monkeypatch):
+    """The count comes from the end-of-central-directory record.
+
+    Constructing ZipFile parses every central-directory header, which is the
+    cost this check exists to avoid: 190k entries took 17 s and 115 MB to
+    reject for being too many. Monkeypatching the constructor to explode proves
+    the rejection happens before it is reached.
+    """
+    import zipfile as zf_module
+    path = build(tmp_path, {f"f{i}.txt": "x" for i in range(limits_max_entries() + 1)})
+
+    def explode(*args, **kwargs):
+        raise AssertionError("ZipFile was constructed before the entry count was checked")
+
+    monkeypatch.setattr(zf_module, "ZipFile", explode)
+    assert "too_many_entries" in codes(path)
+
+
+def limits_max_entries() -> int:
+    from themes import limits
+    return limits.MAX_ENTRIES
+
+
+def test_the_declared_entry_count_matches_reality(tmp_path):
+    from themes.archive import declared_entry_count
+    path = build(tmp_path, {f"f{i}.txt": "x" for i in range(7)})
+    assert declared_entry_count(path) == 7
+
+
+def test_an_unreadable_end_record_falls_back_rather_than_crashing(tmp_path):
+    from themes.archive import declared_entry_count
+    path = tmp_path / "nope.zip"
+    path.write_bytes(b"not a zip at all")
+    assert declared_entry_count(path) is None
+    # And inspect still rejects it, through the ZipFile path.
+    assert "bad_archive" in codes(path)
+
+
+# --- I11: the total-uncompressed cap had no test at all ---------------------
+
+
+def test_rejects_an_archive_over_the_uncompressed_cap(tmp_path, monkeypatch):
+    """MAX_UNCOMPRESSED_BYTES, which nothing exercised.
+
+    Monkeypatched rather than built at full size: reaching 60 MB uncompressed
+    while staying under both the 20 MB archive cap and the 100x expansion cap
+    would need a 600 KB-per-second generator and put a minute on the suite for
+    a threshold comparison.
+    """
+    from themes import limits
+    monkeypatch.setattr(limits, "MAX_UNCOMPRESSED_BYTES", 100)
+    # Random bytes, so the expansion-ratio check cannot fire first and mask it.
+    path = build(tmp_path, {"a.bin": os.urandom(500)})
+    assert "uncompressed_too_large" in codes(path)
+
+
+def test_accepts_an_archive_just_under_the_uncompressed_cap(tmp_path, monkeypatch):
+    from themes import limits
+    monkeypatch.setattr(limits, "MAX_UNCOMPRESSED_BYTES", 1000)
+    path = build(tmp_path, {"a.bin": os.urandom(500)})
+    assert {e.name for e in inspect(path)} == {"a.bin"}
