@@ -8,6 +8,7 @@ a reviewer needs to find.
 import json
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ValidationError
 
@@ -18,6 +19,13 @@ MANIFEST_NAME = "theme.json"
 VALID_TARGETS = frozenset({"web", "appViewer", "desktop"})
 VALID_THEMES = frozenset({"dark", "light"})
 HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
+
+# The only schemes a link rendered as theme provenance may carry. Stated as
+# what is accepted rather than what is refused: javascript: was the case that
+# came up, but data:, vbscript: and every scheme a browser gains next are the
+# same problem, and the spec's own threat model names the localStorage JWT as
+# what a link in the admin UI is reaching for.
+LINK_SCHEMES = frozenset({"http", "https"})
 
 
 class Author(BaseModel):
@@ -69,6 +77,38 @@ def is_safe_relative_path(path: str) -> bool:
         return False
     parts = path.split("/")
     return not any(p in ("..", ".", "") for p in parts)
+
+
+def is_safe_link(url: str) -> bool:
+    """A manifest link must be a plain web address.
+
+    Affirmative: an http: or https: URL with a host. Anything else — a scheme
+    that executes (javascript:), a scheme that carries a payload (data:), a
+    scheme-relative reference, or a bare word a browser would resolve against
+    the admin page — is not a link to somewhere else and is refused.
+    """
+    if not url or len(url) > limits.MAX_URL_LENGTH:
+        return False
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return False
+    return parts.scheme.lower() in LINK_SCHEMES and bool(parts.netloc)
+
+
+def _check_length(
+    value: str | None, field: str, cap: int, issues: list[ThemeIssue]
+) -> None:
+    """Bound one free-text field.
+
+    Stage 2 puts these in database columns and stage 3 renders them, so they
+    are bounded where they are parsed rather than at every place they are used.
+    """
+    if value is not None and len(value) > cap:
+        issues.append(ThemeIssue(
+            file=MANIFEST_NAME, code="field_too_long",
+            message=f"{field} is {len(value)} characters; at most {cap} allowed",
+        ))
 
 
 def parse_manifest(raw: bytes) -> Manifest:
@@ -141,6 +181,25 @@ def parse_manifest(raw: bytes) -> Manifest:
             file=MANIFEST_NAME, code="bad_accent",
             message="brand.accent must be a #rrggbb hex colour",
         ))
+
+    if manifest.author.url is not None and not is_safe_link(manifest.author.url):
+        issues.append(ThemeIssue(
+            file=MANIFEST_NAME, code="bad_author_url",
+            message=(
+                f"author.url must be an http:// or https:// address of at most "
+                f"{limits.MAX_URL_LENGTH} characters"
+            ),
+        ))
+
+    _check_length(manifest.name, "name", limits.MAX_NAME_LENGTH, issues)
+    _check_length(manifest.author.name, "author.name", limits.MAX_NAME_LENGTH, issues)
+    _check_length(manifest.brand.name, "brand.name", limits.MAX_NAME_LENGTH, issues)
+    _check_length(manifest.description, "description", limits.MAX_DESCRIPTION_LENGTH, issues)
+    for index, preview in enumerate(manifest.preview):
+        _check_length(
+            preview.caption, f"preview[{index}].caption",
+            limits.MAX_CAPTION_LENGTH, issues,
+        )
 
     if len(manifest.preview) > limits.MAX_PREVIEWS:
         issues.append(ThemeIssue(
