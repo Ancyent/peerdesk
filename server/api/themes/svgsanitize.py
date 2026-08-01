@@ -42,26 +42,55 @@ def _local(tag: str) -> str:
 def _is_safe_url_value(value: str) -> bool:
     """Check if an attribute value with url() references is safe.
 
-    Only local fragment references like url(#identifier) are allowed.
-    Off-origin references (https://, //, data:, etc.) are rejected.
+    Only well-formed local fragment references like url(#identifier) are allowed.
+    Off-origin references, unterminated tokens, and empty url() are rejected.
 
     Case-insensitive: URL(), Url(), url() are all treated the same.
-    Multiple references: ALL must be local fragments for the value to be safe.
-    """
-    # Match url(...) case-insensitively with optional whitespace before paren and around quotes
-    # e.g., url(#grad), URL(#grad), url( '#grad' ), URL ('#GRAD')
-    matches = re.finditer(r'url\s*\(\s*["\']?([^)]+?)["\']?\s*\)', value, re.IGNORECASE)
+    Multiple references: ALL must be well-formed local fragments for the value to be safe.
 
-    found_any = False
-    for match in matches:
-        found_any = True
-        reference = match.group(1).strip().strip('\'"')
-        # Only allow local fragment references starting with #
-        if not reference.startswith('#'):
-            # Found an off-origin reference
+    Per CSS Syntax Module Level 3, unterminated url() tokens are parse errors but may
+    still be emitted by the tokenizer. This function rejects them to ensure renderers
+    cannot fetch off-origin references through incomplete tokens.
+    """
+    # First, find ALL url( tokens, including incomplete ones.
+    # Pattern: url followed by optional whitespace and opening paren
+    url_token_pattern = r'url\s*\('
+    url_tokens = list(re.finditer(url_token_pattern, value, re.IGNORECASE))
+
+    if not url_tokens:
+        # No url() token, it's safe
+        return True
+
+    # Check each url( token for validity and safety
+    for token_match in url_tokens:
+        # Find the position of the opening paren
+        paren_pos = token_match.end() - 1
+        search_start = paren_pos + 1
+
+        # Find the closing paren for this token
+        close_paren = value.find(')', search_start)
+
+        if close_paren == -1:
+            # No closing paren found - unterminated token, unsafe
             return False
 
-    # If no url() found, it's safe. If all found were local, it's safe.
+        # Extract the content between parens
+        content = value[search_start:close_paren]
+
+        # Remove leading/trailing whitespace and quotes
+        reference = content.strip()
+        reference = reference.strip('"\'')
+        reference = reference.strip()
+
+        # Check for empty url()
+        if not reference:
+            return False
+
+        # Only allow local fragment references starting with #
+        if not reference.startswith('#'):
+            return False
+
+    # All url tokens are well-formed and point to local fragments
     return True
 
 
