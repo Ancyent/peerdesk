@@ -66,10 +66,10 @@ describe('theme surface', () => {
           .map((s) => s.split(' as ')[0]); // Handle "import { X as Y }"
 
         for (const name of importedNames) {
-          expect(hookCarrying.has(name)).toBe(
-            false,
+          expect(
+            hookCarrying.has(name),
             `${file} imports ${name} from @pd/ui, which carries a data-pd-* hook`,
-          );
+          ).toBe(false);
         }
       }
     }
