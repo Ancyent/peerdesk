@@ -15,11 +15,17 @@ from routers import (
 async def lifespan(app: FastAPI):
     # Mirror GitHub releases locally so no client ever has to call the GitHub
     # API (60 req/hour per source IP — shared by every client behind one NAT).
-    task = asyncio.create_task(release_cache.refresh_loop(), name="release-refresh")
+    # With a local builder owning the cache there is nothing to mirror, and a
+    # loop that woke up hourly would eventually overwrite the operator's own
+    # artifacts with the project's.
+    task = None
+    if release_cache.mirrors_github():
+        task = asyncio.create_task(release_cache.refresh_loop(), name="release-refresh")
     yield
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await task
+    if task is not None:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
 
 app = FastAPI(title="PeerDesk API", lifespan=lifespan)
