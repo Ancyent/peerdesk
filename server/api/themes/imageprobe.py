@@ -87,8 +87,8 @@ def _is_svg(data: bytes) -> bool:
 
         # Check for XML prolog
         if data[i:i+5] == b"<?xml":
-            # Skip to end of prolog
-            end = data.find(b"?>", i)
+            # Skip to end of prolog, bounded by the 1024-byte window
+            end = data.find(b"?>", i, bound)
             if end == -1:
                 return False
             i = end + 2
@@ -96,8 +96,8 @@ def _is_svg(data: bytes) -> bool:
 
         # Check for DOCTYPE
         if data[i:i+9].upper() == b"<!DOCTYPE":
-            # Skip to end of DOCTYPE
-            end = data.find(b">", i)
+            # Skip to end of DOCTYPE, bounded by the 1024-byte window
+            end = data.find(b">", i, bound)
             if end == -1:
                 return False
             i = end + 1
@@ -105,8 +105,8 @@ def _is_svg(data: bytes) -> bool:
 
         # Check for comment
         if data[i:i+4] == b"<!--":
-            # Skip to end of comment
-            end = data.find(b"-->", i)
+            # Skip to end of comment, bounded by the 1024-byte window
+            end = data.find(b"-->", i, bound)
             if end == -1:
                 return False
             i = end + 3

@@ -114,3 +114,36 @@ def test_svg_with_leading_whitespace_is_detected():
     # SVG preceded by leading whitespace and newlines should be detected.
     info = probe(b'  \n\t<svg xmlns="http://www.w3.org/2000/svg"></svg>')
     assert info.kind == "svg"
+
+
+def test_unterminated_comment_with_large_body_returns_none():
+    # An unterminated comment followed by large body must not scan the entire file.
+    # The search is bounded to 1024 bytes, so this returns None quickly without
+    # scanning the full 50 MB body.
+    big = b"<!--" + b"x" * (50 * 1024 * 1024)
+    assert probe(big) is None
+
+
+def test_unterminated_xml_prolog_with_large_body_returns_none():
+    # An unterminated XML prolog followed by large body must not scan the entire file.
+    # The search is bounded to 1024 bytes.
+    big = b"<?xml" + b"x" * (50 * 1024 * 1024)
+    assert probe(big) is None
+
+
+def test_unterminated_doctype_with_large_body_returns_none():
+    # An unterminated DOCTYPE followed by large body must not scan the entire file.
+    # The search is bounded to 1024 bytes.
+    big = b"<!DOCTYPE" + b"x" * (50 * 1024 * 1024)
+    assert probe(big) is None
+
+
+def test_svg_with_preamble_longer_than_1024_bytes_returns_none():
+    # An SVG whose valid preamble (XML declaration, comments, etc.) exceeds the
+    # 1024-byte window is rejected. This is a deliberate consequence of the bound
+    # to prevent unbounded parsing; real SVG files have minimal preambles.
+    preamble = b"<?xml version='1.0'?>\n" + b"<!-- comment -->\n" * 100
+    svg_content = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    data = preamble + svg_content
+    assert len(preamble) > 1024
+    assert probe(data) is None
