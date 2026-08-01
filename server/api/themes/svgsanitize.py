@@ -8,6 +8,7 @@ references off-origin, which is what the allowlists below are for.
 An allowlist, not a blocklist: the set of SVG features is large and grows, and a
 blocklist is a promise to have thought of everything.
 """
+import re
 from xml.etree import ElementTree as ET
 
 from defusedxml.common import DefusedXmlException
@@ -39,26 +40,29 @@ def _local(tag: str) -> str:
 
 
 def _is_safe_url_value(value: str) -> bool:
-    """Check if an attribute value with a url() reference is safe.
+    """Check if an attribute value with url() references is safe.
 
     Only local fragment references like url(#identifier) are allowed.
     Off-origin references (https://, //, data:, etc.) are rejected.
+
+    Case-insensitive: URL(), Url(), url() are all treated the same.
+    Multiple references: ALL must be local fragments for the value to be safe.
     """
-    import re
-    # Match url(...) with optional whitespace and quotes
-    # e.g., url(#grad), url( '#grad' ), url("#grad")
-    match = re.search(r'url\s*\(\s*["\']?([^)]+?)["\']?\s*\)', value)
-    if not match:
-        # No url() in the value, it's safe
-        return True
+    # Match url(...) case-insensitively with optional whitespace before paren and around quotes
+    # e.g., url(#grad), URL(#grad), url( '#grad' ), URL ('#GRAD')
+    matches = re.finditer(r'url\s*\(\s*["\']?([^)]+?)["\']?\s*\)', value, re.IGNORECASE)
 
-    reference = match.group(1).strip()
-    # Only allow local fragment references starting with #
-    if reference.startswith('#'):
-        return True
+    found_any = False
+    for match in matches:
+        found_any = True
+        reference = match.group(1).strip().strip('\'"')
+        # Only allow local fragment references starting with #
+        if not reference.startswith('#'):
+            # Found an off-origin reference
+            return False
 
-    # Reject any off-origin reference
-    return False
+    # If no url() found, it's safe. If all found were local, it's safe.
+    return True
 
 
 def _clean(element: ET.Element) -> None:
@@ -66,9 +70,9 @@ def _clean(element: ET.Element) -> None:
         if _local(name) not in ALLOWED_ATTRS:
             del element.attrib[name]
         else:
-            # Check attribute value for unsafe url() references
+            # Check attribute value for unsafe url() references (case-insensitive)
             value = element.attrib[name]
-            if 'url(' in value and not _is_safe_url_value(value):
+            if not _is_safe_url_value(value):
                 del element.attrib[name]
 
     for child in list(element):

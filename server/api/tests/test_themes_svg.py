@@ -123,3 +123,66 @@ def test_strips_fill_attribute_with_data_url():
         FILE
     )
     assert b"data:" not in out
+
+
+# Tests for bypass fixes: case sensitivity, multiple references, whitespace
+def test_strips_fill_attribute_with_uppercase_url_function():
+    out = sanitize_svg(
+        f'<svg {NS}><path d="M0 0" fill="URL(https://attacker.invalid/x)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"attacker.invalid" not in out
+
+
+def test_strips_fill_attribute_with_mixed_case_url_function():
+    out = sanitize_svg(
+        f'<svg {NS}><path d="M0 0" fill="Url(https://attacker.invalid/x)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"attacker.invalid" not in out
+
+
+def test_strips_fill_attribute_with_safe_url_followed_by_unsafe_url():
+    out = sanitize_svg(
+        f'<svg {NS}><defs><linearGradient id="a"><stop/></linearGradient></defs>'
+        f'<path d="M0 0" fill="url(#a) url(https://attacker.invalid/b)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"attacker.invalid" not in out
+
+
+def test_strips_fill_attribute_with_unsafe_url_followed_by_safe_url():
+    out = sanitize_svg(
+        f'<svg {NS}><defs><linearGradient id="b"><stop/></linearGradient></defs>'
+        f'<path d="M0 0" fill="url(https://attacker.invalid/a) url(#b)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"attacker.invalid" not in out
+
+
+def test_strips_fill_attribute_with_url_function_and_space_before_paren():
+    out = sanitize_svg(
+        f'<svg {NS}><path d="M0 0" fill="url (https://attacker.invalid/x)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"attacker.invalid" not in out
+
+
+def test_keeps_fill_attribute_with_uppercase_url_function_and_local_reference():
+    out = sanitize_svg(
+        f'<svg {NS}><defs><linearGradient id="grad"><stop/></linearGradient></defs>'
+        f'<path d="M0 0" fill="URL(#grad)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"grad" in out
+
+
+def test_keeps_fill_attribute_with_multiple_local_url_references():
+    out = sanitize_svg(
+        f'<svg {NS}><defs><linearGradient id="a"><stop/></linearGradient>'
+        f'<linearGradient id="b"><stop/></linearGradient></defs>'
+        f'<path d="M0 0" fill="url(#a) url(#b)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"url(#a)" in out or (b"url" in out and b"#a" in out)
+    assert b"url(#b)" in out or (b"url" in out and b"#b" in out)
