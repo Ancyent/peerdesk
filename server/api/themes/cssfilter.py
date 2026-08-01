@@ -45,6 +45,45 @@ def _is_internal_url(value: str) -> bool:
     return True
 
 
+def _check_token_tree(token, filename: str, line: int, issues: list[ThemeIssue]) -> None:
+    """Recursively check all URL tokens in a token tree, at any depth.
+
+    Does not depend on function names — walks every token and checks url() tokens
+    wherever they appear, no matter how deeply nested in other functions.
+    """
+    if token.type == "error":
+        # Parse errors in tokens
+        issues.append(ThemeIssue(
+            file=filename, code="bad_css", line=line,
+            message=getattr(token, "message", "parse error in declaration"),
+        ))
+    elif token.type == "url":
+        # Unquoted url(...) form
+        url_value = token.value
+        if not _is_internal_url(url_value):
+            issues.append(ThemeIssue(
+                file=filename, code="external_url", line=line,
+                message=f"url({url_value}) must point inside the theme archive",
+            ))
+    elif token.type == "function":
+        # Check if this is a url() function itself (quoted form)
+        if token.lower_name == "url":
+            for arg in token.arguments:
+                if hasattr(arg, "value"):
+                    url_value = arg.value
+                    if not _is_internal_url(url_value):
+                        issues.append(ThemeIssue(
+                            file=filename, code="external_url", line=line,
+                            message=f"url({url_value}) must point inside the theme archive",
+                        ))
+
+        # Regardless of function name, recurse into arguments to find nested urls.
+        # This ensures url() at any depth in any function is checked.
+        if hasattr(token, "arguments"):
+            for arg in token.arguments:
+                _check_token_tree(arg, filename, line, issues)
+
+
 def _check_declarations(
     content: list, selector: str, filename: str, issues: list[ThemeIssue]
 ) -> None:
@@ -85,52 +124,9 @@ def _check_declarations(
                 message=f"{name} is not on the allowed property list",
             ))
 
+        # Recursively check all tokens in the declaration value for URLs
         for token in decl.value:
-            if token.type == "error":
-                # Parse errors in declarations (e.g., url(var(--x)) creates ParseError)
-                issues.append(ThemeIssue(
-                    file=filename, code="bad_css", line=line,
-                    message=getattr(token, "message", "parse error in declaration"),
-                ))
-            elif token.type == "url":
-                # Unquoted url(https://...) form
-                url_value = token.value
-                if not _is_internal_url(url_value):
-                    issues.append(ThemeIssue(
-                        file=filename, code="external_url", line=line,
-                        message=f"url({url_value}) must point inside the theme archive",
-                    ))
-            elif token.type == "function" and token.lower_name == "url":
-                # Quoted url("https://...") form
-                for arg in token.arguments:
-                    if hasattr(arg, "value"):
-                        url_value = arg.value
-                        if not _is_internal_url(url_value):
-                            issues.append(ThemeIssue(
-                                file=filename, code="external_url", line=line,
-                                message=f"url({url_value}) must point inside the theme archive",
-                            ))
-            elif token.type == "function" and token.lower_name == "image-set":
-                # Recursively check url() inside image-set()
-                for arg in token.arguments:
-                    if hasattr(arg, "type") and arg.type == "url":
-                        # image-set(url(...) 1x) puts url tokens directly in arguments
-                        url_value = arg.value
-                        if not _is_internal_url(url_value):
-                            issues.append(ThemeIssue(
-                                file=filename, code="external_url", line=line,
-                                message=f"url({url_value}) must point inside the theme archive",
-                            ))
-                    elif hasattr(arg, "type") and arg.type == "function" and arg.lower_name == "url":
-                        # Alternative form with function token
-                        for nested_arg in arg.arguments:
-                            if hasattr(nested_arg, "value"):
-                                url_value = nested_arg.value
-                                if not _is_internal_url(url_value):
-                                    issues.append(ThemeIssue(
-                                        file=filename, code="external_url", line=line,
-                                        message=f"url({url_value}) must point inside the theme archive",
-                                    ))
+            _check_token_tree(token, filename, line, issues)
 
 
 def _check_rule(rule, filename: str, issues: list[ThemeIssue]) -> None:

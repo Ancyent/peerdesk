@@ -176,3 +176,46 @@ def test_rejects_bad_url_tokens():
 def test_accepts_unquoted_relative_url():
     out = filter_css('[data-pd-btn] { background-image: url(images/tile.png); }', "css/web.css")
     assert "images/tile.png" in out
+
+
+def test_rejects_cross_fade_with_external_url():
+    # Generic function recursion test: cross-fade can contain urls
+    assert "external_url" in codes('[data-pd-btn] { background-image: cross-fade(url(https://attacker.invalid/a) 50%, url(good.png) 50%); }')
+
+
+def test_rejects_webkit_image_set_with_external_url():
+    # Vendor-prefixed function should still be recursively checked
+    assert "external_url" in codes('[data-pd-btn] { background-image: -webkit-image-set(url(https://attacker.invalid/a.png) 1x); }')
+
+
+def test_rejects_nested_image_set_with_external_url():
+    # Nested same-function: image-set(image-set(url(...)))
+    assert "external_url" in codes('[data-pd-btn] { background-image: image-set(image-set(url(https://attacker.invalid/a) 1x) 1x); }')
+
+
+def test_rejects_url_buried_three_functions_deep():
+    # Generic unknown function at arbitrary depth
+    assert "external_url" in codes('[data-pd-btn] { background-image: foo(bar(baz(url(https://attacker.invalid/a)))); }')
+
+
+def test_accepts_url_buried_three_functions_deep_with_relative_path():
+    # Same structure but with relative path should be accepted
+    out = filter_css('[data-pd-btn] { background-image: foo(bar(baz(url(images/a.png)))); }', "css/web.css")
+    assert "images/a.png" in out
+
+
+def test_rejects_mixed_relative_and_external_urls_in_functions():
+    # One relative (accepted), one external (rejected) in different nested functions
+    assert "external_url" in codes('[data-pd-btn] { background-image: foo(url(good.png), bar(url(https://attacker.invalid/a))); }')
+
+
+def test_accepts_calc_without_url():
+    # Functions without URLs should pass through unchanged
+    out = filter_css('[data-pd-btn] { width: calc(100% - 10px); }', "css/web.css")
+    assert "calc" in out and "100%" in out
+
+
+def test_accepts_linear_gradient_without_url():
+    # Complex function without URLs should pass through
+    out = filter_css('[data-pd-btn] { background: linear-gradient(to right, red, blue); }', "css/web.css")
+    assert "linear-gradient" in out and "red" in out
