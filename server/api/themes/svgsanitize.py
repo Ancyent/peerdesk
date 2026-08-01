@@ -38,10 +38,38 @@ def _local(tag: str) -> str:
     return tag.split("}", 1)[1] if tag.startswith("{") else tag
 
 
+def _is_safe_url_value(value: str) -> bool:
+    """Check if an attribute value with a url() reference is safe.
+
+    Only local fragment references like url(#identifier) are allowed.
+    Off-origin references (https://, //, data:, etc.) are rejected.
+    """
+    import re
+    # Match url(...) with optional whitespace and quotes
+    # e.g., url(#grad), url( '#grad' ), url("#grad")
+    match = re.search(r'url\s*\(\s*["\']?([^)]+?)["\']?\s*\)', value)
+    if not match:
+        # No url() in the value, it's safe
+        return True
+
+    reference = match.group(1).strip()
+    # Only allow local fragment references starting with #
+    if reference.startswith('#'):
+        return True
+
+    # Reject any off-origin reference
+    return False
+
+
 def _clean(element: ET.Element) -> None:
     for name in list(element.attrib):
         if _local(name) not in ALLOWED_ATTRS:
             del element.attrib[name]
+        else:
+            # Check attribute value for unsafe url() references
+            value = element.attrib[name]
+            if 'url(' in value and not _is_safe_url_value(value):
+                del element.attrib[name]
 
     for child in list(element):
         if _local(child.tag) not in ALLOWED_TAGS:

@@ -30,12 +30,12 @@ def test_strips_foreignobject_which_can_carry_html():
     assert b"foreignObject" not in out
 
 
-def test_strips_use_with_an_external_reference():
+def test_strips_use_tag_which_can_reference_external_svg():
     out = sanitize_svg(f'<svg {NS}><use href="https://attacker.invalid/x#y"/></svg>'.encode(), FILE)
     assert b"attacker.invalid" not in out
 
 
-def test_strips_an_anchor_carrying_a_javascript_url():
+def test_strips_anchor_tag_which_can_carry_javascript_url():
     out = sanitize_svg(f'<svg {NS}><a href="javascript:alert(1)"><path d="M0 0"/></a></svg>'.encode(), FILE)
     assert b"javascript" not in out.lower()
 
@@ -70,3 +70,56 @@ def test_rejects_an_external_entity_reference():
     )
     with pytest.raises(ThemeRejected):
         sanitize_svg(xxe, FILE)
+
+
+# Additional tests for attribute-level URL reference filtering
+def test_strips_fill_attribute_with_external_url_reference_on_allowed_tag():
+    out = sanitize_svg(
+        f'<svg {NS}><path d="M0 0" fill="url(https://attacker.invalid/x)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"attacker.invalid" not in out
+    assert b'fill=' not in out or b'fill=""' in out or b'fill' not in out.split(b'>')[0]
+
+
+def test_strips_stroke_attribute_with_external_url_reference_on_allowed_tag():
+    out = sanitize_svg(
+        f'<svg {NS}><path d="M0 0" stroke="url(https://attacker.invalid/x)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"attacker.invalid" not in out
+
+
+def test_keeps_fill_attribute_with_local_fragment_reference():
+    out = sanitize_svg(
+        f'<svg {NS}><defs><linearGradient id="grad"><stop/></linearGradient></defs>'
+        f'<path d="M0 0" fill="url(#grad)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"url(#grad)" in out
+    assert b"grad" in out
+
+
+def test_keeps_fill_attribute_with_whitespace_and_quotes_around_fragment():
+    out = sanitize_svg(
+        f'<svg {NS}><defs><linearGradient id="grad"><stop/></linearGradient></defs>'
+        f'<path d="M0 0" fill="url( \'#grad\' )"/></svg>'.encode(),
+        FILE
+    )
+    assert b"grad" in out
+
+
+def test_strips_fill_attribute_with_protocol_relative_url():
+    out = sanitize_svg(
+        f'<svg {NS}><path d="M0 0" fill="url(//attacker.invalid/x)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"attacker.invalid" not in out
+
+
+def test_strips_fill_attribute_with_data_url():
+    out = sanitize_svg(
+        f'<svg {NS}><path d="M0 0" fill="url(data:image/png;base64,iVBORw0KGgo=)"/></svg>'.encode(),
+        FILE
+    )
+    assert b"data:" not in out
