@@ -20,10 +20,29 @@ def _normalise(selector: str) -> str:
 
 
 def _is_internal_url(value: str) -> bool:
+    """Check if a URL is a genuine relative path safe for the theme archive.
+
+    Returns True only for relative paths without schemes. A genuine relative path:
+    - has no scheme (no ':' before the first '/')
+    - does not start with '/' (absolute path)
+    - does not start with '//' (protocol-relative)
+
+    Everything else is external: http://, https://, data:, javascript:, etc.
+    """
     lowered = value.strip().lower()
-    if lowered.startswith(("http://", "https://", "//", "data:", "file:", "blob:")):
+
+    # Reject leading slashes (absolute paths and protocol-relative)
+    if lowered.startswith(("/", "//")):
         return False
-    return not lowered.startswith("/")
+
+    # Reject anything with a scheme (anything with ':' before the first '/')
+    slash_pos = lowered.find("/")
+    colon_pos = lowered.find(":")
+    if colon_pos != -1 and (slash_pos == -1 or colon_pos < slash_pos):
+        return False
+
+    # Passed all checks: is a relative path
+    return True
 
 
 def _check_declarations(
@@ -67,7 +86,22 @@ def _check_declarations(
             ))
 
         for token in decl.value:
-            if token.type == "function" and token.lower_name == "url":
+            if token.type == "error":
+                # Parse errors in declarations (e.g., url(var(--x)) creates ParseError)
+                issues.append(ThemeIssue(
+                    file=filename, code="bad_css", line=line,
+                    message=getattr(token, "message", "parse error in declaration"),
+                ))
+            elif token.type == "url":
+                # Unquoted url(https://...) form
+                url_value = token.value
+                if not _is_internal_url(url_value):
+                    issues.append(ThemeIssue(
+                        file=filename, code="external_url", line=line,
+                        message=f"url({url_value}) must point inside the theme archive",
+                    ))
+            elif token.type == "function" and token.lower_name == "url":
+                # Quoted url("https://...") form
                 for arg in token.arguments:
                     if hasattr(arg, "value"):
                         url_value = arg.value
@@ -76,6 +110,27 @@ def _check_declarations(
                                 file=filename, code="external_url", line=line,
                                 message=f"url({url_value}) must point inside the theme archive",
                             ))
+            elif token.type == "function" and token.lower_name == "image-set":
+                # Recursively check url() inside image-set()
+                for arg in token.arguments:
+                    if hasattr(arg, "type") and arg.type == "url":
+                        # image-set(url(...) 1x) puts url tokens directly in arguments
+                        url_value = arg.value
+                        if not _is_internal_url(url_value):
+                            issues.append(ThemeIssue(
+                                file=filename, code="external_url", line=line,
+                                message=f"url({url_value}) must point inside the theme archive",
+                            ))
+                    elif hasattr(arg, "type") and arg.type == "function" and arg.lower_name == "url":
+                        # Alternative form with function token
+                        for nested_arg in arg.arguments:
+                            if hasattr(nested_arg, "value"):
+                                url_value = nested_arg.value
+                                if not _is_internal_url(url_value):
+                                    issues.append(ThemeIssue(
+                                        file=filename, code="external_url", line=line,
+                                        message=f"url({url_value}) must point inside the theme archive",
+                                    ))
 
 
 def _check_rule(rule, filename: str, issues: list[ThemeIssue]) -> None:

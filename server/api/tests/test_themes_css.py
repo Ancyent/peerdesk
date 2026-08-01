@@ -127,3 +127,52 @@ def test_rejects_a_media_query_wrapping_an_unpublished_selector():
 def test_accepts_a_media_query_wrapping_a_published_selector():
     out = filter_css("@media (min-width: 600px) { [data-pd-btn] { width: 100px; } }", "css/web.css")
     assert "min-width" in out
+
+
+def test_rejects_an_unquoted_external_url():
+    assert "external_url" in codes('[data-pd-btn] { background-image: url(https://attacker.invalid/a.png); }')
+
+
+def test_rejects_an_unquoted_protocol_relative_url():
+    assert "external_url" in codes('[data-pd-btn] { background-image: url(//attacker.invalid/a.png); }')
+
+
+def test_rejects_an_unquoted_data_url():
+    assert "external_url" in codes('[data-pd-btn] { background-image: url(data:image/svg+xml,<svg/>); }')
+
+
+def test_rejects_uppercase_url_with_external_target():
+    assert "external_url" in codes('[data-pd-btn] { background-image: URL(https://attacker.invalid/a.png); }')
+
+
+def test_rejects_url_inside_image_set_with_external_target():
+    assert "external_url" in codes('[data-pd-btn] { background-image: image-set(url(https://attacker.invalid/a) 1x); }')
+
+
+def test_rejects_url_in_custom_property_with_external_target():
+    assert "external_url" in codes(':root { --x: url(https://attacker.invalid/a); }')
+
+
+def test_rejects_javascript_scheme():
+    assert "external_url" in codes('[data-pd-btn] { background-image: url("javascript:alert(1)"); }')
+
+
+def test_rejects_vbscript_scheme():
+    assert "external_url" in codes('[data-pd-btn] { background-image: url("vbscript:msgbox(1)"); }')
+
+
+def test_rejects_mailto_scheme():
+    assert "external_url" in codes('[data-pd-btn] { background-image: url("mailto:x@x.com"); }')
+
+
+def test_rejects_custom_scheme():
+    assert "external_url" in codes('[data-pd-btn] { background-image: url("myapp://exfiltrate"); }')
+
+
+def test_rejects_bad_url_tokens():
+    assert "bad_css" in codes('[data-pd-btn] { background-image: url(var(--x)); }')
+
+
+def test_accepts_unquoted_relative_url():
+    out = filter_css('[data-pd-btn] { background-image: url(images/tile.png); }', "css/web.css")
+    assert "images/tile.png" in out
