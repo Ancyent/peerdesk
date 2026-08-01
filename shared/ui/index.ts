@@ -37,4 +37,4 @@ export { ConfirmProvider, useConfirm } from './ConfirmProvider';
 
 export { InlineError } from './InlineError';
 
-export { CRITICAL_COMPONENT_FILES, PUBLISHED_HOOKS } from './themeSurface';
+export { CRITICAL_COMPONENT_FILES, PUBLISHED_HOOKS, RESERVED_TOKEN_PREFIX } from './themeSurface';

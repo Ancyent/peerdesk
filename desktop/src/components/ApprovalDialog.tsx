@@ -11,7 +11,13 @@ interface ApprovalReq {
 
 /** Attended-access prompt. The agent emits `approval-request` for every
  *  incoming connection; the host must accept or reject. Auto-rejects after
- *  60s (matching the agent-side timeout) so a stale prompt can't hang. */
+ *  60s (matching the agent-side timeout) so a stale prompt can't hang.
+ *
+ *  Every colour below is a --pd-sys-* token, which no uploaded theme may
+ *  declare. This prompt used to survive theming by accident, because it still
+ *  held hardcoded hex while the rest of the app moved to tokens; the pending
+ *  token-adoption work would have removed that accident silently. Reading
+ *  reserved tokens makes the protection a decision that survives it. */
 export function ApprovalDialog() {
   const { t } = useTranslation('viewer');
   const { notify } = useNotify();
@@ -75,34 +81,37 @@ export function ApprovalDialog() {
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(5, 8, 13, 0.72)', backdropFilter: 'blur(2px)',
+        background: 'var(--pd-sys-overlay, rgba(5, 8, 13, 0.72))', backdropFilter: 'blur(2px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
       <div
         style={{
-          width: 340, background: '#161b22', border: '1px solid rgba(38,198,218,0.35)',
-          borderRadius: 12, padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
+          width: 340,
+          background: 'var(--pd-sys-surface-bg, #161b22)',
+          border: 'var(--pd-sys-surface-border, 1px solid rgba(38,198,218,0.35))',
+          borderRadius: 'var(--pd-sys-radius, 12px)', padding: 22,
+          boxShadow: 'var(--pd-sys-surface-shadow, 0 20px 60px rgba(0,0,0,0.55))',
           animation: 'pd-pop 140ms ease-out',
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#e6edf3', marginBottom: 6 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--pd-sys-text-1, #e6edf3)', marginBottom: 6 }}>
           {t('viewer:approval.title')}
         </div>
-        <div style={{ fontSize: 12, color: '#b3bdca', marginBottom: 16, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: 'var(--pd-sys-text-2, #b3bdca)', marginBottom: 16, lineHeight: 1.5 }}>
           {t('viewer:approval.message')}
-          <br />{t('viewer:approval.fromIp')} <span style={{ color: '#26c6da', fontFamily: 'monospace' }}>{req.remote_ip}</span>
+          <br />{t('viewer:approval.fromIp')} <span style={{ color: 'var(--pd-sys-accent, #26c6da)', fontFamily: 'monospace' }}>{req.remote_ip}</span>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
             onClick={() => respond(false)}
-            style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: '1px solid #30363d', background: 'transparent', color: '#f0a0a0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: '1px solid var(--pd-sys-border-dim, #30363d)', background: 'transparent', color: 'var(--pd-sys-danger, #f0a0a0)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
           >
             {t('viewer:approval.reject')}
           </button>
           <button
             onClick={() => respond(true)}
-            style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: 'none', background: '#26c6da', color: '#0d1117', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '9px 0', borderRadius: 7, border: 'none', background: 'var(--pd-sys-accent, #26c6da)', color: 'var(--pd-sys-accent-ink, #0d1117)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
           >
             {t('viewer:approval.accept', { secs })}
           </button>

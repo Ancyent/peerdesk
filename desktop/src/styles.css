@@ -100,6 +100,33 @@ body::before {
   --surface-shadow: 0 10px 30px -8px rgb(0 0 0 / 0.5);
   --chrome-bg:      var(--bg-sidebar);
   --chrome-blur:    none;
+
+  /* --- reserved: security-critical UI ---------------------------------- *
+   * The confirm dialog, the modal shell, the session-approval prompt and the
+   * security-code banner render through these and nothing else. An uploaded
+   * theme may not declare a --pd-sys-* token; the validator rejects the whole
+   * package if it tries (RESERVED_TOKEN_PREFIX in
+   * server/api/themes/surface.py).
+   *
+   * Written as literals, never as var(--token). A var() reference to a
+   * settable token would hand the guarantee straight back: setting --text-1
+   * would blank the approval prompt through the indirection. */
+  --pd-sys-surface-bg:     #172131;
+  --pd-sys-surface-border: 1px solid rgba(148, 176, 200, 0.14);
+  --pd-sys-surface-blur:   none;
+  --pd-sys-surface-shadow: 0 10px 30px -8px rgb(0 0 0 / 0.5);
+  --pd-sys-radius:      12px;
+  --pd-sys-overlay:     rgba(5, 8, 13, 0.72);
+  --pd-sys-border:      rgba(34, 197, 176, 0.24);
+  --pd-sys-border-dim:  rgba(148, 176, 200, 0.14);
+  --pd-sys-text-1:      #f2f6fa;
+  --pd-sys-text-2:      #b9c7d8;
+  --pd-sys-text-3:      #8595aa;
+  --pd-sys-accent:      #22c5b0;
+  --pd-sys-accent-bg:   rgba(34, 197, 176, 0.14);
+  --pd-sys-accent-ink:  #04201d;
+  --pd-sys-danger:      #f87171;
+  --pd-sys-danger-ink:  #2a0b0d;
 }
 
 /* --- light -------------------------------------------------------------- */
@@ -147,6 +174,24 @@ body::before {
   --surface-shadow: 0 10px 30px -10px rgb(15 30 50 / 0.18);
   --chrome-bg:      var(--bg-sidebar);
   --chrome-blur:    none;
+
+  /* Reserved: see the dark block above for why these are literals. */
+  --pd-sys-surface-bg:     #ffffff;
+  --pd-sys-surface-border: 1px solid rgba(15, 30, 50, 0.13);
+  --pd-sys-surface-blur:   none;
+  --pd-sys-surface-shadow: 0 10px 30px -10px rgb(15 30 50 / 0.18);
+  --pd-sys-radius:      12px;
+  --pd-sys-overlay:     rgba(15, 30, 50, 0.45);
+  --pd-sys-border:      rgba(13, 139, 125, 0.30);
+  --pd-sys-border-dim:  rgba(15, 30, 50, 0.13);
+  --pd-sys-text-1:      #0d1420;
+  --pd-sys-text-2:      #3d4b5c;
+  --pd-sys-text-3:      #64748b;
+  --pd-sys-accent:      #0d8b7d;
+  --pd-sys-accent-bg:   rgba(13, 139, 125, 0.12);
+  --pd-sys-accent-ink:  #ffffff;
+  --pd-sys-danger:      #d64550;
+  --pd-sys-danger-ink:  #ffffff;
 }
 
 /* Dark, slim scrollbars for the inner scroll areas (panels, settings, etc.) */

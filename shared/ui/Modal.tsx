@@ -1,7 +1,24 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { surfaceStyle } from './Surface';
+
+/** The dialog shell's own surface recipe, read from reserved tokens.
+ *
+ *  This deliberately does not call surfaceStyle() from Surface.tsx. That helper
+ *  reads --surface-*, which an uploaded theme is allowed to set, so a Modal
+ *  rendered through it could be blanked by a theme that never selected it —
+ *  and Modal is what ConfirmDialog renders inside. --pd-sys-* tokens cannot be
+ *  set by a theme (RESERVED_TOKEN_PREFIX in server/api/themes/surface.py), and
+ *  keeping the recipe here rather than importing it also means Modal has no
+ *  edge to a themeable module at all. */
+const DIALOG_SURFACE = {
+  background: 'var(--pd-sys-surface-bg, #172131)',
+  border: 'var(--pd-sys-surface-border, 1px solid rgba(148,176,200,0.14))',
+  boxShadow: 'var(--pd-sys-surface-shadow, 0 10px 30px -8px rgb(0 0 0 / 0.5))',
+  backdropFilter: 'var(--pd-sys-surface-blur, none)',
+  WebkitBackdropFilter: 'var(--pd-sys-surface-blur, none)',
+  borderRadius: 'var(--pd-sys-radius, 12px)',
+} as const;
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -143,7 +160,7 @@ export function Modal({ open, onClose, labelledBy, children, width = 380, initia
       onClick={onOverlayClick}
       style={{
         position: 'fixed', inset: 0, zIndex: 1200,
-        background: 'rgba(5, 8, 13, 0.72)',
+        background: 'var(--pd-sys-overlay, rgba(5, 8, 13, 0.72))',
         // Written twice because nothing in the toolchain adds vendor prefixes,
         // and WebKitGTK - the engine behind the desktop window - only ships the
         // prefixed property. Unprefixed alone, the blur vanished silently there
@@ -162,11 +179,7 @@ export function Modal({ open, onClose, labelledBy, children, width = 380, initia
         onMouseDown={onDialogMouseDown}
         onKeyDown={onKeyDown}
         style={{
-          // The var(--token, #fallback) pairs that used to be here existed only
-          // because desktop defined no tokens at all, so shared components fell
-          // back to a hardcoded copy of the web palette and rendered green
-          // inside a cyan window. Both apps declare the set now.
-          ...surfaceStyle('panel'),
+          ...DIALOG_SURFACE,
           width, maxWidth: '100%',
           padding: 22,
           animation: 'pd-modal-pop 140ms ease-out',
