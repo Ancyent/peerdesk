@@ -14,7 +14,7 @@ from xml.etree import ElementTree as ET
 from defusedxml.common import DefusedXmlException
 from defusedxml.ElementTree import fromstring as defused_fromstring
 
-from .errors import ThemeIssue, ThemeRejected
+from .errors import IssueList, ThemeIssue, ThemeRejected
 
 SVG_NS = "http://www.w3.org/2000/svg"
 
@@ -34,7 +34,8 @@ ALLOWED_ATTRS = frozenset({
     "id", "class", "xmlns", "version", "preserveAspectRatio",
 })
 
-            # Elements that are dangerous and must cause rejection (stored lowercase for case-insensitive matching)
+# Elements that are dangerous and must cause rejection (stored lowercase for
+# case-insensitive matching).
 DANGEROUS_TAGS = frozenset({
     "script", "foreignobject", "iframe", "embed", "object", "handler",
     "animate", "animatetransform", "animatemotion", "set",
@@ -58,6 +59,15 @@ def _is_safe_url_value(value: str) -> bool:
     Per CSS Syntax Module Level 3, unterminated url() tokens are parse errors but may
     still be emitted by the tokenizer. This function rejects them to ensure renderers
     cannot fetch off-origin references through incomplete tokens.
+
+    The invariant that makes the scan below correct, written down because two
+    reviewers have now had to re-derive it: extraction always begins at the
+    character after the opening paren this very match found, so `content` is
+    always a suffix of the true url() body. A mis-scan can therefore only
+    truncate the reference — never extend it, and never invent a leading '#'
+    that the author did not write. Truncation makes the check stricter (a
+    truncated reference either still starts with '#' or is rejected), so the
+    failure mode of this function is a false rejection, not a false accept.
     """
     # First, find ALL url( tokens, including incomplete ones.
     # Pattern: url followed by optional whitespace and opening paren
@@ -113,9 +123,11 @@ def _check_dangerous(element: ET.Element, filename: str) -> list[ThemeIssue]:
     - Attributes: on* (event handlers), href, xlink:href
     - Attribute values: off-origin url() references
     """
-    issues: list[ThemeIssue] = []
+    issues = IssueList()
 
     def check_element(el: ET.Element) -> None:
+        if issues.stopped():
+            return
         tag_name = _local(el.tag)
 
         # Check if element itself is dangerous (case-insensitive)
@@ -165,7 +177,7 @@ def _check_dangerous(element: ET.Element, filename: str) -> list[ThemeIssue]:
             check_element(child)
 
     check_element(element)
-    return issues
+    return issues.finish()
 
 
 def _clean(element: ET.Element) -> None:
@@ -213,9 +225,16 @@ def sanitize_svg(data: bytes, filename: str) -> bytes:
             file=filename, code="bad_svg", message=f"not well-formed XML: {exc}",
         )]) from None
 
-    if _local(root.tag) != "svg":
+    # The namespace is part of the check, not decoration. A local-name-only
+    # test accepts <svg xmlns="http://evil.invalid/ns">, and the output of that
+    # is re-serialised into a document that no longer probes as an SVG by this
+    # validator's own probe() — a file admitted as one kind and written as
+    # another. Requiring the SVG namespace is also what every renderer requires
+    # before it will draw the file at all.
+    if root.tag != f"{{{SVG_NS}}}svg":
         raise ThemeRejected([ThemeIssue(
-            file=filename, code="not_svg", message="root element must be <svg>",
+            file=filename, code="not_svg",
+            message=f"root element must be <svg> in the {SVG_NS} namespace",
         )])
 
     # Check for dangerous elements and attributes

@@ -384,3 +384,36 @@ def test_case_insensitive_event_handler_preserves_original_spelling():
         sanitize_svg(f'<svg {NS}><path d="M0 0" ONLOAD="alert(1)"/></svg>'.encode(), FILE)
     message = next(i.message for i in e.value.issues if i.code == "svg_event_handler")
     assert "ONLOAD" in message
+
+
+# --- M1: the root check is namespace-aware ----------------------------------
+
+
+def test_rejects_an_svg_root_in_another_namespace():
+    """<svg xmlns="http://evil.invalid/ns"> is not an SVG.
+
+    A local-name-only check accepted it, and its sanitized output no longer
+    probed as SVG by this validator's own probe() — a file admitted as one kind
+    and written as another.
+    """
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(b'<svg xmlns="http://evil.invalid/ns"><path d="M0 0"/></svg>', FILE)
+    assert any(i.code == "not_svg" for i in e.value.issues)
+
+
+def test_rejects_an_svg_root_with_no_namespace_at_all():
+    with pytest.raises(ThemeRejected) as e:
+        sanitize_svg(b'<svg><path d="M0 0"/></svg>', FILE)
+    assert any(i.code == "not_svg" for i in e.value.issues)
+
+
+def test_the_sanitized_output_still_probes_as_an_svg():
+    """What comes out must be the kind of file that went in.
+
+    This is the property the namespace check exists to preserve, asserted
+    against the validator's own probe rather than against the sanitizer.
+    """
+    from themes.imageprobe import probe
+    out = sanitize_svg(f'<svg {NS}><path d="M0 0"/></svg>'.encode(), FILE)
+    assert probe(out) is not None
+    assert probe(out).kind == "svg"
