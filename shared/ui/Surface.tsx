@@ -9,9 +9,10 @@ const GEOMETRY: Record<SurfaceKind, CSSProperties> = {
 };
 
 /** Reads the surface recipe straight off the token set, which is what lets the
- *  same component render as glass on web and as an opaque panel on desktop with
- *  no prop, no branch and no build flag - desktop simply declares
- *  --surface-blur: none.
+ *  same component render as glass on both web and desktop with no prop, no
+ *  branch and no build flag - desktop declares the same --surface-* and
+ *  --chrome-* values as web now that a probe confirmed WebKitGTK composites
+ *  backdrop-filter.
  *
  *  -webkit-backdrop-filter is not redundant. Nothing in this toolchain adds
  *  vendor prefixes (there is no autoprefixer), and WebKitGTK - the engine

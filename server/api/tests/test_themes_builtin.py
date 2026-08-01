@@ -36,21 +36,6 @@ def _tokens(css: str, block: str) -> dict[str, str]:
     }
 
 
-def is_desktop_recipe_token(name: str) -> bool:
-    """Whether a token is part of the surface recipe desktop overrides.
-
-    Desktop deliberately replaces the whole recipe (--surface-* and --chrome-*)
-    pending a WebKitGTK probe confirming backdrop-filter composites in the Tauri
-    window. Until then desktop renders opaque, so those values are expected to
-    differ while every other token must match exactly.
-
-    A function rather than an inline condition so the rule itself can be
-    tested. Inlined, converting it back to a hard-coded name list — the exact
-    regression its own test names — changed nothing that any test could see.
-    """
-    return name.startswith("--surface-") or name.startswith("--chrome-")
-
-
 def _settable(tokens: dict[str, str]) -> dict[str, str]:
     """Drop the reserved tokens, which a theme package deliberately lacks.
 
@@ -92,6 +77,16 @@ def test_builtin_tokens_match_the_web_stylesheet():
 
 
 def test_builtin_tokens_match_the_desktop_stylesheet():
+    """The built-in theme and desktop/src/styles.css must not drift.
+
+    Desktop used to ship the surface recipe (--surface-* and --chrome-*) opaque,
+    pending a probe of whether WebKitGTK - the engine behind the Tauri window -
+    composites backdrop-filter at all. The probe (2026-08-01, against
+    libwebkit2gtk-4.1) confirmed it does, so desktop now carries the same glass
+    recipe as web and there is no longer a divergence to skip: every settable
+    token is compared exactly, the same way test_builtin_tokens_match_the_web_stylesheet
+    compares against web/src/branding.css.
+    """
     builtin = (BUILTIN_DIR / "css" / "tokens.css").read_text()
     desktop = (REPO_ROOT / "desktop" / "src" / "styles.css").read_text()
 
@@ -103,39 +98,9 @@ def test_builtin_tokens_match_the_desktop_stylesheet():
         f"only in desktop/src/styles.css {sorted(set(theirs) - set(ours))}"
     )
     for name, value in ours.items():
-        if is_desktop_recipe_token(name):
-            continue
         assert theirs[name] == value, (
             f"{name} differs: builtin {value!r} vs desktop {theirs[name]!r}"
         )
-
-
-def test_the_desktop_skip_rule_is_a_prefix_rule():
-    """The skip rule itself, exercised as the implementation it is.
-
-    The previous version of this test re-derived the rule locally, so
-    converting the real skip to a hard-coded name list — the regression its own
-    docstring named — left it green.
-    """
-    assert is_desktop_recipe_token("--surface-bg")
-    assert is_desktop_recipe_token("--chrome-blur")
-    # The point of a prefix: a token nobody has written yet is covered too.
-    assert is_desktop_recipe_token("--surface-anything-at-all")
-    assert is_desktop_recipe_token("--chrome-anything-at-all")
-
-    assert not is_desktop_recipe_token("--accent")
-    assert not is_desktop_recipe_token("--accent-hover")
-    assert not is_desktop_recipe_token("--text-1")
-
-
-def test_the_skip_rule_covers_tokens_that_exist_and_spares_the_rest():
-    builtin_tokens = _tokens((BUILTIN_DIR / "css" / "tokens.css").read_text(), ":root")
-    skipped = [n for n in builtin_tokens if is_desktop_recipe_token(n)]
-    compared = [n for n in builtin_tokens if not is_desktop_recipe_token(n)]
-    # Neither side may be empty, or the rule would be doing no work in one
-    # direction and the comparison above would be vacuous in the other.
-    assert len(skipped) >= 4
-    assert len(compared) >= 10
 
 
 def test_the_app_stylesheets_declare_the_reserved_tokens_in_both_themes():
