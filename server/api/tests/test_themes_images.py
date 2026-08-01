@@ -74,3 +74,43 @@ def test_returns_none_for_a_zip_disguised_as_an_image():
 def test_a_malformed_jpeg_segment_chain_terminates():
     # A zero-length segment would loop forever if the walk were not bounded.
     assert probe(b"\xff\xd8\xff\xe0\x00\x00" + b"\x00" * 32) is None
+
+
+def test_html_containing_svg_tag_returns_none():
+    # SVG tag inside HTML body is not an SVG document.
+    assert probe(b"<html><body>hi<svg xmlns='x'></svg></body></html>") is None
+
+
+def test_text_containing_svg_string_returns_none():
+    # SVG tag as a literal string in text/JS is not an SVG document.
+    assert probe(b"var x = '<svg'; console.log(x);") is None
+
+
+def test_svg_with_xml_prolog_is_detected():
+    # SVG preceded by XML prolog should be detected (already tests this).
+    info = probe(b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    assert info.kind == "svg"
+
+
+def test_svg_with_doctype_is_detected():
+    # SVG preceded by DOCTYPE should be detected.
+    info = probe(b'<!DOCTYPE svg><svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    assert info.kind == "svg"
+
+
+def test_svg_with_xml_comment_is_detected():
+    # SVG preceded by XML comment should be detected.
+    info = probe(b'<!-- comment --><svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    assert info.kind == "svg"
+
+
+def test_svg_with_utf8_bom_is_detected():
+    # SVG preceded by UTF-8 BOM should be detected.
+    info = probe(b'\xef\xbb\xbf<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    assert info.kind == "svg"
+
+
+def test_svg_with_leading_whitespace_is_detected():
+    # SVG preceded by leading whitespace and newlines should be detected.
+    info = probe(b'  \n\t<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    assert info.kind == "svg"
