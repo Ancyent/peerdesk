@@ -28,14 +28,27 @@ def is_safe_entry_name(name: str) -> bool:
     r"""Affirm that a ZIP entry name is safe to extract.
 
     A name is safe if and only if ALL of these hold:
-    - non-empty and no longer than MAX_ENTRY_NAME_LENGTH bytes
+    - non-empty and no longer than MAX_ENTRY_NAME_LENGTH bytes (which is ASCII, so bytes = chars)
     - does not begin with / (absolute path)
     - splits on / into at least one component
     - each component is non-empty, not . or .., at most 255 bytes, and contains
-      only characters with code >= 0x20 (no control chars) and != 0x7F (DEL),
-      and does not contain \, :, or NUL
+      only ASCII characters from the allowlist: a-z, A-Z, 0-9, - _ . + ( ), space
+
+    ASCII-only is deliberate. Restricting to ASCII closes filename spoofing and
+    normalisation collisions (RTLO, zero-width joiners, C1 controls, Unicode
+    line/paragraph separators, combining marks, and future codepoints) in one
+    clause. It is a reasonable cost to prevent these attacks and achieve
+    consistency across platforms — theme authors cannot name a file café.png,
+    but validators taking archives from strangers cannot afford that risk.
     """
+    # Allowlist of acceptable ASCII characters (one per category to be explicit)
+    # Letters, digits, and punctuation/space that are safe across filesystems
+    ALLOWED_CHARS = set(
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.+() "
+    )
+
     # Non-empty and length-bounded at the whole-name level
+    # Using len() on str is safe because we only accept ASCII (one char = one byte)
     if not name or len(name) > limits.MAX_ENTRY_NAME_LENGTH:
         return False
 
@@ -60,19 +73,14 @@ def is_safe_entry_name(name: str) -> bool:
         if component in (".", ".."):
             return False
 
-        # Component must be at most 255 bytes
+        # Component must be at most 255 bytes (256 ASCII chars max per component)
+        # len() counts characters; ASCII is one byte per character
         if len(component) > 255:
             return False
 
-        # Every character must be acceptable:
-        # - no control chars (below 0x20)
-        # - no DEL (0x7F)
-        # - no backslash (0x5C)
-        # - no colon (0x3A)
-        # - no NUL (0x00)
+        # Every character must be in the allowlist
         for char in component:
-            code = ord(char)
-            if code < 0x20 or code == 0x7F or char in ("\\", ":", "\x00"):
+            if char not in ALLOWED_CHARS:
                 return False
 
     return True

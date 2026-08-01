@@ -92,10 +92,23 @@ def test_is_safe_entry_name_rejects_windows_drive_prefix():
     assert not is_safe_entry_name("C:x")
 
 
-def test_is_safe_entry_name_rejects_control_characters():
-    """Control characters (tab, newline, etc.) are not acceptable."""
+def test_is_safe_entry_name_rejects_all_non_ascii_and_control_characters():
+    """All non-ASCII and control characters are rejected.
+
+    This includes C0 control chars, C1 control chars, and special Unicode.
+    """
+    # C0 control characters (below 0x20)
     assert not is_safe_entry_name("a\tb")  # tab (0x09)
     assert not is_safe_entry_name("a\nb")  # newline (0x0A)
+    # C1 control characters (0x80-0x9F range)
+    assert not is_safe_entry_name("a\x85b")  # NEL (0x85)
+    assert not is_safe_entry_name("a\x9bb")  # CSI (0x9B)
+    # Right-to-left override (U+202E)
+    assert not is_safe_entry_name("a‮b")
+    # Zero-width joiner (U+200D)
+    assert not is_safe_entry_name("a‍b")
+    # Paragraph separator (U+2029)
+    assert not is_safe_entry_name("a b")
 
 
 def test_is_safe_entry_name_rejects_unbounded_length():
@@ -169,3 +182,43 @@ def test_rejects_archive_with_high_extract_version(tmp_path):
         info.extract_version = 99
         z.writestr(info, "content")
     assert "bad_archive" in codes(path)
+
+
+def test_is_safe_entry_name_rejects_accented_characters():
+    """Accented characters like é are rejected (ASCII-only policy).
+
+    This is a deliberate cost to prevent filename spoofing and normalisation
+    collisions. Theme authors cannot name files café.png, but the validator
+    is more secure and consistent across platforms.
+    """
+    assert not is_safe_entry_name("café.png")
+
+
+def test_is_safe_entry_name_rejects_component_of_non_ascii_bytes():
+    """A component of 255 non-ASCII characters is rejected.
+
+    This demonstrates why len() on a str was insufficient before: 255 é
+    characters would be 255 characters but 510 UTF-8 bytes. Now that we
+    restrict to ASCII, len() counts bytes correctly.
+    """
+    component_255_accents = "é" * 255
+    assert not is_safe_entry_name(component_255_accents)
+    # Even if it were 255 bytes worth of accented chars, it'd still be rejected
+    # because the characters themselves are non-ASCII
+    assert len(component_255_accents) == 255
+    assert len(component_255_accents.encode("utf-8")) == 510
+
+
+def test_is_safe_entry_name_accepts_all_allowed_punctuation():
+    """All allowed punctuation and space characters are accepted together."""
+    # Test a name with every allowed punctuation character: - _ . + ( ) and space
+    assert is_safe_entry_name("file-name_v1.0+patch(1).png")
+    assert is_safe_entry_name("dir/sub dir/file with space.txt")
+    # Test each punctuation character individually
+    assert is_safe_entry_name("a-b")
+    assert is_safe_entry_name("a_b")
+    assert is_safe_entry_name("a.b")
+    assert is_safe_entry_name("a+b")
+    assert is_safe_entry_name("a(b")
+    assert is_safe_entry_name("a)b")
+    assert is_safe_entry_name("a b")
