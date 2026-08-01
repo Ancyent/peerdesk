@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en" data-direction="aurora" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PeerDesk design - Viewer (active session)</title>
+<style>
+/* ==========================================================================
+   PeerDesk design mockup - an active remote session.
+
+   The hardest screen for glass, and the only one with continuous repaint. The
+   probe and the FPS counter are here rather than on the other mockups because
+   this is where the answer actually matters.
+   ========================================================================== */
+/* --- A: Aurora Glass ---------------------------------------------------- */
+[data-direction="aurora"][data-theme="dark"]{
+  --bg-base:#0b111c; --bg-surface:#172131; --bg-raised:#1e2a3d; --bg-sidebar:#080d16;
+  --bg-hover:#24334a; --bg-active:#2b3d59;
+  --border:rgba(34,197,176,.24); --border-dim:rgba(148,176,200,.14);
+  --text-1:#f2f6fa; --text-2:#b9c7d8; --text-3:#8595aa;
+  --accent:#22c5b0; --accent-2:#3ba7f0; --accent-hover:#3ad9c4; --accent-ink:#04201d;
+  --green:#34d8a4; --green-bg:rgba(52,216,164,.14);
+  --red:#f87171;   --red-bg:rgba(248,113,113,.14);
+  --yellow:#fbbf24;--yellow-bg:rgba(251,191,36,.14);
+  /* Positioned to pass UNDER the content, not just along the edges. Glass with
+     nothing but flat base behind it is indistinguishable from a solid panel -
+     which is exactly what direction B already is, for free. */
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(34,197,176,.30), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%, rgba(59,167,240,.27), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(126,87,224,.25), transparent 65%);
+  --surface-bg:rgb(255 255 255 / .07);
+  --surface-border:1px solid rgb(255 255 255 / .13);
+  --surface-blur:blur(14px) saturate(160%);
+  --surface-shadow:inset 0 1px 0 0 rgb(255 255 255 / .15), 0 10px 30px -8px rgb(0 0 0 / .5);
+  --chrome-bg:rgb(255 255 255 / .04);
+  --chrome-blur:blur(18px) saturate(150%);
+  --radius:12px;
+}
+[data-direction="aurora"][data-theme="light"]{
+  --bg-base:#eef2f7; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#e7ecf3;
+  --bg-hover:#e2e8f0; --bg-active:#d3dce8;
+  --border:rgba(13,139,125,.30); --border-dim:rgba(15,30,50,.13);
+  --text-1:#0d1420; --text-2:#3d4b5c; --text-3:#64748b;
+  --accent:#0d8b7d; --accent-2:#1f6feb; --accent-hover:#0b7568; --accent-ink:#ffffff;
+  --green:#0f9d63; --green-bg:rgba(15,157,99,.12);
+  --red:#d64550;   --red-bg:rgba(214,69,80,.12);
+  --yellow:#b45309;--yellow-bg:rgba(180,83,9,.12);
+  --page-image:
+    radial-gradient(1000px 700px at 15% 12%, rgba(13,139,125,.22), transparent 62%),
+    radial-gradient(880px 620px at 85% 4%, rgba(31,111,235,.20), transparent 62%),
+    radial-gradient(900px 720px at 62% 78%, rgba(150,110,220,.18), transparent 65%);
+  --surface-bg:rgb(255 255 255 / .62);
+  /* Dark edge, not white: a white border on a white panel over a pale backdrop
+     is invisible. The inset highlight stays white - it is a specular effect. */
+  --surface-border:1px solid rgb(15 30 50 / .12);
+  --surface-blur:blur(16px) saturate(180%);
+  --surface-shadow:inset 0 1px 0 0 rgb(255 255 255 / .7), 0 10px 30px -10px rgb(15 30 50 / .18);
+  --chrome-bg:rgb(255 255 255 / .6);
+  --chrome-blur:blur(18px) saturate(150%);
+  --radius:12px;
+}
+
+/* --- B: Solid Slate ----------------------------------------------------- */
+[data-direction="slate"][data-theme="dark"]{
+  --bg-base:#12171f; --bg-surface:#1a2029; --bg-raised:#222933; --bg-sidebar:#0e131a;
+  --bg-hover:#232b36; --bg-active:#2b3543;
+  --border:#39424f; --border-dim:#2c343f;
+  --text-1:#eef2f7; --text-2:#aeb9c7; --text-3:#7d8899;
+  --accent:#35c9e0; --accent-2:#4f8ff7; --accent-hover:#52d6ea; --accent-ink:#062227;
+  --green:#3ecf8e; --green-bg:rgba(62,207,142,.13);
+  --red:#f2555a;   --red-bg:rgba(242,85,90,.13);
+  --yellow:#e3b341;--yellow-bg:rgba(227,179,65,.13);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(0 0 0 / .28);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:10px;
+}
+[data-direction="slate"][data-theme="light"]{
+  --bg-base:#f6f7f9; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#eceff3;
+  --bg-hover:#eef1f5; --bg-active:#e2e7ee;
+  --border:#c6ced8; --border-dim:#d8dde4;
+  --text-1:#131820; --text-2:#4b5563; --text-3:#727e8d;
+  --accent:#0e9384; --accent-2:#1d6ce0; --accent-hover:#0c7f72; --accent-ink:#ffffff;
+  --green:#0b8a57; --green-bg:rgba(11,138,87,.11);
+  --red:#c9333c;   --red-bg:rgba(201,51,60,.11);
+  --yellow:#9a5b06;--yellow-bg:rgba(154,91,6,.11);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(19 24 32 / .06);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:10px;
+}
+
+/* --- C: Light Studio ---------------------------------------------------- */
+[data-direction="studio"][data-theme="light"]{
+  --bg-base:#fbfbfd; --bg-surface:#ffffff; --bg-raised:#ffffff; --bg-sidebar:#f5f5f9;
+  --bg-hover:#f1f1f6; --bg-active:#ebebf6;
+  --border:#dcdce6; --border-dim:#e8e8f0;
+  --text-1:#14171f; --text-2:#4a5060; --text-3:#79808f;
+  --accent:#5b5bd6; --accent-2:#0ea5e9; --accent-hover:#4f4fc9; --accent-ink:#ffffff;
+  --green:#12855f; --green-bg:rgba(18,133,95,.10);
+  --red:#d03249;   --red-bg:rgba(208,50,73,.10);
+  --yellow:#9a6207;--yellow-bg:rgba(154,98,7,.10);
+  --page-image:none;
+  --surface-bg:#ffffff;
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(20 23 31 / .04), 0 10px 26px -14px rgb(20 23 31 / .16);
+  --chrome-bg:#ffffff;
+  --chrome-blur:none;
+  --radius:14px;
+}
+[data-direction="studio"][data-theme="dark"]{
+  --bg-base:#15161c; --bg-surface:#1d1f27; --bg-raised:#252832; --bg-sidebar:#111218;
+  --bg-hover:#252832; --bg-active:#2d3040;
+  --border:#353947; --border-dim:#2a2d37;
+  --text-1:#f4f5f8; --text-2:#b0b4c2; --text-3:#7f8494;
+  --accent:#7c7cf0; --accent-2:#38bdf8; --accent-hover:#8d8df4; --accent-ink:#0d0e14;
+  --green:#34d399; --green-bg:rgba(52,211,153,.13);
+  --red:#fb7185;   --red-bg:rgba(251,113,133,.13);
+  --yellow:#fbbf24;--yellow-bg:rgba(251,191,36,.13);
+  --page-image:none;
+  --surface-bg:var(--bg-surface);
+  --surface-border:1px solid var(--border-dim);
+  --surface-blur:none;
+  --surface-shadow:0 1px 2px rgb(0 0 0 / .3);
+  --chrome-bg:var(--bg-sidebar);
+  --chrome-blur:none;
+  --radius:14px;
+}
+
+/* --- shared ------------------------------------------------------------- */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg-base); color:var(--text-2);
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:var(--page-image);
+}
+
+/* The control bar keeps its own neutral colors in every direction, so it can
+   never be mistaken for part of the design being judged. */
+.devbar{
+  position:fixed; top:0; left:0; right:0; height:42px; z-index:200;
+  display:flex; align-items:center; gap:18px; padding:0 14px;
+  background:#0a0a0c; color:#d6d8de; border-bottom:1px solid #24262e;
+  font-size:12px;
+}
+.devbar b{color:#fff;font-size:12px;font-weight:600}
+.devbar .grp{display:flex;gap:5px;align-items:center}
+.devbar .lbl{color:#8a8f9c;font-size:11px}
+.devbar button{
+  font:inherit;font-size:11px;padding:4px 10px;border-radius:999px;cursor:pointer;
+  background:transparent;color:#c3c7d1;border:1px solid #34374211;border-color:#343742;
+}
+.devbar button[aria-pressed="true"]{background:#e8eaf0;color:#0a0a0c;border-color:#e8eaf0;font-weight:600}
+.devbar .hint{margin-left:auto;color:#6c7280;font-size:11px}
+
+.stage{position:relative;z-index:1;height:calc(100vh - 42px);margin-top:42px;overflow:hidden;background:#05070b}
+
+/* Stand-in for the decoded stream. Honest about what it is: this animates real
+   pixels every frame, so it measures compositing cost the same way a stream
+   would - but it is not video decode, so a live session will differ. */
+.feed{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(900px 700px at 25% 30%, #1d4f6b, transparent 60%),
+    radial-gradient(800px 640px at 75% 65%, #4a2a6b, transparent 60%),
+    radial-gradient(700px 560px at 55% 10%, #1f6b5a, transparent 60%),
+    #0a1018;
+  background-size:180% 180%,180% 180%,180% 180%,auto;
+  animation:drift 16s ease-in-out infinite alternate;
+}
+@keyframes drift{
+  from{background-position:0% 0%,100% 0%,50% 100%,0 0}
+  to{background-position:100% 55%,0% 75%,20% 0%,0 0}
+}
+/* A fake remote desktop drawn on top, so the overlays sit over content with
+   real edges rather than over a smooth wash that flatters any blur. */
+.fake{position:absolute;inset:0;opacity:.92}
+.fake .bar{position:absolute;top:0;left:0;right:0;height:28px;background:rgba(8,12,20,.9);
+  border-bottom:1px solid rgba(255,255,255,.07)}
+.fake .bar::before{content:'';position:absolute;left:12px;top:10px;width:74px;height:8px;border-radius:4px;background:rgba(255,255,255,.28)}
+.fake .bar::after{content:'';position:absolute;right:12px;top:10px;width:120px;height:8px;border-radius:4px;background:rgba(255,255,255,.18)}
+.fake .dock{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);width:360px;height:52px;
+  border-radius:14px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 14px 40px rgba(0,0,0,.45)}
+/* A light document window and a dark editor window: the overlays have to hold
+   up over both, which a smooth gradient alone would never test. */
+.fake .w1{position:absolute;top:64px;left:6%;width:392px;height:268px;border-radius:9px;overflow:hidden;
+  background:#f2f5fa;box-shadow:0 26px 60px rgba(0,0,0,.55)}
+.fake .w1::before{content:'';position:absolute;inset:0 0 auto 0;height:30px;background:#e2e7ef;border-bottom:1px solid #d3dae4}
+.fake .w1::after{content:'';position:absolute;left:20px;top:52px;right:20px;bottom:20px;border-radius:4px;
+  background:repeating-linear-gradient(#cfd6e2 0 9px, transparent 9px 24px)}
+.fake .w2{position:absolute;top:142px;left:33%;width:452px;height:306px;border-radius:9px;overflow:hidden;
+  background:#12161f;border:1px solid rgba(255,255,255,.13);box-shadow:0 26px 60px rgba(0,0,0,.6)}
+.fake .w2::before{content:'';position:absolute;inset:0 0 auto 0;height:30px;background:#1b2130;border-bottom:1px solid rgba(255,255,255,.08)}
+.fake .w2::after{content:'';position:absolute;left:18px;top:50px;right:18px;bottom:18px;border-radius:4px;
+  background:repeating-linear-gradient(#7ee0c8 0 6px, transparent 6px 20px, #8fb4e8 20px 26px, transparent 26px 46px);
+  opacity:.3}
+
+/* floating toolbar - OverlayControls */
+.ctl{
+  position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:10;
+  display:flex;align-items:center;gap:4px;padding:6px;border-radius:12px;
+  background:var(--surface-bg);border:var(--surface-border);box-shadow:var(--surface-shadow);
+  backdrop-filter:var(--surface-blur);-webkit-backdrop-filter:var(--surface-blur);
+}
+.ctl .grab{padding:0 8px;color:var(--text-3);cursor:grab;font-size:13px;line-height:1}
+.ctl button{
+  display:grid;place-items:center;width:34px;height:34px;border-radius:9px;cursor:pointer;
+  background:transparent;border:1px solid transparent;color:var(--text-2);
+  transition:transform .14s ease-out,background .14s,color .14s;
+}
+.ctl button:hover{background:var(--bg-hover);color:var(--text-1);transform:translateY(-1px)}
+.ctl button:active{transform:scale(.94);transition-duration:90ms}
+.ctl button.on{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.ctl button.dg:hover{background:var(--red);color:#fff}
+.ctl .div{width:1px;height:22px;background:var(--border-dim);margin:0 4px}
+.ctl .lbl{font-size:12px;color:var(--text-2);padding:0 10px 0 4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1px}
+
+/* stats overlay */
+.stats{
+  position:absolute;top:16px;right:16px;z-index:10;width:206px;padding:12px 14px;border-radius:12px;
+  background:var(--surface-bg);border:var(--surface-border);box-shadow:var(--surface-shadow);
+  backdrop-filter:var(--surface-blur);-webkit-backdrop-filter:var(--surface-blur);
+  font-size:11px;color:var(--text-2);
+}
+.stats h5{margin:0 0 9px;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-3);font-weight:700}
+.stats .r{display:flex;justify-content:space-between;gap:12px;line-height:1.85}
+.stats .v{color:var(--text-1);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.stats .g{color:var(--green)}
+.spark{display:flex;align-items:flex-end;gap:2px;height:26px;margin-top:9px}
+.spark i{flex:1;background:var(--accent);opacity:.55;border-radius:1px}
+
+/* connection banner */
+.banner{
+  position:absolute;bottom:18px;left:50%;transform:translateX(-50%);z-index:10;
+  display:flex;align-items:center;gap:11px;padding:10px 16px;border-radius:999px;
+  background:var(--surface-bg);border:var(--surface-border);box-shadow:var(--surface-shadow);
+  backdrop-filter:var(--surface-blur);-webkit-backdrop-filter:var(--surface-blur);
+  font-size:12px;color:var(--text-2);
+}
+.banner .d{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.82)}}
+.banner b{color:var(--text-1);font-weight:600}
+.banner button{font:inherit;font-size:11px;font-weight:600;padding:5px 12px;border-radius:999px;cursor:pointer;
+  background:transparent;border:1px solid var(--border-dim);color:var(--text-2);transition:background .14s,color .14s}
+.banner button:hover{background:var(--red);color:#fff;border-color:transparent}
+
+/* capability probe - always visible, bottom left */
+.probe{
+  position:absolute;left:16px;bottom:18px;z-index:20;width:290px;padding:12px 14px;border-radius:10px;
+  background:#0e1016;border:1px solid #262a35;color:#c6cad6;font-size:11px;line-height:1.75;
+}
+.probe h5{margin:0 0 7px;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:#7b8090;font-weight:700}
+.probe .r{display:flex;justify-content:space-between;gap:10px}
+.probe .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#fff}
+.probe .note{margin-top:8px;padding-top:8px;border-top:1px solid #262a35;color:#7b8090;font-size:10px;line-height:1.5}
+
+@media (prefers-reduced-motion:reduce){
+  .feed{animation:none}
+  .banner .d{animation:none}
+  .ctl button{transition:opacity .14s}
+  .ctl button:hover{transform:none;opacity:.85}
+}
+[data-reduced="1"] .feed{animation:none}
+[data-reduced="1"] .banner .d{animation:none}
+[data-reduced="1"] .ctl button:hover{transform:none;opacity:.85}
+</style>
+</head>
+<body>
+
+<div class="devbar">
+  <b>Viewer</b>
+  <span class="grp"><span class="lbl">Direction</span>
+    <button data-dir="aurora" aria-pressed="true">A - Aurora Glass</button>
+    <button data-dir="slate"  aria-pressed="false">B - Solid Slate</button>
+    <button data-dir="studio" aria-pressed="false">C - Light Studio</button>
+  </span>
+  <span class="grp"><span class="lbl">Theme</span>
+    <button data-theme="dark"  aria-pressed="true">Dark</button>
+    <button data-theme="light" aria-pressed="false">Light</button>
+  </span>
+  <span class="grp">
+    <button data-reduced aria-pressed="false">Reduced motion</button>
+  </span>
+  <span class="hint">watch the FPS number while switching directions</span>
+</div>
+
+<div class="stage">
+  <div class="feed"></div>
+  <div class="fake"><div class="bar"></div><div class="w1"></div><div class="w2"></div><div class="dock"></div></div>
+
+  <div class="ctl">
+    <span class="grab">&#8942;&#8942;</span>
+    <span class="lbl">482 913 007</span>
+    <div class="div"></div>
+    <button class="on" title="Keyboard">&#9000;</button>
+    <button title="Clipboard">&#128203;</button>
+    <button title="File transfer">&#128193;</button>
+    <button title="Screenshot">&#128247;</button>
+    <button title="Displays">&#128421;</button>
+    <button title="Quality">&#9881;</button>
+    <div class="div"></div>
+    <button title="Fullscreen">&#9974;</button>
+    <button class="dg" title="Disconnect">&#9211;</button>
+  </div>
+
+  <div class="stats">
+    <h5>Session stats</h5>
+    <div class="r"><span>FPS</span><span class="v g" id="sfps">60</span></div>
+    <div class="r"><span>Latency</span><span class="v">18 ms</span></div>
+    <div class="r"><span>Bitrate</span><span class="v">4.2 Mbps</span></div>
+    <div class="r"><span>Resolution</span><span class="v">2560&times;1440</span></div>
+    <div class="r"><span>Codec</span><span class="v">H.264</span></div>
+    <div class="spark" id="spark"></div>
+  </div>
+
+  <div class="banner">
+    <span class="d"></span>
+    <span>Connected to <b>DESKTOP-PROD-01</b> &middot; 00:14:22</span>
+    <button>Disconnect</button>
+  </div>
+
+  <div class="probe">
+    <h5>Capability probe</h5>
+    <div class="r"><span>backdrop-filter</span><span class="v" id="p1">-</span></div>
+    <div class="r"><span>-webkit-backdrop-filter</span><span class="v" id="p2">-</span></div>
+    <div class="r"><span>page FPS</span><span class="v" id="fps">-</span></div>
+    <div class="note" id="verdict"></div>
+  </div>
+</div>
+
+<script>
+/* Controls. Plain script, no modules - ES modules hit CORS restrictions when
+   the page is opened over file://, which is the whole point of this file. */
+var root = document.documentElement;
+function press(sel, attr, val){
+  var all = document.querySelectorAll(sel);
+  for (var i = 0; i < all.length; i++){
+    all[i].setAttribute('aria-pressed', String(all[i].getAttribute(attr) === val));
+  }
+}
+function setDir(v){ root.setAttribute('data-direction', v); press('[data-dir]', 'data-dir', v);
+  /* Studio is a light-first direction; landing in its dark variant first would
+     misrepresent it. */
+  if (v === 'studio' && root.getAttribute('data-theme') === 'dark') setTheme('light');
+}
+function setTheme(v){ root.setAttribute('data-theme', v); press('[data-theme]', 'data-theme', v); }
+
+document.addEventListener('click', function(e){
+  var t = e.target.closest ? e.target.closest('button') : null;
+  if (!t) return;
+  if (t.hasAttribute('data-dir'))   setDir(t.getAttribute('data-dir'));
+  if (t.hasAttribute('data-theme')) setTheme(t.getAttribute('data-theme'));
+  if (t.hasAttribute('data-reduced')){
+    var on = root.getAttribute('data-reduced') === '1';
+    root.setAttribute('data-reduced', on ? '0' : '1');
+    t.setAttribute('aria-pressed', String(!on));
+  }
+});
+/* Addressable, so a specific combination can be sent as a link rather than as
+   a list of clicks to reproduce: machines.html?dir=slate&theme=light */
+var q = new URLSearchParams(location.search);
+if (['aurora','slate','studio'].indexOf(q.get('dir')) >= 0) setDir(q.get('dir'));
+if (['dark','light'].indexOf(q.get('theme')) >= 0) setTheme(q.get('theme'));
+
+document.addEventListener('keydown', function(e){
+  if (e.key === '1') setDir('aurora');
+  if (e.key === '2') setDir('slate');
+  if (e.key === '3') setDir('studio');
+  if (e.key === 'd' || e.key === 'D') setTheme('dark');
+  if (e.key === 'l' || e.key === 'L') setTheme('light');
+});
+
+/* Asked as two separate questions on purpose. Chromium answers yes/no and
+   WebKitGTK - the engine inside the Tauri window - answers no/yes. That
+   difference is the whole reason to open this file in the real window. */
+function sup(p){ return (typeof CSS !== 'undefined' && CSS.supports) ? CSS.supports(p, 'blur(1px)') : false; }
+var std = sup('backdrop-filter'), wk = sup('-webkit-backdrop-filter');
+document.getElementById('p1').textContent = std ? 'yes' : 'NO';
+document.getElementById('p2').textContent = wk ? 'yes' : 'NO';
+document.getElementById('verdict').textContent = (std || wk)
+  ? 'Glass is supported here. The FPS number is compositing cost only - not video decode - so a real session will differ.'
+  : 'Neither spelling is supported: direction A degrades to flat panels on this engine. Direction B is the answer.';
+
+/* Same idiom as web/src/App.tsx:153-161 - a rAF that only increments, and a
+   1s interval that drains it - so the repo keeps one way of counting frames. */
+var frames = 0, hist = [];
+(function tick(){ frames++; requestAnimationFrame(tick); })();
+setInterval(function(){
+  document.getElementById('fps').textContent = frames;
+  document.getElementById('sfps').textContent = frames;
+  hist.push(frames); if (hist.length > 28) hist.shift();
+  var max = Math.max.apply(null, hist.concat([60]));
+  document.getElementById('spark').innerHTML = hist.map(function(v){
+    return '<i style="height:' + Math.max(6, Math.round(v / max * 100)) + '%"></i>';
+  }).join('');
+  frames = 0;
+}, 1000);
+</script>
+</body>
+</html>
