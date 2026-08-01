@@ -50,6 +50,62 @@ pub struct PtySession {
     exited: tokio::sync::watch::Receiver<bool>,
 }
 
+/// Shells whose first argument accepts `-l` (login shell). This is deliberately
+/// an allowlist, unlike some security checks elsewhere in this repo where an
+/// unlisted case must be rejected: here the unlisted direction is "spawn
+/// without `-l`", which still works, just with a poorer (agent-inherited)
+/// environment instead of the machine's configured one. An unrecognized shell
+/// that does NOT support `-l` would otherwise print an error and exit
+/// immediately, leaving the user with a terminal that opens and instantly
+/// dies — worse than the degraded-but-working fallback, so the safe default
+/// here is "no flag" rather than "reject".
+const LOGIN_CAPABLE_SHELLS: &[&str] = &["bash", "sh", "dash", "zsh", "fish", "ksh", "tcsh", "csh"];
+
+/// Build the command used to spawn the user's shell: `$SHELL` (fallback bash,
+/// then sh), as a login shell when we can affirm it supports `-l`, with
+/// `TERM`/`LANG`/`PATH` set as defaults.
+///
+/// The agent runs as a systemd service (see `service.rs`), which has no
+/// controlling terminal and therefore no `TERM`, `LANG`, or a real `PATH` —
+/// unlike an SSH session. `-l` makes the shell source `/etc/profile` and the
+/// user's own profile, which is how it picks up whatever the administrator
+/// actually configured on that machine; we can't know that in advance, so
+/// that beats hardcoding values. `CommandBuilder` sets these three env vars
+/// on the process *before* the shell runs, so if the login shell's profile
+/// scripts also set them, the profile's values win — ours are only a floor
+/// for a machine that configures nothing.
+fn shell_command() -> CommandBuilder {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| {
+        if std::path::Path::new("/bin/bash").exists() {
+            "/bin/bash".into()
+        } else {
+            "/bin/sh".into()
+        }
+    });
+
+    let shell_name = std::path::Path::new(&shell)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+
+    let mut cmd = CommandBuilder::new(&shell);
+    if LOGIN_CAPABLE_SHELLS.contains(&shell_name) {
+        cmd.arg("-l");
+    }
+
+    // TERM: the viewer renders with @xterm/xterm (web/src/components/TerminalView.tsx),
+    // which implements the xterm-256color terminfo, so that's the value that
+    // matches what the client actually understands.
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("LANG", "C.UTF-8");
+    cmd.env(
+        "PATH",
+        "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    );
+
+    cmd
+}
+
 impl PtySession {
     /// Spawn `$SHELL` (fallback bash, then sh) in a PTY of the given size and
     /// start a blocking reader thread that broadcasts output bytes.
@@ -61,14 +117,7 @@ impl PtySession {
             pixel_width: 0,
             pixel_height: 0,
         })?;
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| {
-            if std::path::Path::new("/bin/bash").exists() {
-                "/bin/bash".into()
-            } else {
-                "/bin/sh".into()
-            }
-        });
-        let cmd = CommandBuilder::new(shell);
+        let cmd = shell_command();
         let child = pair.slave.spawn_command(cmd)?;
         drop(pair.slave); // close our copy so the shell owns the slave
 
@@ -173,6 +222,93 @@ pub fn start_bridge(cols: u16, rows: u16) -> Result<TerminalBridge> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    // Tests that read/set $SHELL must not run concurrently — std::env is
+    // process-global, so a parallel test could see another test's value.
+    static SHELL_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    /// The remote terminal is unusable without `TERM`: `clear`, `top`, `vim`
+    /// and everything else that reads terminfo either errors out or
+    /// degrades. The viewer's @xterm/xterm implements xterm-256color, so
+    /// that's the value that must be set as a default on the spawned command.
+    #[test]
+    fn shell_command_sets_term_for_the_viewer() {
+        let _guard = SHELL_ENV_LOCK.lock().unwrap();
+        let cmd = shell_command();
+        assert_eq!(cmd.get_env("TERM"), Some(std::ffi::OsStr::new("xterm-256color")));
+    }
+
+    /// LANG and PATH are floors for a systemd service environment that has
+    /// almost nothing; a login shell's profile overrides them where the
+    /// machine configures its own.
+    #[test]
+    fn shell_command_sets_lang_and_path_defaults() {
+        let _guard = SHELL_ENV_LOCK.lock().unwrap();
+        let cmd = shell_command();
+        assert!(cmd.get_env("LANG").is_some());
+        let path = cmd
+            .get_env("PATH")
+            .expect("PATH must have a default")
+            .to_str()
+            .expect("PATH must be valid utf8");
+        assert!(
+            path.contains("/usr/bin"),
+            "PATH default must contain /usr/bin, got {path:?}"
+        );
+    }
+
+    /// bash accepts `-l`, so a login shell must be requested: that's what
+    /// sources /etc/profile and the user's profile, picking up PATH, LANG
+    /// etc. the way an SSH session would.
+    #[test]
+    fn shell_command_passes_login_flag_for_bash() {
+        let _guard = SHELL_ENV_LOCK.lock().unwrap();
+        std::env::set_var("SHELL", "/bin/bash");
+        let cmd = shell_command();
+        std::env::remove_var("SHELL");
+        assert_eq!(&cmd.get_argv()[1..], &["-l"]);
+    }
+
+    /// zsh also accepts `-l`.
+    #[test]
+    fn shell_command_passes_login_flag_for_zsh() {
+        let _guard = SHELL_ENV_LOCK.lock().unwrap();
+        std::env::set_var("SHELL", "/bin/zsh");
+        let cmd = shell_command();
+        std::env::remove_var("SHELL");
+        assert_eq!(&cmd.get_argv()[1..], &["-l"]);
+    }
+
+    /// An unrecognized shell must get no arguments at all. Passing `-l` to a
+    /// shell that doesn't understand it prints an error and exits
+    /// immediately — a terminal that opens and instantly dies, worse than
+    /// the degraded-but-working fallback of no flag.
+    #[test]
+    fn shell_command_passes_no_args_for_an_unknown_shell() {
+        let _guard = SHELL_ENV_LOCK.lock().unwrap();
+        std::env::set_var("SHELL", "/opt/weird/myshell");
+        let cmd = shell_command();
+        std::env::remove_var("SHELL");
+        assert_eq!(cmd.get_argv().len(), 1, "expected no args beyond argv[0]");
+    }
+
+    /// With $SHELL unset, the existing bash-then-sh fallback must still
+    /// produce a runnable command (bash is present in the test environment).
+    #[test]
+    fn shell_command_falls_back_when_shell_is_unset() {
+        let _guard = SHELL_ENV_LOCK.lock().unwrap();
+        std::env::remove_var("SHELL");
+        let cmd = shell_command();
+        let program = cmd.get_argv()[0]
+            .to_str()
+            .expect("program must be valid utf8");
+        assert!(
+            program == "/bin/bash" || program == "/bin/sh",
+            "expected bash-then-sh fallback, got {program:?}"
+        );
+    }
+
     #[test]
     fn classifies_resize_and_keystrokes() {
         assert_eq!(
