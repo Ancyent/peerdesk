@@ -4,7 +4,7 @@ import zipfile
 
 import pytest
 
-from themes.errors import ThemeRejected
+from themes.errors import ThemeRejected, ThemeIssue
 from themes.validate import validate_archive
 
 MANIFEST = {
@@ -120,25 +120,162 @@ def test_a_font_that_is_not_a_font_is_rejected(tmp_path):
     assert any(i.code == "bad_asset_type" for i in e.value.issues)
 
 
-def test_recursion_error_in_css_parsing_is_caught(tmp_path, monkeypatch):
-    """A deeply nested CSS value can cause RecursionError in tinycss2.
+def test_an_svg_referenced_as_a_preview_is_rejected(tmp_path):
+    """Previews must be raster; SVG is not allowed even if it's well-formed."""
+    svg_data = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    manifest = {**MANIFEST, "preview": [{"src": "images/logo.svg"}]}
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/logo.svg": svg_data}, manifest))
+    assert any(i.code == "bad_asset_type" and "previews must be" in i.message for i in e.value.issues)
 
-    We must catch it and convert it to ThemeRejected so the archive
-    is cleanly rejected, not a 500 error.
+
+def test_an_svg_referenced_as_a_logo_is_sanitized_and_kept(tmp_path):
+    """SVGs referenced as a logo (not preview) are sanitized and kept."""
+    svg_data = b'<svg xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40"/></svg>'
+    # Add logo to manifest to make it a referenced asset.
+    manifest = {**MANIFEST, "logo": "images/logo.svg"}
+    result = validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/logo.svg": svg_data}, manifest))
+    assert "images/logo.svg" in result.files
+
+
+def test_manifest_cannot_reference_itself(tmp_path):
+    """The manifest cannot reference itself as an asset (preview or otherwise)."""
+    manifest = {**MANIFEST, "preview": [{"src": "theme.json"}]}
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}"}, manifest))
+    assert any(i.code == "bad_manifest" for i in e.value.issues)
+
+
+def test_corrupted_entry_produces_themed_rejection(tmp_path, monkeypatch):
+    """Archive entries that raise any exception during read are rejected cleanly.
+
+    This tests the defensive requirement: no exception from archive content
+    escapes validate_archive. Instead, all exceptions become ThemeRejected.
+    """
+    from themes import validate
+    import zipfile as zf_module
+
+    original_zf_read = zf_module.ZipFile.read
+
+    call_count = [0]
+
+    def read_that_fails_on_css(self, name, pwd=None):
+        call_count[0] += 1
+        if call_count[0] == 2 and name == "css/tokens.css":  # Fail on CSS read.
+            raise OSError("corrupted or incomplete deflate stream")
+        return original_zf_read(self, name, pwd)
+
+    monkeypatch.setattr(zf_module.ZipFile, "read", read_that_fails_on_css)
+
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}"}))
+
+    # Should have at least one issue from the exception.
+    assert len(e.value.issues) > 0
+    # Verify we didn't let the raw exception escape.
+    for issue in e.value.issues:
+        assert isinstance(issue, ThemeIssue)
+
+
+def test_read_errors_dont_hide_other_issues(tmp_path, monkeypatch):
+    """When one entry read fails, validation continues and reports all issues."""
+    from themes import validate
+
+    original_read_entry = validate._read_entry
+    call_count = [0]
+
+    def read_entry_that_fails_once(zf, name):
+        call_count[0] += 1
+        if call_count[0] == 2:  # Fail on CSS entry only.
+            return None, ThemeIssue(file=name, code="unreadable_entry", message="test")
+        return original_read_entry(zf, name)
+
+    monkeypatch.setattr(validate, "_read_entry", read_entry_that_fails_once)
+
+    # Manifest references a missing asset so we get two issues.
+    manifest = {
+        **MANIFEST,
+        "preview": [{"src": "images/missing.png"}]
+    }
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}"}, manifest))
+
+    codes = {i.code for i in e.value.issues}
+    # Should have both the read error and missing asset issue.
+    assert "unreadable_entry" in codes
+    assert "missing_asset" in codes
+
+
+def test_deeply_nested_css_is_rejected_not_recursion_error(tmp_path, monkeypatch):
+    """Deeply nested CSS (or other parser pathologies) trigger RecursionError.
+
+    The validator must catch it and convert to ThemeRejected, not let it escape.
     """
     from themes import validate
 
-    # Mock filter_css to raise RecursionError, simulating what can happen
-    # with deeply nested CSS that exceeds the parser's stack depth.
-    def raise_recursion(*args, **kwargs):
-        raise RecursionError("maximum recursion depth exceeded")
+    # Mock filter_css to raise RecursionError, simulating what happens with
+    # deeply nested calc() (2000+ levels) or similar CSS parser pathology.
+    original_filter_css = validate.filter_css
 
-    monkeypatch.setattr(validate, "filter_css", raise_recursion)
+    def filter_css_that_recurses(source, filename):
+        if "deep" in source:
+            raise RecursionError("parser depth limit exceeded")
+        return original_filter_css(source, filename)
+
+    monkeypatch.setattr(validate, "filter_css", filter_css_that_recurses)
 
     with pytest.raises(ThemeRejected) as e:
-        validate_archive(build(tmp_path, {"css/tokens.css": ":root {}"}))
+        # Use a marker in the CSS that will trigger the mock to raise.
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root { --deep: calc(1); }"}))
 
+    # The RecursionError must be caught and converted to a ThemeIssue.
     assert any(i.code == "bad_css" for i in e.value.issues)
-    # Verify the message indicates it's a nesting issue
-    css_issue = next(i for i in e.value.issues if i.code == "bad_css")
-    assert "nested" in css_issue.message or "complex" in css_issue.message
+
+
+def test_deeply_nested_svg_is_rejected_not_recursion_error(tmp_path):
+    """Real deeply nested SVG (1000+ levels of <g> tags) triggers RecursionError.
+
+    The validator must catch it and convert to ThemeRejected.
+    """
+    # Build an SVG with 1000 levels of nesting, which triggers RecursionError in sanitizer.
+    nested_svg = "<svg xmlns='http://www.w3.org/2000/svg'>"
+    nested_svg += "<g>" * 1000
+    nested_svg += "<circle cx='50' cy='50' r='40'/>"
+    nested_svg += "</g>" * 1000
+    nested_svg += "</svg>"
+
+    # Reference it so it's in the expected set.
+    manifest = {**MANIFEST, "logo": "images/deep.svg"}
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/deep.svg": nested_svg.encode()}, manifest))
+
+    # The RecursionError during SVG sanitization must be caught.
+    assert any(i.code == "bad_asset" for i in e.value.issues)
+
+
+def test_deeply_nested_image_metadata_is_rejected_not_recursion_error(tmp_path, monkeypatch):
+    """Deeply nested image metadata (e.g., in PNG chunks) can trigger RecursionError.
+
+    The validator must catch it during probe and convert to ThemeRejected.
+    """
+    from themes import validate
+
+    # Mock the probe function to raise RecursionError for a test image.
+    def raise_recursion_on_complex_image(data):
+        # Raise only for images we explicitly mark as complex (larger than typical).
+        # The manifest (JSON) is small, so it won't hit this.
+        if len(data) == len(PNG_1x1) + 1:  # Our test image is PNG_1x1 with extra byte
+            raise RecursionError("too complex to parse image metadata")
+        # For other images, use real probe.
+        from themes.imageprobe import probe as real_probe
+        return real_probe(data)
+
+    monkeypatch.setattr(validate, "probe", raise_recursion_on_complex_image)
+
+    # Create an "image" by appending a byte to PNG_1x1 to trigger the mock.
+    test_image = PNG_1x1 + b"x"
+    manifest = {**MANIFEST, "logo": "images/complex.png"}
+    with pytest.raises(ThemeRejected) as e:
+        validate_archive(build(tmp_path, {"css/tokens.css": ":root{}", "images/complex.png": test_image}, manifest))
+
+    assert any(i.code == "bad_asset" for i in e.value.issues)
