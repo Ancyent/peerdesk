@@ -147,3 +147,61 @@ def test_svg_with_preamble_longer_than_1024_bytes_returns_none():
     data = preamble + svg_content
     assert len(preamble) > 1024
     assert probe(data) is None
+
+
+def webp_vp8l(width: int, height: int) -> bytes:
+    """A lossless-WebP header with real dimension bits.
+
+    VP8L packs (width-1) into 14 bits and (height-1) into the next 14, after
+    the 0x2F signature byte.
+    """
+    bits = (width - 1) | ((height - 1) << 14)
+    chunk = b"VP8L" + struct.pack("<I", 5) + b"\x2f" + struct.pack("<I", bits)[:4]
+    body = b"WEBP" + chunk
+    return b"RIFF" + struct.pack("<I", len(body)) + body + b"\x00" * 16
+
+
+def webp_vp8_lossy(width: int, height: int) -> bytes:
+    """A lossy-WebP header with real dimension bits.
+
+    VP8 stores width and height as 14-bit values in the two 16-bit words that
+    follow the 3-byte start code and the 3-byte frame tag.
+    """
+    body = b"WEBP" + b"VP8 " + struct.pack("<I", 20)
+    body += b"\x00" * 3  # frame tag
+    body += b"\x9d\x01\x2a"  # start code
+    body += struct.pack("<HH", width, height)
+    return b"RIFF" + struct.pack("<I", len(body)) + body + b"\x00" * 16
+
+
+def test_reads_webp_vp8l_dimensions():
+    """Lossless WebP, which only VP8X had a fixture for.
+
+    These numbers feed the pixel cap, so a parser returning (1, 1) for every
+    lossless WebP would let any image through it.
+    """
+    info = probe(webp_vp8l(1000, 750))
+    assert info.kind == "webp"
+    assert (info.width, info.height) == (1000, 750)
+
+
+def test_reads_webp_vp8_lossy_dimensions():
+    info = probe(webp_vp8_lossy(1024, 768))
+    assert info.kind == "webp"
+    assert (info.width, info.height) == (1024, 768)
+
+
+def test_each_webp_variant_reports_its_own_size():
+    # A parser collapsing the variants to one constant would pass each test
+    # above in isolation only if it happened to guess right; three different
+    # sizes through three different code paths cannot all be a coincidence.
+    def size(data: bytes) -> tuple[int, int]:
+        info = probe(data)
+        return (info.width, info.height)
+
+    sizes = {
+        size(webp_vp8x(300, 200)),
+        size(webp_vp8l(1000, 750)),
+        size(webp_vp8_lossy(1024, 768)),
+    }
+    assert sizes == {(300, 200), (1000, 750), (1024, 768)}

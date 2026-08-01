@@ -8,6 +8,8 @@ import re
 import struct
 from dataclasses import dataclass
 
+from . import limits
+
 SVG_ROOT_RE = re.compile(rb"<svg[\s>/]", re.IGNORECASE)
 
 
@@ -68,9 +70,9 @@ def _is_svg(data: bytes) -> bool:
 
     Skips optional preamble (BOM, whitespace, XML prolog, DOCTYPE, comments)
     and verifies that the first real content is the <svg> root element.
-    Stays bounded within the first 1024 bytes.
+    Stays bounded within the first limits.MAX_SVG_SNIFF_BYTES bytes.
     """
-    bound = min(len(data), 1024)
+    bound = min(len(data), limits.MAX_SVG_SNIFF_BYTES)
     i = 0
 
     # Skip UTF-8 BOM
@@ -87,7 +89,7 @@ def _is_svg(data: bytes) -> bool:
 
         # Check for XML prolog
         if data[i:i+5] == b"<?xml":
-            # Skip to end of prolog, bounded by the 1024-byte window
+            # Skip to the end of the prolog, bounded by the sniff window
             end = data.find(b"?>", i, bound)
             if end == -1:
                 return False
@@ -96,7 +98,7 @@ def _is_svg(data: bytes) -> bool:
 
         # Check for DOCTYPE
         if data[i:i+9].upper() == b"<!DOCTYPE":
-            # Skip to end of DOCTYPE, bounded by the 1024-byte window
+            # Skip to the end of the DOCTYPE, bounded by the sniff window
             end = data.find(b">", i, bound)
             if end == -1:
                 return False
@@ -105,7 +107,7 @@ def _is_svg(data: bytes) -> bool:
 
         # Check for comment
         if data[i:i+4] == b"<!--":
-            # Skip to end of comment, bounded by the 1024-byte window
+            # Skip to the end of the comment, bounded by the sniff window
             end = data.find(b"-->", i, bound)
             if end == -1:
                 return False
