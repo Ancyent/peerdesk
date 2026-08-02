@@ -54,3 +54,47 @@ def teardown_module():
     # Leave the module as the rest of the suite expects to find it.
     os.environ.pop("RELEASE_SOURCE", None)
     importlib.reload(release_cache)
+
+
+def test_a_locally_built_release_is_served_with_its_own_signature(tmp_path):
+    """A client verifies an update against the key baked into it. This asserts
+    the signature the server hands out is the one the local build produced, so
+    a deployment serving its own artifacts serves its own trust domain too."""
+    import release_cache
+
+    (tmp_path / "peerdesk-viewer-linux-v9.9.9.AppImage").write_bytes(b"payload")
+    (tmp_path / "peerdesk-viewer-linux-v9.9.9.AppImage.sig").write_text("LOCALLY-SIGNED")
+
+    manifest = {
+        "tag_name": "v9.9.9",
+        "assets": [
+            {"name": "peerdesk-viewer-linux-v9.9.9.AppImage", "size": 7},
+            {"name": "peerdesk-viewer-linux-v9.9.9.AppImage.sig", "size": 14},
+        ],
+    }
+
+    def sig_reader(name):
+        p = tmp_path / name
+        return p.read_text() if p.exists() else None
+
+    platforms = release_cache.updater_platforms(
+        manifest, sig_reader, base_url="https://example.invalid"
+    )
+    entry = next(iter(platforms.values()))
+    assert entry["signature"] == "LOCALLY-SIGNED"
+    assert "peerdesk-viewer-linux-v9.9.9.AppImage" in entry["url"]
+
+
+def test_an_asset_with_no_signature_is_not_offered_as_an_update():
+    """Offering an unsigned artifact would make every client reject the update
+    at install time, after downloading it. Better not to offer it at all."""
+    import release_cache
+
+    manifest = {
+        "tag_name": "v9.9.9",
+        "assets": [{"name": "peerdesk-viewer-linux-v9.9.9.AppImage", "size": 7}],
+    }
+    platforms = release_cache.updater_platforms(
+        manifest, lambda name: None, base_url="https://example.invalid"
+    )
+    assert platforms == {}
