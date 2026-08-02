@@ -31,8 +31,15 @@ def _artifacts(tmp_path: Path) -> Path:
 
 def test_writes_every_required_key(tmp_path):
     m = write_manifest(_artifacts(tmp_path), "v9.9.9")
-    assert set(m) == {"tag_name", "html_url", "body", "published_at", "fetched_at", "assets"}
+    assert {"tag_name", "html_url", "body", "published_at", "fetched_at", "assets"} <= set(m)
     assert m["tag_name"] == "v9.9.9"
+
+
+def test_linux_package_appears_only_when_supplied(tmp_path):
+    m = write_manifest(_artifacts(tmp_path), "v9.9.9")
+    assert "linux_package" not in m
+    m2 = write_manifest(_artifacts(tmp_path), "v9.9.9", linux_package="acme-desk")
+    assert m2["linux_package"] == "acme-desk"
 
 
 def test_lists_every_artifact_with_its_real_size(tmp_path):
