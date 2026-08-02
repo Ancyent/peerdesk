@@ -175,7 +175,7 @@ reinstall manually.
 
 **2. Point the client at your own key and your own server.** Both of these are
 compiled into the client at build time, so both have to be set *before* you
-build — set them, then commit, then run step 3.
+build — set them, then commit, then work through steps 3 and 4.
 
 - Set `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` to the
   contents of the generated `.pub` file.
@@ -184,14 +184,51 @@ build — set them, then commit, then run step 3.
   load-bearing and what happens if you skip it: the endpoint is baked into
   every client and cannot be changed after the fact, so a self-hoster who
   builds without editing it ships a client that still asks *this project's*
-  server for updates. `RELEASE_SOURCE=local` in step 4 has no effect on that —
+  server for updates. `RELEASE_SOURCE=local` in step 3 has no effect on that —
   the client never asks your server at all, so it looks correctly configured
   and silently never updates.
 
 Skipping either of these produces a build that runs clean and looks fine; the
 failure only shows up later, as an update nobody gets.
 
-**3. Run a build:**
+**3. Switch the server to serve its own cache — do this *before* the first
+build.** Set `RELEASE_SOURCE=local` in `deploy/.env`, then recreate the `api`
+service so it picks the value up:
+
+```bash
+cd deploy
+docker compose up -d api
+```
+
+The order matters and it is not a style preference. While `RELEASE_SOURCE` is
+still `github`, the api keeps running `refresh_loop()` on its timer (every
+`RELEASE_REFRESH_SECONDS`, default 3600). The build in step 4 swaps its
+artifacts into the cache and writes a manifest carrying your new tag; the next
+tick compares that tag against the latest tag on GitHub, sees they differ,
+downloads GitHub's assets — and then prunes every file the new manifest does
+not list, which is all ten artifacts the build just spent half an hour
+producing.
+
+Losing the build is the smaller half of it. Nothing reports an error, so an
+operator who then flips to `local` and restarts is left serving **GitHub's
+project-signed artifacts while believing the deployment serves its own** — and
+clients built with their key cannot verify them. That mixed-provenance state is
+precisely what `RELEASE_SOURCE` exists to prevent, and it is invisible from the
+outside.
+
+`RELEASE_SOURCE` accepts only `github` (the default) or `local` — any other
+value makes the API refuse to start at import time. There is deliberately no
+`both`: artifacts from the two sources are signed with different keys, and
+offering a mix would mean some clients silently can't verify the update they
+were just told about.
+
+Between this step and the end of step 4 the cache is whatever it already was,
+and once the first local build replaces it there is no going back to the
+mirrored set without flipping `RELEASE_SOURCE` back. On a deployment that has
+never mirrored anything, `/api/releases/latest` returns 503 and the Downloads
+page has nothing to offer until step 4 finishes. That is expected.
+
+**4. Run a build:**
 
 ```bash
 cd deploy
@@ -230,13 +267,18 @@ Know before you run it:
   twelve — the **Android APK and the portable Windows `.exe` are not built**
   by this path. Switching to a self-hosted release cache removes those two
   from the Downloads page.
-
-**4. Switch the server to serve it.** Set `RELEASE_SOURCE=local` in
-`deploy/.env` and restart the `api` service. `RELEASE_SOURCE` accepts only
-`github` (the default) or `local` — any other value makes the API refuse to
-start at import time. There is deliberately no `both`: artifacts from the two
-sources are signed with different keys, and offering a mix would mean some
-clients silently can't verify the update they were just told about.
+- The Windows installers it produces (`.msi` and `-setup.exe`) **do not carry
+  the WebView2 bootstrapper**. On a clean Windows that has never had Edge
+  WebView2 installed — not a rare machine; it is the default state of any
+  install predating the current in-box runtime — the viewer **installs
+  successfully and then does not start**. There is no error at install time,
+  and nothing on the server can detect it. Until that gap is closed, test on a
+  target-like machine before pointing users at these installers.
+- **These installers have never been executed on a Windows machine.** The work
+  that produced them proved the definitions are structurally valid — `wixl` and
+  `makensis` accept them and emit installers of the expected shape — not that
+  they install, upgrade, or launch anything. Treat the Windows half of this
+  path as unverified until you have run it yourself.
 
 **5. Back up the `release_cache` volume.** It now holds artifacts that exist
 nowhere else — not in git, not on GitHub. Alongside `postgres_data`, it is one
