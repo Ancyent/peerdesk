@@ -238,8 +238,12 @@ cp "$ROOT"/deploy/builder/installers/peerdesk-viewer.nsi "$PKG/"
 (
   cd "$PKG"
   wixl -D Version="$NUMERIC" \
+       -D ProductName="PeerDesk" \
+       -D BinaryName="peerdesk-desktop.exe" \
        -o "$STAGE/peerdesk-viewer-windows-${VERSION}-x64.msi" peerdesk-viewer.wxs
   makensis -DVERSION="$NUMERIC" \
+           -DPRODUCT_NAME="PeerDesk" \
+           -DBINARY_NAME="peerdesk-desktop.exe" \
            -DOUTFILE="$STAGE/peerdesk-viewer-windows-${VERSION}-x64-setup.exe" \
            peerdesk-viewer.nsi
 )
