@@ -5,13 +5,24 @@
 # the Downloads page, install.sh and the updater all offer these artifacts with
 # no code change anywhere.
 #
+# Set BRAND_DIR to a directory holding a brand.json and its icon to build a
+# white-label client; leave it unset for the PeerDesk build, which produces
+# exactly what it always has.
+#
 # This writes into the checkout it is pointed at: `npm ci` replaces
 # desktop/node_modules, both target/ trees are filled with release objects, and
 # the Windows cross-build generates
-# desktop/src-tauri/gen/schemas/windows-schema.json. No tracked file is
-# modified: the release version is stamped through TAURI_CONFIG and
-# `cargo tauri build --config`, so a build killed with `docker rm -f` leaves
-# the checkout exactly as it found it.
+# desktop/src-tauri/gen/schemas/windows-schema.json. An unbranded build
+# modifies no tracked file: the release version is stamped through TAURI_CONFIG
+# and `cargo tauri build --config`, so a build killed with `docker rm -f`
+# leaves the checkout exactly as it found it.
+#
+# A BRAND_DIR build additionally overwrites desktop/src-tauri/icons/, which IS
+# tracked, because `cargo tauri icon` has nowhere else to put the generated set
+# that tauri.conf.json names by path. So a branded build leaves the checkout
+# dirty where an unbranded one does not; restore it with
+# `git checkout desktop/src-tauri/icons` (and `git clean -fd` on the same path,
+# for the extra sizes the generator emits) before building another brand.
 set -euo pipefail
 
 VERSION="${VERSION:?VERSION must be set, e.g. VERSION=v1.2.3}"
@@ -98,6 +109,47 @@ esac
 
 [ -r "$KEY" ] || { echo "UPDATER_KEY_PATH '${KEY}' is not readable" >&2; exit 1; }
 
+# The brand profile decides the product name, the identifier, the update
+# endpoint, the icon and every viewer artifact's name. Reading it here, before
+# the first compile, is the whole reason Task 1's validation is strict: a
+# non-square icon or an identifier that is not reverse-DNS raises ValueError,
+# which under `set -e` aborts in a second rather than failing inside the
+# Windows bundler twenty minutes in.
+#
+# BRAND_DIR unset yields the unbranded values below, which are the literals
+# this script used before white-labelling existed.
+BRAND_DIR="${BRAND_DIR:-}"
+BRAND_JSON="$(python3 -c '
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import brand
+p = brand.load_profile(sys.argv[2] or None)
+print(json.dumps({
+    "config": brand.tauri_config(p, sys.argv[3]),
+    "prefix": brand.artifact_prefix(p),
+    "product_name": p.product_name if p else "PeerDesk",
+    "binary": (p.slug + ".exe") if p else "peerdesk-desktop.exe",
+    "icon": str(p.icon) if p else "",
+}))
+' "$ROOT/deploy/builder" "$BRAND_DIR" "$NUMERIC")"
+
+# Every field comes back out through the JSON parser. A product name may
+# legitimately contain a quote or a brace, and reading the same string with
+# grep or sed would corrupt it silently - producing an installer named after a
+# fragment of the brand rather than failing.
+brand_field() {
+  python3 -c '
+import json, sys
+value = json.loads(sys.argv[1])[sys.argv[2]]
+print(value if isinstance(value, str) else json.dumps(value))
+' "$BRAND_JSON" "$1"
+}
+BRAND_CONFIG="$(brand_field config)"
+PREFIX="$(brand_field prefix)"
+BRAND_PRODUCT="$(brand_field product_name)"
+BRAND_BINARY="$(brand_field binary)"
+BRAND_ICON="$(brand_field icon)"
+
 # Signing is not optional. A build that quietly produced unsigned artifacts
 # would break auto-update for every client that installed them, and they would
 # only find out at the next update.
@@ -159,7 +211,7 @@ verify_updater_signature() {
     || { echo "signature for $(basename "$artifact") does not verify against the pubkey in tauri.conf.json" >&2; return 1; }
 }
 
-echo "==> PeerDesk ${VERSION} -> ${CACHE_DIR}"
+echo "==> ${BRAND_PRODUCT} ${VERSION} -> ${CACHE_DIR}"
 
 echo "[0/7] signing key self-test"
 printf 'peerdesk signing self-test\n' > "$PKG/keycheck"
@@ -169,10 +221,11 @@ verify_updater_signature "$PKG/keycheck" || {
   exit 1
 }
 
-# Stamp the release version into the app itself. Without this the bundles carry
-# whatever version the checkout happens to hold, and a client that installs the
-# update still reports the old version afterwards, so the server offers it the
-# same update forever.
+# Stamp the release version - and, when branded, the product name, identifier,
+# binary name, window title and update endpoint - into the app itself. Without
+# the version the bundles carry whatever the checkout happens to hold, and a
+# client that installs the update still reports the old version afterwards, so
+# the server offers it the same update forever.
 #
 # Tauri reads this in two places and needs both. tauri-build merges TAURI_CONFIG
 # into the config it compiles in, which is what reaches the Windows viewer --
@@ -184,12 +237,7 @@ verify_updater_signature "$PKG/keycheck" || {
 # Doing it this way means the build writes no tracked file at all, so a
 # container killed with `docker rm -f` leaves nothing behind. Stage A stamped
 # tauri.conf.json in place and restored it on exit, which a SIGKILL defeated.
-TAURI_CONFIG="$(python3 -c '
-import json, sys
-sys.path.insert(0, sys.argv[1])
-import brand
-print(json.dumps(brand.tauri_config(None, sys.argv[2])))
-' "$ROOT/deploy/builder" "$NUMERIC")"
+TAURI_CONFIG="$BRAND_CONFIG"
 export TAURI_CONFIG
 echo "    app version stamped to ${NUMERIC}"
 
@@ -197,6 +245,16 @@ echo "[1/7] frontend"
 cd "$ROOT/desktop"
 npm ci
 npm run build
+
+# The one part of a brand that cannot travel through TAURI_CONFIG: bundle.icon
+# and app.trayIcon.iconPath are paths, so the files at those paths have to be
+# the operator's. Generating them here rather than earlier keeps the unbranded
+# build's promise that it touches no tracked file - this runs only when a
+# profile supplied an icon.
+if [ -n "$BRAND_ICON" ]; then
+  echo "    generating icons from $(basename "$BRAND_ICON")"
+  cargo tauri icon "$BRAND_ICON" -o "$ROOT/desktop/src-tauri/icons"
+fi
 
 echo "[2/7] agent, Linux and Windows"
 cd "$ROOT"
@@ -222,29 +280,44 @@ BUNDLE=src-tauri/target/release/bundle
 # previous run's bundle here to be published under the new tag.
 rm -rf "$BUNDLE"
 cargo tauri build --config "$TAURI_CONFIG"
-cp "$BUNDLE"/deb/*.deb               "$STAGE/peerdesk-viewer-linux-${VERSION}-amd64.deb"
-cp "$BUNDLE"/rpm/*.rpm               "$STAGE/peerdesk-viewer-linux-${VERSION}-x86_64.rpm"
-cp "$BUNDLE"/appimage/*.AppImage     "$STAGE/peerdesk-viewer-linux-${VERSION}.AppImage"
-cp "$BUNDLE"/appimage/*.AppImage.sig "$STAGE/peerdesk-viewer-linux-${VERSION}.AppImage.sig"
+cp "$BUNDLE"/deb/*.deb               "$STAGE/${PREFIX}-viewer-linux-${VERSION}-amd64.deb"
+cp "$BUNDLE"/rpm/*.rpm               "$STAGE/${PREFIX}-viewer-linux-${VERSION}-x86_64.rpm"
+cp "$BUNDLE"/appimage/*.AppImage     "$STAGE/${PREFIX}-viewer-linux-${VERSION}.AppImage"
+cp "$BUNDLE"/appimage/*.AppImage.sig "$STAGE/${PREFIX}-viewer-linux-${VERSION}.AppImage.sig"
+
+# Read the Debian package name out of the package Tauri just built rather than
+# deriving it: Tauri's sanitisation rule is its own (it turns "PeerDesk" into
+# "peer-desk", splitting at the case boundary), and a reimplementation here
+# would drift from it. The Downloads page prints this in its uninstall
+# instructions, so a wrong value is a command that fails on the operator's
+# machine.
+LINUX_PACKAGE="$(dpkg-deb -f "$STAGE/${PREFIX}-viewer-linux-${VERSION}-amd64.deb" Package)"
+echo "    linux package name: ${LINUX_PACKAGE}"
 
 echo "[4/7] viewer, Windows binary"
 # Compiles fine cross-platform; only the bundling has to be done by hand.
 cargo build --release --target x86_64-pc-windows-gnu --manifest-path src-tauri/Cargo.toml
 
 echo "[5/7] Windows installers"
-cp src-tauri/target/x86_64-pc-windows-gnu/release/peerdesk-desktop.exe "$PKG/"
+# mainBinaryName renames what Tauri's own bundler emits, which covers the Linux
+# packages. It does not reach this file: the Windows viewer is a plain
+# `cargo build`, whose output name comes from [[bin]] name in
+# desktop/src-tauri/Cargo.toml and is therefore peerdesk-desktop.exe for every
+# brand. So the rename happens on the copy into the packaging directory, and
+# both installers are told the name they will find there.
+cp src-tauri/target/x86_64-pc-windows-gnu/release/peerdesk-desktop.exe "$PKG/$BRAND_BINARY"
 cp "$ROOT"/deploy/builder/installers/peerdesk-viewer.wxs "$PKG/"
 cp "$ROOT"/deploy/builder/installers/peerdesk-viewer.nsi "$PKG/"
 (
   cd "$PKG"
   wixl -D Version="$NUMERIC" \
-       -D ProductName="PeerDesk" \
-       -D BinaryName="peerdesk-desktop.exe" \
-       -o "$STAGE/peerdesk-viewer-windows-${VERSION}-x64.msi" peerdesk-viewer.wxs
+       -D ProductName="$BRAND_PRODUCT" \
+       -D BinaryName="$BRAND_BINARY" \
+       -o "$STAGE/${PREFIX}-viewer-windows-${VERSION}-x64.msi" peerdesk-viewer.wxs
   makensis -DVERSION="$NUMERIC" \
-           -DPRODUCT_NAME="PeerDesk" \
-           -DBINARY_NAME="peerdesk-desktop.exe" \
-           -DOUTFILE="$STAGE/peerdesk-viewer-windows-${VERSION}-x64-setup.exe" \
+           -DPRODUCT_NAME="$BRAND_PRODUCT" \
+           -DBINARY_NAME="$BRAND_BINARY" \
+           -DOUTFILE="$STAGE/${PREFIX}-viewer-windows-${VERSION}-x64-setup.exe" \
            peerdesk-viewer.nsi
 )
 
@@ -257,23 +330,28 @@ cp "$ROOT"/deploy/builder/installers/peerdesk-viewer.nsi "$PKG/"
 # path flag a hard error - and it cannot simply be dropped either, because
 # `signer sign` reads `--private-key` as the key itself with none of the
 # "is this a file?" handling that the bundler applies to the same variable.
-sign_updater_artifact "$STAGE/peerdesk-viewer-windows-${VERSION}-x64-setup.exe"
+sign_updater_artifact "$STAGE/${PREFIX}-viewer-windows-${VERSION}-x64-setup.exe"
 
 echo "[6/7] verify the staged artifacts"
 # Every step above can exit zero and leave nothing behind - a glob that matched
 # a stale file, a bundler that skipped a target. Name what has to exist and
 # fail here rather than publishing a half release into the cache.
+#
+# The agent entries stay literal on purpose. The agent is not white-labelled -
+# install.sh resolves it by grepping the manifest for the literal name shape
+# `peerdesk-agent-linux-x86_64-v...`, so a branded prefix there would publish
+# an agent that can never be installed.
 expected=(
   "peerdesk-agent-linux-x86_64-${VERSION}"
   "peerdesk-agent-linux-x86_64-headless-${VERSION}"
   "peerdesk-agent-windows-x86_64-${VERSION}.exe"
-  "peerdesk-viewer-linux-${VERSION}-amd64.deb"
-  "peerdesk-viewer-linux-${VERSION}-x86_64.rpm"
-  "peerdesk-viewer-linux-${VERSION}.AppImage"
-  "peerdesk-viewer-linux-${VERSION}.AppImage.sig"
-  "peerdesk-viewer-windows-${VERSION}-x64.msi"
-  "peerdesk-viewer-windows-${VERSION}-x64-setup.exe"
-  "peerdesk-viewer-windows-${VERSION}-x64-setup.exe.sig"
+  "${PREFIX}-viewer-linux-${VERSION}-amd64.deb"
+  "${PREFIX}-viewer-linux-${VERSION}-x86_64.rpm"
+  "${PREFIX}-viewer-linux-${VERSION}.AppImage"
+  "${PREFIX}-viewer-linux-${VERSION}.AppImage.sig"
+  "${PREFIX}-viewer-windows-${VERSION}-x64.msi"
+  "${PREFIX}-viewer-windows-${VERSION}-x64-setup.exe"
+  "${PREFIX}-viewer-windows-${VERSION}-x64-setup.exe.sig"
 )
 for name in "${expected[@]}"; do
   [ -s "$STAGE/$name" ] || { echo "missing or empty artifact: $name" >&2; exit 1; }
@@ -282,8 +360,8 @@ done
 # A .sig existing proves only that a file was written. These are what every
 # installed client checks before applying an update, so check them the same way
 # the client will.
-verify_updater_signature "$STAGE/peerdesk-viewer-linux-${VERSION}.AppImage"
-verify_updater_signature "$STAGE/peerdesk-viewer-windows-${VERSION}-x64-setup.exe"
+verify_updater_signature "$STAGE/${PREFIX}-viewer-linux-${VERSION}.AppImage"
+verify_updater_signature "$STAGE/${PREFIX}-viewer-windows-${VERSION}-x64-setup.exe"
 echo "    both updater signatures verify against the shipped pubkey"
 
 echo "[7/7] publish"
@@ -298,7 +376,8 @@ mkdir -p "$INCOMING"
 # From here the trap owns it, so a failed copy does not leave the cache
 # filesystem full.
 cp "$STAGE"/* "$INCOMING/"
-python3 "$ROOT/deploy/builder/write_manifest.py" "$INCOMING" "$VERSION" "Built locally."
+python3 "$ROOT/deploy/builder/write_manifest.py" \
+  "$INCOMING" "$VERSION" "Built locally." "$LINUX_PACKAGE"
 
 # The swap itself moves within one filesystem, so it consumes no space and
 # cannot fail the way the copy can. A directory holding two versions would leave
