@@ -500,6 +500,22 @@ def test_concurrent_puts_with_membership_lock_do_not_merge(pg):
 
 # --- Regression guard: this must fail if the lock is deleted from team.py ---
 
+# How long tx2 waits for tx1 to hold the membership lock before giving up and
+# running anyway. Generous on purpose: reaching it must mean "team.py issues no
+# FOR UPDATE", never "the machine was briefly busy". The previous value was
+# 0.1s, which an instrumented run showed expiring on *every* execution -- tx1
+# needs ~0.10s just to reach its lock statement. The test passed anyway only
+# because tx2 then took another ~0.08s to reach its own, so tx1 still won by
+# luck rather than by coordination; when scheduling ate that margin, tx2 locked
+# first, tx1 became the last writer, and the run failed with Company B alone.
+TX1_LOCK_WAIT = 2.0
+
+# How long tx1 holds its transaction open waiting for tx2 to contend. Must stay
+# comfortably above TX1_LOCK_WAIT plus one full tx2 transaction: if the lock is
+# ever deleted from team.py, tx2 gives up after TX1_LOCK_WAIT and must still
+# finish inside this window for the merge to happen and the test to fail.
+LOCK_ABSENT_WINDOW = 5.0
+
 class _InstrumentedSession:
     """Wraps a real AsyncSession, delegating everything set_grants (routers/
     team.py) calls on `db`. Two knobs, both driven by inspecting statements
@@ -517,15 +533,38 @@ class _InstrumentedSession:
       (unflushed); sleeping here holds that open long enough for the other
       concurrent call to genuinely overlap it.
     """
-    def __init__(self, session, *, on_lock_acquired=None, delay_before_commit: float = 0.0):
+    def __init__(self, session, *, on_lock_acquired=None, before_commit=None,
+                 trace=None, label: str = ""):
         self._session = session
         self._on_lock_acquired = on_lock_acquired
-        self._delay_before_commit = delay_before_commit
+        # before_commit is an async callable awaited just before delegating
+        # commit(), replacing what used to be a fixed `asyncio.sleep(0.6)`.
+        # The sleep was a guess about how long the other call needs to reach
+        # its own lock; this lets the caller wait on something observable
+        # instead. See the test's docstring for why the guess was wrong.
+        self._before_commit = before_commit
+        # trace is an append-only list of (monotonic_seconds, label, event)
+        # shared by both concurrent calls. It exists because this test failed
+        # once in roughly five full-suite runs and never reproduced on demand,
+        # so the assertion message has to carry enough of the interleaving to
+        # diagnose a CI failure without reproducing it locally. Recording only
+        # -- it changes no timing decision and no control flow.
+        self._trace = trace
+        self._label = label
+
+    def _record(self, event: str) -> None:
+        if self._trace is not None:
+            self._trace.append((time.monotonic(), self._label, event))
 
     async def execute(self, statement, *args, **kwargs):
+        is_lock = "FOR UPDATE" in str(statement)
+        if is_lock:
+            self._record("lock stmt issued")
         result = await self._session.execute(statement, *args, **kwargs)
-        if self._on_lock_acquired is not None and "FOR UPDATE" in str(statement):
-            self._on_lock_acquired.set()
+        if is_lock:
+            self._record("lock stmt returned (row now locked)")
+            if self._on_lock_acquired is not None:
+                self._on_lock_acquired.set()
         return result
 
     def add(self, obj):
@@ -535,9 +574,12 @@ class _InstrumentedSession:
         return await self._session.delete(obj)
 
     async def commit(self):
-        if self._delay_before_commit:
-            await asyncio.sleep(self._delay_before_commit)
-        return await self._session.commit()
+        if self._before_commit is not None:
+            await self._before_commit(self._record)
+        self._record("commit issued")
+        result = await self._session.commit()
+        self._record("commit returned")
+        return result
 
 
 def test_set_grants_route_prevents_merge_under_real_concurrency(pg):
@@ -609,13 +651,48 @@ def test_set_grants_route_prevents_merge_under_real_concurrency(pg):
         Session = async_sessionmaker(engine, expire_on_commit=False)
 
         tx1_lock_acquired = asyncio.Event()
+        trace: list[tuple[float, str, str]] = []
 
-        async def call_set_grants(company_id, *, delay_before_commit, signal_lock=False, wait_for_lock=False):
+        # Dedicated connection: the two racing sessions are themselves in-flight
+        # on blocking queries and cannot service another statement concurrently.
+        poll_conn = await asyncpg.connect(dsn=ASYNCPG_DSN)
+
+        async def wait_until_someone_blocks(record) -> None:
+            """tx1's hold-open, replacing a fixed sleep with an observation.
+
+            Returns as soon as Postgres reports a backend blocked on another
+            transaction's lock -- i.e. the moment tx2 genuinely contends -- or
+            after LOCK_ABSENT_WINDOW if nobody ever blocks, which is what
+            happens when the lock has been deleted from team.py. That window
+            must stay comfortably longer than TX1_LOCK_WAIT plus one full tx2
+            transaction, so the no-lock case still produces the merge this test
+            exists to catch.
+            """
+            deadline = time.monotonic() + LOCK_ABSENT_WINDOW
+            while time.monotonic() < deadline:
+                row = await poll_conn.fetchrow(
+                    "SELECT 1 FROM pg_locks WHERE locktype = 'transactionid' AND NOT granted"
+                )
+                if row is not None:
+                    record("observed the other call blocked on this lock")
+                    return
+                await asyncio.sleep(0.02)
+            record(f"NOBODY BLOCKED within {LOCK_ABSENT_WINDOW}s -- no lock is being taken")
+
+        async def call_set_grants(company_id, *, before_commit, label,
+                                  signal_lock=False, wait_for_lock=False):
+            trace.append((time.monotonic(), label, "call started"))
             if wait_for_lock:
                 try:
-                    await asyncio.wait_for(tx1_lock_acquired.wait(), timeout=0.1)
+                    await asyncio.wait_for(tx1_lock_acquired.wait(), timeout=TX1_LOCK_WAIT)
+                    trace.append((time.monotonic(), label, "saw tx1 hold the lock"))
                 except asyncio.TimeoutError:
-                    pass  # no lock statement seen -- proceed anyway (see docstring)
+                    # No lock statement seen at all -- proceed anyway, so the
+                    # missing-lock regression still produces a merge. This is
+                    # now a real signal rather than routine noise: with
+                    # TX1_LOCK_WAIT set generously, reaching it means team.py
+                    # issued no FOR UPDATE, not that the machine was busy.
+                    trace.append((time.monotonic(), label, "TIMED OUT waiting for tx1's lock"))
             async with Session() as raw_session:
                 admin_membership = (await raw_session.execute(
                     sa_select(Membership).where(Membership.id == admin_membership_id)
@@ -626,7 +703,9 @@ def test_set_grants_route_prevents_merge_under_real_concurrency(pg):
                 wrapped = _InstrumentedSession(
                     raw_session,
                     on_lock_acquired=tx1_lock_acquired if signal_lock else None,
-                    delay_before_commit=delay_before_commit,
+                    before_commit=before_commit,
+                    trace=trace,
+                    label=label,
                 )
                 await set_grants(
                     membership_id=membership_id,
@@ -635,11 +714,17 @@ def test_set_grants_route_prevents_merge_under_real_concurrency(pg):
                     user=admin_user,
                     membership=admin_membership,
                 )
+            trace.append((time.monotonic(), label, "call finished"))
 
-        await asyncio.gather(
-            call_set_grants(co_b, delay_before_commit=0.6, signal_lock=True),   # tx1: A -> B
-            call_set_grants(co_a, delay_before_commit=0.0, wait_for_lock=True),  # tx2: keeps A
-        )
+        try:
+            await asyncio.gather(
+                call_set_grants(co_b, before_commit=wait_until_someone_blocks,
+                                signal_lock=True, label="tx1 (-> B)"),
+                call_set_grants(co_a, before_commit=None,
+                                wait_for_lock=True, label="tx2 (-> A)"),
+            )
+        finally:
+            await poll_conn.close()
         await engine.dispose()
 
         check = await asyncpg.connect(dsn=ASYNCPG_DSN)
@@ -647,14 +732,27 @@ def test_set_grants_route_prevents_merge_under_real_concurrency(pg):
             final = await _final_company_ids(check, membership_id)
         finally:
             await check.close()
-        return final, co_a, co_b
+        return final, co_a, co_b, trace
 
-    final_company_ids, co_a, co_b = asyncio.run(run())
+    final_company_ids, co_a, co_b, trace = asyncio.run(run())
+
+    if final_company_ids == {co_a, co_b}:
+        outcome = ("both companies -- the two concurrent set_grants calls MERGED instead of "
+                   "one replacing the other, which is exactly what the membership row lock "
+                   "in routers/team.py:set_grants exists to prevent")
+    elif final_company_ids == {co_b}:
+        outcome = ("Company B only -- tx1 won, so the two calls ran in the opposite order to "
+                   "the one this test sets up. That is a broken test scenario, not a broken "
+                   "lock: check the timeline below for 'TIMED OUT waiting for tx1's lock'")
+    else:
+        outcome = "neither the expected nor a recognised failure shape"
+
+    origin = trace[0][0] if trace else 0.0
+    timeline = "\n".join(f"    +{t - origin:6.3f}s  {label:12}  {event}" for t, label, event in trace)
 
     assert final_company_ids == {co_a}, (
         f"expected last-writer-wins (tx2's own desired state, Company A only); "
-        f"got {final_company_ids} -- {{co_a, co_b}} together means the two "
-        "concurrent set_grants calls merged instead of one replacing the other, "
-        "which is exactly what the membership row lock in "
-        "routers/team.py:set_grants exists to prevent"
+        f"got {final_company_ids} -- {outcome}.\n"
+        f"  Company A = {co_a}\n  Company B = {co_b}\n"
+        f"  interleaving actually observed:\n{timeline}"
     )
