@@ -73,6 +73,15 @@ def test_release_cache_can_read_what_we_wrote(tmp_path, monkeypatch):
     assert read["tag_name"] == "v9.9.9"
     assert release_cache.asset_path("peerdesk-viewer-windows-v9.9.9-x64.msi") is not None
 
+    # And the updater consumes it: the producer's asset names have to line up
+    # with the suffixes updater_platforms matches on, or a local build serves a
+    # Downloads page that works and an update endpoint that offers nothing.
+    platforms = release_cache.updater_platforms(
+        read, lambda n: release_cache.asset_path(n).read_text() if release_cache.asset_path(n) else None
+    )
+    assert set(platforms) == {"linux-x86_64"}  # no .exe in this fixture
+    assert platforms["linux-x86_64"]["url"].endswith("peerdesk-viewer-linux-v9.9.9.AppImage")
+
 
 def test_refuses_a_directory_with_no_artifacts(tmp_path):
     with pytest.raises(ValueError, match="no artifacts"):

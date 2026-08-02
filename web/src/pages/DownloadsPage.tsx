@@ -101,7 +101,12 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
         )}
       </div>
       <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
-        <a href={release?.html_url ?? releasesUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+        {/* `||`, not `??`: a manifest can carry html_url as an empty string, not
+            just as a missing key. A locally built release has no release page at
+            all, and even the GitHub mirror stores `rel.get("html_url", "")`. `??`
+            passes "" straight through and renders href="", which reloads the
+            current page instead of opening the releases list. */}
+        <a href={release?.html_url || releasesUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
           {t('downloads:page.allReleasesLink')}
         </a>
       </p>

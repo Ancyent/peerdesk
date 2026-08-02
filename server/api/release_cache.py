@@ -32,7 +32,12 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 # with different keys, so a mixed cache could offer a client an update it
 # cannot verify. That is the one configuration that fails silently, so an
 # unrecognised value is refused here rather than guessed at.
-RELEASE_SOURCE = os.getenv("RELEASE_SOURCE", "github").strip().lower()
+#
+# An empty value means "unset", the same way `${RELEASE_SOURCE:-github}` in
+# docker-compose treats it. Without this, an operator who exports the variable
+# empty (a blank line in .env, an unset shell variable expanded into the
+# environment) gets a ValueError at import and an api that restart-loops.
+RELEASE_SOURCE = os.getenv("RELEASE_SOURCE", "github").strip().lower() or "github"
 if RELEASE_SOURCE not in ("github", "local"):
     raise ValueError(
         f"RELEASE_SOURCE must be 'github' or 'local', got {RELEASE_SOURCE!r}"

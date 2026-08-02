@@ -56,15 +56,26 @@ async def latest():
     """The cached release, with every asset URL pointed back at this server."""
     m = release_cache.read_manifest()
     if not m:
-        raise HTTPException(
-            status_code=503,
-            detail=(
+        # The advice has to match the mode. Under RELEASE_SOURCE=local there is
+        # no mirror and no outbound fetch at all, so pointing the operator at
+        # RELEASE_REPO and their network sends them to debug a component that
+        # is switched off — the cache is simply empty until a build fills it.
+        if release_cache.mirrors_github():
+            detail = (
                 "No release cached yet — the server has not been able to reach "
                 "GitHub. Check RELEASE_REPO and outbound network, or populate "
                 "RELEASE_CACHE_DIR by hand with the assets AND a manifest.json "
                 "(see RELEASE_REFRESH_SECONDS in .env.example for its shape)."
-            ),
-        )
+            )
+        else:
+            detail = (
+                "No release cached yet — RELEASE_SOURCE=local, so this server "
+                "never fetches releases; the cache is filled by your own build. "
+                "Run the builder (RUNBOOK section 7) or populate "
+                "RELEASE_CACHE_DIR by hand with the assets AND a manifest.json "
+                "(see RELEASE_REFRESH_SECONDS in .env.example for its shape)."
+            )
+        raise HTTPException(status_code=503, detail=detail)
     return {
         **m,
         "assets": [

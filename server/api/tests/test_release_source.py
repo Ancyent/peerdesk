@@ -39,6 +39,15 @@ def test_the_value_is_case_insensitive(monkeypatch):
     assert _reload(monkeypatch, "Local").mirrors_github() is False
 
 
+def test_an_empty_value_means_github_rather_than_crashing_the_api(monkeypatch):
+    # docker-compose passes ${RELEASE_SOURCE:-github}, so an empty .env line
+    # arrives as "github" there. Set directly in the environment (an exported
+    # but empty shell variable), the empty string reaches this module -- and
+    # raising on it restart-loops the api instead of doing the obvious thing.
+    assert _reload(monkeypatch, "").RELEASE_SOURCE == "github"
+    assert _reload(monkeypatch, "   ").mirrors_github() is True
+
+
 def test_an_unknown_value_is_rejected_at_import(monkeypatch):
     # Failing loudly at startup beats silently mirroring over a local build.
     with pytest.raises(ValueError, match="RELEASE_SOURCE"):

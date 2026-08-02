@@ -34,8 +34,10 @@ def write_manifest(cache_dir: Path, version: str, notes: str = "") -> dict:
     stamp = _now()
     manifest = {
         "tag_name": version,
-        # Locally built releases have no release page. The field stays because
-        # release_cache and the Downloads page both expect the key to exist.
+        # Locally built releases have no release page to link to. The key stays
+        # because the six-key shape is the contract release_cache and the
+        # Downloads page read; the page treats an empty value as absent and
+        # falls back to its configured releases URL.
         "html_url": "",
         "body": notes,
         "published_at": stamp,
