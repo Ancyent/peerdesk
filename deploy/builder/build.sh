@@ -23,6 +23,9 @@
 # dirty where an unbranded one does not; restore it with
 # `git checkout desktop/src-tauri/icons` (and `git clean -fd` on the same path,
 # for the extra sizes the generator emits) before building another brand.
+# Forgetting that is not left to memory: an unbranded build refuses to start on
+# a dirty icons directory, because it would otherwise publish the previous
+# brand's icons in a PeerDesk release with every downstream check still green.
 set -euo pipefail
 
 VERSION="${VERSION:?VERSION must be set, e.g. VERSION=v1.2.3}"
@@ -149,6 +152,42 @@ PREFIX="$(brand_field prefix)"
 BRAND_PRODUCT="$(brand_field product_name)"
 BRAND_BINARY="$(brand_field binary)"
 BRAND_ICON="$(brand_field icon)"
+
+# `cargo tauri icon` overwrites the five tracked files under
+# desktop/src-tauri/icons/ that tauri.conf.json names by path. An unbranded
+# build has BRAND_ICON empty, so it never regenerates them - it compiles
+# whatever is on disk. Left behind by a previous branded run, that is the
+# previous brand's icons inside a PeerDesk release, and nothing downstream
+# notices: [6/7] checks names and signatures, write_manifest records names and
+# sizes, and the artifact signs and verifies cleanly. The only thing standing
+# between that and a published release would be an operator remembering a
+# manual restore, so the unbranded build refuses to start instead.
+#
+# A refusal rather than a trap-based restore, deliberately. A trap is defeated
+# by exactly the `docker rm -f` that this script's version-stamping comment
+# below cites as the reason Stage A's stamp-and-restore had to go, and it would
+# silently discard an operator's own local icon edits. Refusing mutates nothing,
+# so the SIGKILL-proof property is preserved.
+#
+# git's own error is left on stderr and the build refuses if the check cannot be
+# made at all: an unbranded build must not inherit another brand's icons, and
+# treating an unanswerable question as a pass is the failure this guard exists
+# to prevent.
+if [ -z "$BRAND_ICON" ]; then
+  if ! ICONS_DIRTY="$(git -C "$ROOT" status --porcelain -- desktop/src-tauri/icons)"; then
+    echo "cannot determine whether desktop/src-tauri/icons is clean (see git error above)." >&2
+    echo "An unbranded build must not inherit a previous brand's icons and that" >&2
+    echo "cannot be ruled out without git, so this is a refusal, not a warning." >&2
+    exit 1
+  fi
+  if [ -n "$ICONS_DIRTY" ]; then
+    echo "desktop/src-tauri/icons is dirty - a previous branded build left its icons there." >&2
+    echo "An unbranded build does not regenerate them, so it would ship that brand's" >&2
+    echo "icons in a PeerDesk release and every downstream check would still pass." >&2
+    echo "Restore it first: git checkout desktop/src-tauri/icons && git clean -fd desktop/src-tauri/icons" >&2
+    exit 1
+  fi
+fi
 
 # Signing is not optional. A build that quietly produced unsigned artifacts
 # would break auto-update for every client that installed them, and they would
