@@ -1,9 +1,23 @@
 # Build environment for self-hosted client builds. Toolchains only - the build
-# logic lives in build.sh so this layer stays cacheable.
+# logic lives in build.sh so this image stays cacheable across build.sh edits.
 #
 # No Wine. It was installed during the investigation on the assumption that WiX
 # needed it, and nothing used it: wixl builds MSIs natively on Linux.
 FROM rust:1-bookworm
+
+# The slow layer (cargo compiles tauri-cli from source - several minutes),
+# pinned deliberately and not the ^2 that CI uses: cross-compilation is not a
+# path Tauri guarantees, so a CLI upgrade is a change that requires
+# re-running the feasibility experiments rather than something a rebuild
+# should pick up.
+#
+# Placed immediately after FROM, before any apt-get layer below, so that
+# adding or changing a package further down does not bust this layer's cache
+# and force a full recompile. rust:1-bookworm already ships everything this
+# needs (cc, curl, pkg-config, libssl-dev, ca-certificates) - confirmed by
+# building this RUN alone against the base image with no extra apt packages -
+# so no apt-get is required ahead of it.
+RUN cargo install tauri-cli --version "=2.11.4" --locked
 
 # mingw-w64, pinned as the full set. Two experiments failed here, first on
 # dlltool and then on g++, before this was mirrored from a host where the
@@ -35,16 +49,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libssl-dev pkg-config file rpm python3 \
  && rm -rf /var/lib/apt/lists/*
 
+# Node/npm, for the frontend build (npm install + the Vite build) that
+# `cargo tauri build` needs to run before it can bundle either client.
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
 RUN rustup target add x86_64-pc-windows-gnu
-
-# Pinned deliberately, not the ^2 that CI uses. Cross-compilation is not a path
-# Tauri guarantees, so a CLI upgrade is a change that requires re-running the
-# feasibility experiments rather than something a rebuild should pick up.
-RUN cargo install tauri-cli --version "=2.11.4" --locked
 
 WORKDIR /work
 ENTRYPOINT ["/work/deploy/builder/build.sh"]
