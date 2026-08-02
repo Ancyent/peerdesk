@@ -23,6 +23,31 @@ RELEASE_REPO = os.getenv("RELEASE_REPO", "Ancyent/peerdesk")
 REFRESH_SECONDS = int(os.getenv("RELEASE_REFRESH_SECONDS", "3600"))
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
+# Where the cache gets its contents. "github" mirrors the project's releases,
+# which is what every deployment did before self-hosted builds existed, so it
+# stays the default. "local" means a builder wrote this directory and nothing
+# may overwrite it.
+#
+# There is deliberately no "both": artifacts from the two sources are signed
+# with different keys, so a mixed cache could offer a client an update it
+# cannot verify. That is the one configuration that fails silently, so an
+# unrecognised value is refused here rather than guessed at.
+#
+# An empty value means "unset", the same way `${RELEASE_SOURCE:-github}` in
+# docker-compose treats it. Without this, an operator who exports the variable
+# empty (a blank line in .env, an unset shell variable expanded into the
+# environment) gets a ValueError at import and an api that restart-loops.
+RELEASE_SOURCE = os.getenv("RELEASE_SOURCE", "github").strip().lower() or "github"
+if RELEASE_SOURCE not in ("github", "local"):
+    raise ValueError(
+        f"RELEASE_SOURCE must be 'github' or 'local', got {RELEASE_SOURCE!r}"
+    )
+
+
+def mirrors_github() -> bool:
+    return RELEASE_SOURCE == "github"
+
+
 MANIFEST_NAME = "manifest.json"
 
 
@@ -98,6 +123,9 @@ async def refresh() -> bool:
     a stale agent binary is vastly better than a Downloads page that 503s
     because GitHub happened to be unreachable.
     """
+    if not mirrors_github():
+        log.info("RELEASE_SOURCE=%s, skipping GitHub refresh", RELEASE_SOURCE)
+        return False
     headers = {"Accept": "application/vnd.github+json"}
     if GITHUB_TOKEN:
         headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"

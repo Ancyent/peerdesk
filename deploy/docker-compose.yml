@@ -86,6 +86,10 @@ services:
       # publishing a tag so a new release appears in seconds instead of
       # waiting out RELEASE_REFRESH_SECONDS. Unset -> that endpoint 404s.
       RELEASE_REFRESH_TOKEN: ${RELEASE_REFRESH_TOKEN:-}
+      # Where the release manifest and artifacts come from: "github" (default,
+      # reads the public GitHub releases feed) or "local" (reads only what the
+      # builder profile below has written into release_cache).
+      RELEASE_SOURCE: ${RELEASE_SOURCE:-github}
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,6 +144,34 @@ services:
       - web
     networks:
       - internal
+
+  # Not part of the running stack. Invoked on demand:
+  #   VERSION=v1.2.3 UPDATER_KEY_PATH=... UPDATER_KEY_PASSWORD=... \
+  #     docker compose --profile build run --rm builder
+  #
+  # These variables default rather than use a `:?` required-var form: Compose
+  # interpolates every service's variables up front, before it filters by
+  # profile, so a `:?` here would make plain `docker compose up`/`config` fail
+  # on any host that has not set VERSION/UPDATER_KEY_PATH/UPDATER_KEY_PASSWORD
+  # even though the builder never runs - exactly the "normal deployment"
+  # this profile promises not to touch. build.sh already enforces all three
+  # (VERSION and UPDATER_KEY_PASSWORD directly; UPDATER_KEY_PATH indirectly,
+  # via its "[0/7] signing key self-test" against the unmounted default
+  # below), so a forgotten variable still fails within seconds of `run`
+  # starting rather than silently producing an unsigned build.
+  builder:
+    profiles: ["build"]
+    build:
+      context: ../
+      dockerfile: deploy/builder/Dockerfile
+    volumes:
+      - ../:/work
+      - release_cache:/var/lib/peerdesk/releases
+      - ${UPDATER_KEY_PATH:-/dev/null}:/keys/updater.key:ro
+    environment:
+      VERSION: ${VERSION:-}
+      UPDATER_KEY_PATH: /keys/updater.key
+      UPDATER_KEY_PASSWORD: ${UPDATER_KEY_PASSWORD:-}
 
 volumes:
   postgres_data:

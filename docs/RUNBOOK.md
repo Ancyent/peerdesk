@@ -150,3 +150,145 @@ Host headers entirely (defense against Host-header spoofing), set `PUBLIC_BASE_U
 the api service env (e.g. `PUBLIC_BASE_URL=https://peerdesk.example.com`) — see
 `deploy/docker-compose.yml`. When set it is authoritative; leave empty to auto-derive.
 (The forgeable `X-Forwarded-Host` header is never trusted regardless.)
+
+## 7. Building your own clients (self-hosted release cache)
+
+Instead of pointing users at this project's GitHub releases, a deployment can
+build Linux and Windows clients itself, in a container, and serve them from
+its own release cache. This section covers running that build; the signing
+concepts (updater key, `.sig` files, why signing is not optional) are the same
+ones section 6 already covers in depth — this reuses that key rather than
+introducing a second one.
+
+**1. Generate an updater key pair**, if you don't already have one from
+section 6:
+
+```bash
+cargo tauri signer generate -w ./peerdesk-updater.key
+```
+
+This writes `peerdesk-updater.key` (private) and `peerdesk-updater.key.pub`
+(public). Store the private key **outside the repo**, backed up (a password
+manager, same as section 6 recommends). Losing it means no existing install —
+official or self-built — can ever be updated again; every user has to
+reinstall manually.
+
+**2. Point the client at your own key and your own server.** Both of these are
+compiled into the client at build time, so both have to be set *before* you
+build — set them, then commit, then work through steps 3 and 4.
+
+- Set `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` to the
+  contents of the generated `.pub` file.
+- Set `plugins.updater.endpoints` (same `tauri.conf.json`, same `updater`
+  block) to your own update URL. Section 6 already covers why this field is
+  load-bearing and what happens if you skip it: the endpoint is baked into
+  every client and cannot be changed after the fact, so a self-hoster who
+  builds without editing it ships a client that still asks *this project's*
+  server for updates. `RELEASE_SOURCE=local` in step 3 has no effect on that —
+  the client never asks your server at all, so it looks correctly configured
+  and silently never updates.
+
+Skipping either of these produces a build that runs clean and looks fine; the
+failure only shows up later, as an update nobody gets.
+
+**3. Switch the server to serve its own cache — do this *before* the first
+build.** Set `RELEASE_SOURCE=local` in `deploy/.env`, then recreate the `api`
+service so it picks the value up:
+
+```bash
+cd deploy
+docker compose up -d api
+```
+
+The order matters and it is not a style preference. While `RELEASE_SOURCE` is
+still `github`, the api keeps running `refresh_loop()` on its timer (every
+`RELEASE_REFRESH_SECONDS`, default 3600). The build in step 4 swaps its
+artifacts into the cache and writes a manifest carrying your new tag; the next
+tick compares that tag against the latest tag on GitHub, sees they differ,
+downloads GitHub's assets — and then prunes every file the new manifest does
+not list, which is all ten artifacts the build just spent half an hour
+producing.
+
+Losing the build is the smaller half of it. Nothing reports an error, so an
+operator who then flips to `local` and restarts is left serving **GitHub's
+project-signed artifacts while believing the deployment serves its own** — and
+clients built with their key cannot verify them. That mixed-provenance state is
+precisely what `RELEASE_SOURCE` exists to prevent, and it is invisible from the
+outside.
+
+`RELEASE_SOURCE` accepts only `github` (the default) or `local` — any other
+value makes the API refuse to start at import time. There is deliberately no
+`both`: artifacts from the two sources are signed with different keys, and
+offering a mix would mean some clients silently can't verify the update they
+were just told about.
+
+Between this step and the end of step 4 the cache is whatever it already was,
+and once the first local build replaces it there is no going back to the
+mirrored set without flipping `RELEASE_SOURCE` back. On a deployment that has
+never mirrored anything, `/api/releases/latest` returns 503 and the Downloads
+page has nothing to offer until step 4 finishes. That is expected.
+
+**4. Run a build:**
+
+```bash
+cd deploy
+VERSION=v1.2.3 \
+UPDATER_KEY_PATH=/srv/keys/peerdesk-updater.key \
+UPDATER_KEY_PASSWORD=… \
+  docker compose --profile build run --rm builder
+```
+
+`VERSION` **must be a plain `vX.Y.Z` tag** — no `-rc1`, no `+build` suffix. The
+build refuses anything else and says why: an RPM `Version` field cannot
+contain a hyphen and an MSI `ProductVersion` is three numeric fields and
+nothing else, so a pre-release tag can't be expressed in two of the four
+packages it produces. This isn't a validation nicety to work around — tag the
+release `x.y.z` and re-run.
+
+A cold build (no cached `cargo`/`npm` state, no base images pulled) needs
+roughly **40 GB of free disk** — an estimate, not a measured figure (nothing
+in `build.sh`, the builder `Dockerfile`, or CI enforces or reports it). It's
+still the constraint most operators hit first — check headroom before the
+first run, and revise upward if you see it get close.
+
+Know before you run it:
+- The build **mutates the checkout it runs against** for its duration: it
+  stamps the release version into `desktop/src-tauri/tauri.conf.json`, runs
+  `npm ci`, and writes into both `target/` build trees. The version stamp is
+  restored on exit, including on Ctrl-C.
+- If the container is killed hard (`docker rm -f`) instead of being allowed to
+  stop, that restore never runs and `tauri.conf.json` is left with the stamped
+  version. Run `git checkout -- desktop/src-tauri/tauri.conf.json` (or a plain
+  `git status`/`git diff` to check first) before doing anything else with the
+  checkout.
+- It produces **ten** artifacts: two Linux agents (full and headless), one
+  Windows agent, a `.deb`, `.rpm`, `.AppImage` + its `.sig`, and an `.msi` and
+  Windows `-setup.exe` + its `.sig`. The project's GitHub releases carry
+  twelve — the **Android APK and the portable Windows `.exe` are not built**
+  by this path. Switching to a self-hosted release cache removes those two
+  from the Downloads page.
+- The Windows installers it produces (`.msi` and `-setup.exe`) **do not carry
+  the WebView2 bootstrapper**. On a clean Windows that has never had Edge
+  WebView2 installed — not a rare machine; it is the default state of any
+  install predating the current in-box runtime — the viewer **installs
+  successfully and then does not start**. There is no error at install time,
+  and nothing on the server can detect it. Until that gap is closed, test on a
+  target-like machine before pointing users at these installers.
+- **These installers have never been executed on a Windows machine.** The work
+  that produced them proved the definitions are structurally valid — `wixl` and
+  `makensis` accept them and emit installers of the expected shape — not that
+  they install, upgrade, or launch anything. Treat the Windows half of this
+  path as unverified until you have run it yourself.
+
+**5. Back up the `release_cache` volume.** It now holds artifacts that exist
+nowhere else — not in git, not on GitHub. Alongside `postgres_data`, it is one
+of only two named volumes `deploy/docker-compose.yml` declares, and the first
+piece of user-facing state that lives outside Postgres — add it to whatever
+backup procedure already covers `postgres_data`.
+
+A self-built client and an official client are separate trust domains. Each
+verifies updates against the public key baked into it at build time, so a
+self-built client cannot be updated to an official release, and an official
+client cannot be updated from a self-hosted server. This is the point of
+self-hosting, not a limitation — but moving a fleet from one to the other
+means reinstalling, not updating.

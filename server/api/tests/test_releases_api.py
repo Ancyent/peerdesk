@@ -25,6 +25,19 @@ async def test_latest_503_when_cache_empty(client, cache):
     assert "GitHub" in r.json()["detail"]
 
 
+async def test_latest_503_in_local_mode_does_not_blame_github(client, cache, monkeypatch):
+    """With RELEASE_SOURCE=local nothing is ever fetched, so telling the
+    operator to check RELEASE_REPO and their outbound network sends them to
+    debug a component that is switched off. The cache is just empty."""
+    monkeypatch.setattr(release_cache, "RELEASE_SOURCE", "local")
+    r = await client.get("/releases/latest")
+    assert r.status_code == 503
+    detail = r.json()["detail"]
+    assert "GitHub" not in detail
+    assert "RELEASE_REPO" not in detail
+    assert "RELEASE_SOURCE=local" in detail
+
+
 async def test_latest_returns_manifest_with_server_relative_urls(client, cache):
     _seed(cache)
     r = await client.get("/releases/latest")
