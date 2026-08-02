@@ -173,11 +173,23 @@ manager, same as section 6 recommends). Losing it means no existing install —
 official or self-built — can ever be updated again; every user has to
 reinstall manually.
 
-**2. Bake the public half into the client.** Set `plugins.updater.pubkey` in
-`desktop/src-tauri/tauri.conf.json` to the contents of the generated `.pub`
-file, and commit that change before building. This is the same field section
-6 describes; a self-hosted deployment sets it to its own key instead of the
-project's.
+**2. Point the client at your own key and your own server.** Both of these are
+compiled into the client at build time, so both have to be set *before* you
+build — set them, then commit, then run step 3.
+
+- Set `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` to the
+  contents of the generated `.pub` file.
+- Set `plugins.updater.endpoints` (same `tauri.conf.json`, same `updater`
+  block) to your own update URL. Section 6 already covers why this field is
+  load-bearing and what happens if you skip it: the endpoint is baked into
+  every client and cannot be changed after the fact, so a self-hoster who
+  builds without editing it ships a client that still asks *this project's*
+  server for updates. `RELEASE_SOURCE=local` in step 4 has no effect on that —
+  the client never asks your server at all, so it looks correctly configured
+  and silently never updates.
+
+Skipping either of these produces a build that runs clean and looks fine; the
+failure only shows up later, as an update nobody gets.
 
 **3. Run a build:**
 
@@ -197,8 +209,10 @@ packages it produces. This isn't a validation nicety to work around — tag the
 release `x.y.z` and re-run.
 
 A cold build (no cached `cargo`/`npm` state, no base images pulled) needs
-roughly **40 GB of free disk**. This is the constraint most operators hit
-first — check it before the first run.
+roughly **40 GB of free disk** — an estimate, not a measured figure (nothing
+in `build.sh`, the builder `Dockerfile`, or CI enforces or reports it). It's
+still the constraint most operators hit first — check headroom before the
+first run, and revise upward if you see it get close.
 
 Know before you run it:
 - The build **mutates the checkout it runs against** for its duration: it
@@ -225,9 +239,10 @@ sources are signed with different keys, and offering a mix would mean some
 clients silently can't verify the update they were just told about.
 
 **5. Back up the `release_cache` volume.** It now holds artifacts that exist
-nowhere else — not in git, not on GitHub. It joins the theme volume as the
-second piece of user-facing state living outside Postgres, and belongs in the
-same backup procedure.
+nowhere else — not in git, not on GitHub. Alongside `postgres_data`, it is one
+of only two named volumes `deploy/docker-compose.yml` declares, and the first
+piece of user-facing state that lives outside Postgres — add it to whatever
+backup procedure already covers `postgres_data`.
 
 A self-built client and an official client are separate trust domains. Each
 verifies updates against the public key baked into it at build time, so a
