@@ -728,8 +728,14 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                // Not a literal: this label is on screen at all times, and a
+                // branded build that says "Show PeerDesk" in the tray of an
+                // app called something else is the one place branding is
+                // permanently visible. package_info().name is the productName
+                // tauri-build compiled in, so it already carries the brand.
+                let show_label = format!("Show {}", app.package_info().name);
                 let show_item =
-                    MenuItem::with_id(app, "show", "Show PeerDesk", true, None::<&str>)?;
+                    MenuItem::with_id(app, "show", &show_label, true, None::<&str>)?;
                 let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
                 let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
                 let _tray = TrayIconBuilder::new()
