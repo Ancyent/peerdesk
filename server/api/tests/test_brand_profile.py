@@ -52,6 +52,7 @@ def _merged_config(profile, version="1.2.3"):
     base = json.loads(TAURI_CONF.read_text())
     return _merge_patch(base, tauri_config(profile, version))
 
+
 VALID = {
     "product_name": "Acme Desk",
     "identifier": "com.acme.desk",
@@ -139,10 +140,61 @@ def test_a_malformed_identifier_is_rejected(tmp_path, bad):
         load_profile(_brand_dir(tmp_path, identifier=bad))
 
 
-@pytest.mark.parametrize("bad", ["   ", "Acme/Desk", "Acme\\Desk"])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "   ",
+        "Acme/Desk",
+        "Acme\\Desk",
+        # product_name becomes a WiX `Directory Name` and an NSIS `InstallDir`,
+        # so every character Windows forbids in a directory name has to go too.
+        "Acme:Desk",
+        "Acme*Desk",
+        "Acme?Desk",
+        'Acme"Desk',
+        "Acme<Desk",
+        "Acme>Desk",
+        "Acme|Desk",
+    ],
+)
 def test_a_product_name_that_cannot_be_a_filename_is_rejected(tmp_path, bad):
     with pytest.raises(ValueError, match="product_name"):
         load_profile(_brand_dir(tmp_path, product_name=bad))
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        # tauri-plugin-updater returns InsecureTransportProtocol for anything
+        # that is not https, and this project does not set
+        # dangerousInsecureTransportProtocol.
+        "http://desk.acme.example",
+        # No scheme at all: the plugin's URL parse fails outright.
+        "desk.acme.example",
+        "//desk.acme.example",
+        "not a url at all",
+        "ftp://desk.acme.example",
+    ],
+)
+def test_a_server_url_that_cannot_serve_updates_is_rejected(tmp_path, bad):
+    """A fleet shipped with an unusable update URL can never be updated, and the
+    mistake surfaces on machines the operator no longer controls."""
+    with pytest.raises(ValueError, match="server_url"):
+        load_profile(_brand_dir(tmp_path, server_url=bad))
+
+
+@pytest.mark.parametrize("bad", ["http://u.acme.example/feed", "u.acme.example/feed"])
+def test_an_explicit_updater_endpoint_is_held_to_the_same_rule(tmp_path, bad):
+    with pytest.raises(ValueError, match="updater_endpoint"):
+        load_profile(_brand_dir(tmp_path, updater_endpoint=bad))
+
+
+@pytest.mark.parametrize("bad", [123, ["a", "b"], {}, ""])
+def test_a_non_string_updater_endpoint_is_rejected(tmp_path, bad):
+    """It is the one optional field, so it never passed through the REQUIRED
+    type check that covers the other four."""
+    with pytest.raises(ValueError, match="updater_endpoint"):
+        load_profile(_brand_dir(tmp_path, updater_endpoint=bad))
 
 
 def test_a_missing_icon_file_is_rejected_by_name(tmp_path):

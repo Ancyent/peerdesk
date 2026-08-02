@@ -16,12 +16,18 @@ import re
 import struct
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 PROFILE_NAME = "brand.json"
 REQUIRED = ("product_name", "identifier", "server_url", "icon")
 
 # Reverse-DNS: at least two non-empty, dot-separated segments.
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*(\.[A-Za-z0-9][A-Za-z0-9-]*)+$")
+
+# product_name is not only a display string: it becomes a WiX `Directory Name`
+# and an NSIS `InstallDir`, so it has to survive as a Windows directory name.
+# `/` and `\` additionally break the artifact paths this build writes.
+FORBIDDEN_IN_PRODUCT_NAME = '/\\:*?"<>|'
 
 UPDATE_PATH = "/api/releases/update/{{target}}/{{arch}}/{{current_version}}"
 
@@ -75,6 +81,24 @@ def _check_icon_shape(icon: Path) -> None:
         )
 
 
+def _check_https_url(field: str, value: str) -> None:
+    """Absolute https, or the fleet this builds can never update itself.
+
+    tauri-plugin-updater returns InsecureTransportProtocol for any endpoint that
+    is not https -- this project does not set dangerousInsecureTransportProtocol
+    -- and a schemeless value fails its URL parse outright. Either way the
+    clients install fine and simply never see an update again, on machines the
+    operator no longer controls by the time anyone notices.
+    """
+    parsed = urlsplit(value)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError(
+            f"{PROFILE_NAME}: {field} {value!r} must be an absolute https:// URL, "
+            "e.g. https://desk.acme.example -- the updater refuses any other "
+            "scheme, so a client built with this could never update"
+        )
+
+
 def load_profile(brand_dir: Path | None) -> Profile | None:
     if brand_dir is None:
         return None
@@ -90,8 +114,12 @@ def load_profile(brand_dir: Path | None) -> Profile | None:
             )
 
     product_name = raw["product_name"].strip()
-    if "/" in product_name or "\\" in product_name:
-        raise ValueError(f"{PROFILE_NAME}: product_name must not contain a path separator")
+    bad = sorted(set(product_name) & set(FORBIDDEN_IN_PRODUCT_NAME))
+    if bad:
+        raise ValueError(
+            f"{PROFILE_NAME}: product_name must not contain {' '.join(bad)} -- it "
+            f"becomes a Windows directory name, which forbids {FORBIDDEN_IN_PRODUCT_NAME}"
+        )
 
     identifier = raw["identifier"].strip()
     if not IDENTIFIER_RE.match(identifier):
@@ -105,7 +133,20 @@ def load_profile(brand_dir: Path | None) -> Profile | None:
     _check_icon_shape(icon)
 
     server_url = raw["server_url"].strip().rstrip("/")
-    updater_endpoint = raw.get("updater_endpoint") or (server_url + UPDATE_PATH)
+    _check_https_url("server_url", server_url)
+
+    # The one optional field, so it never passed through the REQUIRED type check
+    # above: without this, 123 and ["a", "b"] both reached the config fragment.
+    if "updater_endpoint" in raw:
+        endpoint = raw["updater_endpoint"]
+        if not isinstance(endpoint, str) or not endpoint.strip():
+            raise ValueError(
+                f"{PROFILE_NAME}: updater_endpoint must be a non-empty string when set"
+            )
+        updater_endpoint = endpoint.strip()
+        _check_https_url("updater_endpoint", updater_endpoint)
+    else:
+        updater_endpoint = server_url + UPDATE_PATH
 
     return Profile(
         product_name=product_name,
