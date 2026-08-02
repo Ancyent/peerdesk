@@ -1,0 +1,6 @@
+{
+  "product_name": "Acme Desk",
+  "identifier": "com.acme.desk",
+  "server_url": "https://desk.acme.example",
+  "icon": "icon.png"
+}
