@@ -8,7 +8,7 @@ import { getConfig } from '../config';
 import { CodeBlock } from '../components/CodeBlock';
 import { TreePicker } from '../components/TreePicker';
 import { placementFor, type PickerNode } from '../components/treePicker';
-import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, AGENT_UNINSTALL_LINUX, AGENT_UNINSTALL_WINDOWS, formatSize, type OsId } from './downloads/osData';
+import { OS_TABS, assetLabel, AGENT_ARGS, LINUX_DISTROS, AGENT_UNINSTALL_LINUX, AGENT_UNINSTALL_WINDOWS, formatSize, uninstallHint, DEFAULT_LINUX_PACKAGE, type OsId } from './downloads/osData';
 import { buildCommand, type InstallMode } from './downloads/commands';
 
 type Asset = ReleaseAsset;
@@ -259,7 +259,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
                             agentBold: <b />,
                             notPackageBold: <b />,
                             installCmd: <code>curl … | bash</code>,
-                            uninstallCmd: <code>apt/dnf/zypper remove peer-desk</code>,
+                            uninstallCmd: <code>{`apt/dnf/zypper remove ${release.linux_package || DEFAULT_LINUX_PACKAGE}`}</code>,
                             extCmd: <code>.deb/.rpm</code>,
                           }}
                         />
@@ -267,7 +267,7 @@ export function DownloadsPage({ os, onOsChange }: { os: OsId; onOsChange: (os: O
                       {viewerAsset && (
                         <div>
                           <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{t('downloads:page.clientViewerLabel', { distro: t(d.label) })}</div>
-                          <CodeBlock code={d.uninstallHint.replace(/<file>/g, viewerAsset.name)} />
+                          <CodeBlock code={uninstallHint(d, release.linux_package).replace(/<file>/g, viewerAsset.name)} />
                         </div>
                       )}
                       <div>

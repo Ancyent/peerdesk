@@ -64,21 +64,32 @@ export interface LinuxDistro {
   pkg: LinuxPkg;
   /** Install command; `<file>` is replaced with the asset filename at render time. */
   installHint: string;
-  /** Uninstall command for the viewer package (`<file>` replaced at render time). */
-  uninstallHint: string;
+  /** Uninstall command template for the viewer package; `{pkg}` is filled in by `uninstallHint()`. */
+  uninstallTemplate: string;
   /** Selects the viewer asset for this distro by extension. */
   match: (assetName: string) => boolean;
 }
 
-// The .deb and .rpm both install the viewer under package name "peer-desk"
-// (Tauri sanitizes productName "PeerDesk"). The AppImage isn't installed — you
-// just delete the file.
+// {pkg} is filled in by uninstallHint() below, not here — the .deb/.rpm
+// package name depends on how the build was branded. The AppImage isn't
+// installed — you just delete the file.
 export const LINUX_DISTROS: LinuxDistro[] = [
-  { id: 'ubuntu',   label: 'downloads:linuxDistros.ubuntu',   pkg: 'deb',      installHint: 'sudo apt install ./<file>',    uninstallHint: 'sudo apt remove peer-desk',    match: (n) => /\.deb$/i.test(n) },
-  { id: 'fedora',   label: 'downloads:linuxDistros.fedora',   pkg: 'rpm',      installHint: 'sudo dnf install ./<file>',    uninstallHint: 'sudo dnf remove peer-desk',    match: (n) => /\.rpm$/i.test(n) },
-  { id: 'opensuse', label: 'downloads:linuxDistros.opensuse', pkg: 'rpm',      installHint: 'sudo zypper install ./<file>', uninstallHint: 'sudo zypper remove peer-desk', match: (n) => /\.rpm$/i.test(n) },
-  { id: 'arch',     label: 'downloads:linuxDistros.arch',     pkg: 'appimage', installHint: 'chmod +x <file> && ./<file>',  uninstallHint: 'rm <file>',                    match: (n) => /\.appimage$/i.test(n) },
+  { id: 'ubuntu',   label: 'downloads:linuxDistros.ubuntu',   pkg: 'deb',      installHint: 'sudo apt install ./<file>',    uninstallTemplate: 'sudo apt remove {pkg}',    match: (n) => /\.deb$/i.test(n) },
+  { id: 'fedora',   label: 'downloads:linuxDistros.fedora',   pkg: 'rpm',      installHint: 'sudo dnf install ./<file>',    uninstallTemplate: 'sudo dnf remove {pkg}',    match: (n) => /\.rpm$/i.test(n) },
+  { id: 'opensuse', label: 'downloads:linuxDistros.opensuse', pkg: 'rpm',      installHint: 'sudo zypper install ./<file>', uninstallTemplate: 'sudo zypper remove {pkg}', match: (n) => /\.rpm$/i.test(n) },
+  { id: 'arch',     label: 'downloads:linuxDistros.arch',     pkg: 'appimage', installHint: 'chmod +x <file> && ./<file>',  uninstallTemplate: 'rm <file>',                match: (n) => /\.appimage$/i.test(n) },
 ];
+
+// The .deb and .rpm install under a package name Tauri derives from
+// productName -- "PeerDesk" becomes "peer-desk". A white-label build produces
+// a different one, so the hint is filled in from the manifest when the build
+// recorded it, and falls back to the project's own name when it did not, which
+// is every GitHub-mirrored release.
+export const DEFAULT_LINUX_PACKAGE = 'peer-desk';
+
+export function uninstallHint(distro: LinuxDistro, linuxPackage?: string): string {
+  return distro.uninstallTemplate.replace('{pkg}', linuxPackage || DEFAULT_LINUX_PACKAGE);
+}
 
 /**
  * Uninstall the headless/CLI agent: systemd service + binary + config (the

@@ -20,38 +20,38 @@
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
-           Name="PeerDesk"
+           Name="$(var.ProductName)"
            Language="1033"
            Version="$(var.Version)"
-           Manufacturer="PeerDesk"
+           Manufacturer="$(var.ProductName)"
            UpgradeCode="6f1b3c4e-9a2d-4d5e-8b7a-1c2d3e4f5a6b">
 
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
 
     <MajorUpgrade
       AllowSameVersionUpgrades="yes"
-      DowngradeErrorMessage="A newer version of PeerDesk is already installed." />
+      DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." />
 
     <Media Id="1" Cabinet="peerdesk.cab" EmbedCab="yes" />
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="PeerDesk">
+        <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)">
           <Component Id="MainExecutable" Guid="8a7b6c5d-4e3f-4a2b-9c8d-7e6f5a4b3c2d" Win64="yes">
-            <File Id="PeerDeskExe" Name="peerdesk-desktop.exe"
-                  Source="peerdesk-desktop.exe" KeyPath="yes" />
+            <File Id="PeerDeskExe" Name="$(var.BinaryName)"
+                  Source="$(var.BinaryName)" KeyPath="yes" />
           </Component>
         </Directory>
       </Directory>
 
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="AppMenuFolder" Name="PeerDesk">
+        <Directory Id="AppMenuFolder" Name="$(var.ProductName)">
           <Component Id="StartMenuShortcut" Guid="2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e">
-            <Shortcut Id="AppShortcut" Name="PeerDesk"
-                      Target="[INSTALLFOLDER]peerdesk-desktop.exe"
+            <Shortcut Id="AppShortcut" Name="$(var.ProductName)"
+                      Target="[INSTALLFOLDER]$(var.BinaryName)"
                       WorkingDirectory="INSTALLFOLDER" />
             <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />
-            <RegistryValue Root="HKCU" Key="Software\PeerDesk" Name="installed"
+            <RegistryValue Root="HKCU" Key="Software\$(var.ProductName)" Name="installed"
                            Type="integer" Value="1" KeyPath="yes" />
           </Component>
         </Directory>

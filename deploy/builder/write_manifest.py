@@ -2,8 +2,9 @@
 
 server/api/release_cache.py serves whatever is in the cache directory, and the
 Downloads page, install.sh and the desktop updater all read through it. So the
-only contract a local build has to satisfy is this file's shape - six keys, and
-an entry per artifact. Get it right and nothing downstream changes at all.
+contract a local build has to satisfy is this file's shape - six required keys
+plus an entry per artifact, and optionally a linux_package key when the build
+recorded one. Get it right and nothing downstream changes at all.
 """
 import json
 import sys
@@ -17,7 +18,8 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def write_manifest(cache_dir: Path, version: str, notes: str = "") -> dict:
+def write_manifest(cache_dir: Path, version: str, notes: str = "",
+                    linux_package: str | None = None) -> dict:
     cache_dir = Path(cache_dir)
 
     assets = sorted(
@@ -45,14 +47,22 @@ def write_manifest(cache_dir: Path, version: str, notes: str = "") -> dict:
         "assets": assets,
     }
 
+    if linux_package:
+        # Read out of the built .deb rather than derived here: Tauri's
+        # sanitisation rule is its own, and a reimplementation would drift.
+        manifest["linux_package"] = linux_package
+
     (cache_dir / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2))
     return manifest
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        raise SystemExit("usage: write_manifest.py <cache_dir> <version> [notes]")
+        raise SystemExit("usage: write_manifest.py <cache_dir> <version> [notes] [linux_package]")
     written = write_manifest(
-        Path(sys.argv[1]), sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else ""
+        Path(sys.argv[1]),
+        sys.argv[2],
+        sys.argv[3] if len(sys.argv) > 3 else "",
+        sys.argv[4] if len(sys.argv) > 4 else None,
     )
     print(f"wrote {len(written['assets'])} assets for {written['tag_name']}")

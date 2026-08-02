@@ -10,8 +10,14 @@
 !ifndef OUTFILE
   !error "OUTFILE must be passed: makensis -DOUTFILE=path.exe"
 !endif
+!ifndef PRODUCT_NAME
+  !error "PRODUCT_NAME must be passed: makensis -DPRODUCT_NAME=..."
+!endif
+!ifndef BINARY_NAME
+  !error "BINARY_NAME must be passed: makensis -DBINARY_NAME=..."
+!endif
 
-!define APPNAME "PeerDesk"
+!define APPNAME "${PRODUCT_NAME}"
 !define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}"
 
 Name "${APPNAME} ${VERSION}"
@@ -40,10 +46,10 @@ FunctionEnd
 
 Section "Install"
   SetOutPath "$INSTDIR"
-  File "peerdesk-desktop.exe"
+  File "${BINARY_NAME}"
 
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
-  CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\peerdesk-desktop.exe"
+  CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\${BINARY_NAME}"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
   ; The entries Add/Remove Programs reads. Tauri writes these for us today;
@@ -56,7 +62,7 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
-  Delete "$INSTDIR\peerdesk-desktop.exe"
+  Delete "$INSTDIR\${BINARY_NAME}"
   Delete "$INSTDIR\uninstall.exe"
   Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"
   RMDir "$SMPROGRAMS\${APPNAME}"

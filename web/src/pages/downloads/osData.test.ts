@@ -49,16 +49,16 @@ describe('uninstall hints', () => {
   it('every distro has install + uninstall hints', () => {
     for (const d of LINUX_DISTROS) {
       expect(d.installHint.length).toBeGreaterThan(0);
-      expect(d.uninstallHint.length).toBeGreaterThan(0);
+      expect(d.uninstallTemplate.length).toBeGreaterThan(0);
     }
   });
-  it('deb/rpm uninstall targets the real package name peer-desk', () => {
+  it('deb/rpm uninstall defaults to the real package name peer-desk', () => {
     for (const id of ['ubuntu', 'fedora', 'opensuse']) {
       const d = LINUX_DISTROS.find(x => x.id === id)!;
-      expect(d.uninstallHint).toContain('peer-desk');
+      expect(uninstallHint(d)).toContain('peer-desk');
     }
     // AppImage isn't a package — uninstall is just deleting the file.
-    expect(LINUX_DISTROS.find(x => x.id === 'arch')!.uninstallHint).toContain('rm ');
+    expect(uninstallHint(LINUX_DISTROS.find(x => x.id === 'arch')!)).toContain('rm ');
   });
   it('agent uninstall removes the service, the binary, and the config', () => {
     expect(AGENT_UNINSTALL_LINUX).toContain('--uninstall-service');
@@ -136,5 +136,29 @@ describe('formatSize', () => {
     expect(formatSize(500_000)).toBe('488 KB');
     expect(formatSize(0)).toBe('');
     expect(formatSize(NaN)).toBe('');
+  });
+});
+
+import { uninstallHint } from './osData';
+
+describe('uninstallHint', () => {
+  const deb = LINUX_DISTROS.find(d => d.id === 'ubuntu')!;
+  const rpm = LINUX_DISTROS.find(d => d.id === 'fedora')!;
+  const appimage = LINUX_DISTROS.find(d => d.id === 'arch')!;
+
+  it('names the package the build actually produced', () => {
+    expect(uninstallHint(deb, 'acme-desk')).toBe('sudo apt remove acme-desk');
+    expect(uninstallHint(rpm, 'acme-desk')).toBe('sudo dnf remove acme-desk');
+  });
+
+  it('falls back to peer-desk when the manifest does not say', () => {
+    // GitHub-mirrored manifests carry no linux_package, and the project's own
+    // releases are built from productName "PeerDesk", which Tauri sanitises to
+    // "peer-desk". The fallback is exactly today's behaviour.
+    expect(uninstallHint(deb, undefined)).toBe('sudo apt remove peer-desk');
+  });
+
+  it('leaves the AppImage hint alone, since nothing is installed', () => {
+    expect(uninstallHint(appimage, 'acme-desk')).toBe('rm <file>');
   });
 });

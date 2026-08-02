@@ -189,6 +189,8 @@ export interface Release {
   tag_name: string;
   html_url: string;
   assets: ReleaseAsset[];
+  /** Present only on locally built releases whose manifest recorded it. */
+  linux_package?: string;
 }
 
 export const api = {
