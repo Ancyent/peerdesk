@@ -83,7 +83,14 @@ esac
 
 # The setup .exe is an updater artifact, so it needs a detached signature the
 # same way the AppImage does. The MSI is not offered as an update, so it has none.
-cargo tauri signer sign \
+#
+# TAURI_SIGNING_PRIVATE_KEY has to come off the environment for this one call.
+# `signer sign` binds that variable to `--private-key`, which is declared
+# `conflicts_with("private_key_path")`, so leaving it set makes the explicit
+# path flag a hard error - and it cannot simply be dropped either, because
+# `signer sign` reads `--private-key` as the key itself with none of the
+# "is this a file?" handling that the bundler applies to the same variable.
+env -u TAURI_SIGNING_PRIVATE_KEY cargo tauri signer sign \
   --private-key-path "$KEY" \
   --password "$UPDATER_KEY_PASSWORD" \
   "$STAGE/peerdesk-viewer-windows-${VERSION}-x64-setup.exe"

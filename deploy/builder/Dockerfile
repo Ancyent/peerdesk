@@ -57,5 +57,22 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 RUN rustup target add x86_64-pc-windows-gnu
 
+# The agent's own Linux dependencies. The `gui-capture` default feature pulls in
+# xcap (pipewire/X11/xcb), enigo (xdo/XTest) and cpal (ALSA), none of which the
+# viewer needs, so the layers above were not enough: the first end-to-end run
+# died in libspa-sys with "Package libpipewire-0.3 was not found". This is the
+# same list .github/workflows/build-clients.yml installs for the agent job, and
+# it belongs here for the same reason.
+#
+# Appended last on purpose: everything above it, including the several-minute
+# tauri-cli compile, stays cached when this list changes.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libxdo-dev libasound2-dev libx11-dev libxtst-dev \
+      libxcb1-dev libxcb-randr0-dev libxcb-shm0-dev \
+      libpipewire-0.3-dev libgbm-dev libegl1-mesa-dev \
+      libwayland-dev libxkbcommon-dev \
+      libclang-dev \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /work
 ENTRYPOINT ["/work/deploy/builder/build.sh"]
