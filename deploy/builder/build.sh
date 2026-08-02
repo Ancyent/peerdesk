@@ -32,6 +32,20 @@ CONF="$ROOT/desktop/src-tauri/tauri.conf.json"
 # is three numeric fields and nothing else. A pre-release tag is therefore not
 # something to trim quietly - trimming would ship an installer whose version
 # disagrees with the tag it was built from. Refuse it and say why.
+# The leading `v` is not cosmetic. web/public/install.sh resolves the agent by
+# grepping the manifest for `peerdesk-agent-linux-x86_64-v[^"]*` (and the
+# `-headless-v` variant), so an artifact named ...-1.2.3 is invisible to it: the
+# build goes green, the cache fills, the Downloads page works, and every
+# `install.sh` run fails with "no Linux agent binary". Cheaper to refuse here.
+case "$VERSION" in
+  v*) ;;
+  *) echo "VERSION '${VERSION}' must start with 'v', e.g. v1.2.3." >&2
+     echo "install.sh looks the agent up by the literal name shape" >&2
+     echo "'peerdesk-agent-linux-x86_64-v...', so artifacts built without the" >&2
+     echo "'v' are published but can never be installed." >&2
+     exit 1 ;;
+esac
+
 NUMERIC="${VERSION#v}"
 case "$NUMERIC" in
   *-*|*+*)
@@ -53,15 +67,32 @@ case "$CACHE_DIR" in
   /*) ;;
   *) echo "CACHE_DIR must be an absolute path, got '${CACHE_DIR}'" >&2; exit 1 ;;
 esac
-CACHE_DIR="${CACHE_DIR%/}"
-if [ -z "$CACHE_DIR" ]; then
+# Compare resolved paths, not the strings as typed. A lexical comparison lets
+# `/work/../work` and any symlinked spelling of the same directory slip past a
+# guard that is the only thing standing between a typo and `rm -rf` over the
+# source tree. `-m` because the cache directory legitimately may not exist yet;
+# ROOT always does.
+CACHE_DIR="$(realpath -m "$CACHE_DIR")"
+ROOT="$(realpath "$ROOT")"
+if [ "$CACHE_DIR" = "/" ]; then
   echo "CACHE_DIR must not be the filesystem root" >&2
   exit 1
 fi
+# Both directions, because both are destructive. The publish step empties
+# CACHE_DIR, so a cache that CONTAINS the checkout deletes the sources being
+# read - and a cache nested INSIDE the checkout (e.g. CACHE_DIR=/work/deploy)
+# deletes them just as thoroughly one level down. Equality is caught by the
+# first pattern, since `*` also matches the empty string.
 case "$ROOT/" in
   "$CACHE_DIR"/*)
     echo "CACHE_DIR '${CACHE_DIR}' contains the checkout at '${ROOT}'." >&2
     echo "Publishing there would delete the source tree this build reads." >&2
+    exit 1 ;;
+esac
+case "$CACHE_DIR/" in
+  "$ROOT"/*)
+    echo "CACHE_DIR '${CACHE_DIR}' is inside the checkout at '${ROOT}'." >&2
+    echo "Publishing there would delete part of the source tree this build reads." >&2
     exit 1 ;;
 esac
 
@@ -86,7 +117,13 @@ CONF_BACKUP=""
 # full after the build has gone.
 INCOMING=""
 cleanup() {
-  [ -n "$CONF_BACKUP" ] && [ -f "$CONF_BACKUP" ] && mv -f "$CONF_BACKUP" "$CONF"
+  # `cp` then `rm`, never `mv`: mktemp creates the backup 0600 and `mv` carries
+  # that mode onto tauri.conf.json, so every build silently narrows a tracked
+  # file's permissions. git does not track non-exec mode bits, so `git status`
+  # stays clean and nobody notices until something else cannot read the file.
+  # `cp` writes through the existing inode and leaves its mode alone.
+  [ -n "$CONF_BACKUP" ] && [ -f "$CONF_BACKUP" ] \
+    && cp -f "$CONF_BACKUP" "$CONF" && rm -f "$CONF_BACKUP"
   [ -n "$STAGE" ] && rm -rf "$STAGE"
   [ -n "$PKG" ] && rm -rf "$PKG"
   [ -n "$INCOMING" ] && rm -rf "$INCOMING"
@@ -123,7 +160,10 @@ verify_updater_signature() {
   [ -s "$artifact.sig" ] || { echo "no signature for $(basename "$artifact")" >&2; return 1; }
   base64 -d "$artifact.sig" > "$decoded" 2>/dev/null \
     || { echo "signature for $(basename "$artifact") is not base64" >&2; return 1; }
-  minisign -V -p "$PUBKEY_FILE" -x "$decoded" -m "$artifact" >/dev/null 2>&1 \
+  # stdout only: minisign's stderr carries the real cause when the failure is
+  # not a mismatch at all (missing binary, unreadable pubkey, malformed input).
+  # Swallowing it turned every such breakage into a misleading "does not verify".
+  minisign -V -p "$PUBKEY_FILE" -x "$decoded" -m "$artifact" >/dev/null \
     || { echo "signature for $(basename "$artifact") does not verify against the pubkey in tauri.conf.json" >&2; return 1; }
 }
 
@@ -147,6 +187,17 @@ verify_updater_signature "$PKG/keycheck" || {
 # where the Tauri CLI never runs and a CLI-level override would not apply. That
 # would leave the Windows client stale while looking fixed. The original is
 # restored by the trap above.
+#
+# Known better approach, deliberately not taken here: `tauri-build` reads the
+# TAURI_CONFIG environment variable, so exporting it (and passing the matching
+# `--config` to `cargo tauri build`) would stamp both the CLI-bundled Linux
+# artifacts AND the plain-`cargo build` Windows exe without ever writing to a
+# tracked file. That removes three things at once: this backup/restore trap
+# branch, the mode-preserving dance it needs, and the "a SIGKILL leaves the
+# checkout dirty" caveat the RUNBOOK has to warn about. It was not done in this
+# pass because the only honest way to verify it is a full ~30-minute build, and
+# a wrong version stamp is exactly the failure that looks green and ships stale
+# clients. Do it next time a full build is being run anyway.
 CONF_BACKUP="$(mktemp)"
 cp "$CONF" "$CONF_BACKUP"
 python3 - "$CONF" "$NUMERIC" <<'PY'
