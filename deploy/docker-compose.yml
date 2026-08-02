@@ -168,10 +168,16 @@ services:
       - ../:/work
       - release_cache:/var/lib/peerdesk/releases
       - ${UPDATER_KEY_PATH:-/dev/null}:/keys/updater.key:ro
+      - ${BRAND_DIR:-/dev/null}:/brand:ro
     environment:
       VERSION: ${VERSION:-}
       UPDATER_KEY_PATH: /keys/updater.key
       UPDATER_KEY_PASSWORD: ${UPDATER_KEY_PASSWORD:-}
+      # Set only when the host sets BRAND_DIR (the `:+` form, not `:-`): an
+      # operator who sets nothing gets an unbranded build rather than one
+      # pointed at the empty mount above. See the profile-interpolation note
+      # near the top of this service for why `:?` cannot be used here either.
+      BRAND_DIR: ${BRAND_DIR:+/brand}
 
 volumes:
   postgres_data:

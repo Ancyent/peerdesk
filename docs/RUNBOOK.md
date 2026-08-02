@@ -252,15 +252,16 @@ still the constraint most operators hit first — check headroom before the
 first run, and revise upward if you see it get close.
 
 Know before you run it:
-- The build **mutates the checkout it runs against** for its duration: it
-  stamps the release version into `desktop/src-tauri/tauri.conf.json`, runs
-  `npm ci`, and writes into both `target/` build trees. The version stamp is
-  restored on exit, including on Ctrl-C.
-- If the container is killed hard (`docker rm -f`) instead of being allowed to
-  stop, that restore never runs and `tauri.conf.json` is left with the stamped
-  version. Run `git checkout -- desktop/src-tauri/tauri.conf.json` (or a plain
-  `git status`/`git diff` to check first) before doing anything else with the
-  checkout.
+- The build **mutates the checkout it runs against** for its duration: it runs
+  `npm ci` and writes into both `target/` build trees. The release version (and,
+  for a branded build, the product name, identifier, binary name, window title
+  and update endpoint) is stamped through an environment channel
+  (`TAURI_CONFIG` / `cargo tauri build --config`), not written into any tracked
+  file, so an unbranded build leaves the checkout exactly as it found it — even
+  if the container is killed hard (`docker rm -f`) mid-build. There is nothing
+  to restore.
+- A **branded** build is the one exception: see section 8 for what it leaves
+  behind in `desktop/src-tauri/icons/` and how to clean it up.
 - It produces **ten** artifacts: two Linux agents (full and headless), one
   Windows agent, a `.deb`, `.rpm`, `.AppImage` + its `.sig`, and an `.msi` and
   Windows `-setup.exe` + its `.sig`. The project's GitHub releases carry
@@ -292,3 +293,109 @@ self-built client cannot be updated to an official release, and an official
 client cannot be updated from a self-hosted server. This is the point of
 self-hosting, not a limitation — but moving a fleet from one to the other
 means reinstalling, not updating.
+
+## 8. White-label (branded) client builds
+
+The build in section 7 also accepts a brand profile, which replaces the
+PeerDesk name, identifier, icon and update endpoint throughout the desktop
+viewer it produces. This section covers what a brand actually changes, how to
+supply one, and what a branded build leaves behind.
+
+**What a brand changes, and what it doesn't.** Display name, logo and accent
+colour are already runtime settings — they come from `GET /branding` (see the
+web UI's branding settings) and need no build at all; changing them takes
+effect immediately for every existing install, desktop included. What *does*
+require a build is anything compiled into the binary: the product name shown
+by the OS (title bar, Start menu, `.deb`/`.rpm` package name), the app
+identifier, the installer/bundle name, and the auto-update endpoint. That
+split exists on purpose — duplicating the runtime fields into the build would
+create two places for a brand to be defined, with no guarantee they agree.
+
+**The profile.** A brand is a directory containing a `brand.json` and the
+icon it references. Four fields are required:
+
+- `product_name` — shown in title bars, the Start menu, and used to derive the
+  Linux package name. Must not contain a path separator.
+- `identifier` — the app identifier, reverse-DNS, e.g. `com.acme.remotedesk`
+  (at least two dot-separated segments).
+- `server_url` — see below.
+- `icon` — a filename, relative to the brand directory, of **one square PNG or
+  SVG**. A non-square PNG is rejected before the build starts; an SVG is
+  accepted without a shape check since it scales.
+
+One field is optional:
+
+- `updater_endpoint` — overrides the update URL the client is built to check.
+  Leave it unset and it's derived from `server_url` (see below); set it only
+  if updates need to be served from somewhere other than the main server.
+
+A minimal `brand.json`:
+
+```json
+{
+  "product_name": "Acme Remote",
+  "identifier": "com.acme.remotedesk",
+  "server_url": "https://remote.acme.example.com",
+  "icon": "icon.png"
+}
+```
+
+Validation runs before the first compile and fails in under a second on a bad
+field — deliberately, since the same mistake caught here would otherwise
+surface twenty minutes in, inside the Windows bundler or `cargo tauri icon`,
+with an error naming neither the field nor the file.
+
+**`server_url` drives the update endpoint.** Unless `updater_endpoint` is set
+explicitly, the client's update URL is built from `server_url` (as
+`{server_url}/api/releases/update/{{target}}/{{arch}}/{{current_version}}`).
+That value gets compiled into the client and, same as section 6's update
+endpoint, cannot be changed after the build — so `server_url` must be the
+address this brand's users will actually reach, not an internal or
+build-time-only hostname.
+
+**Running a branded build.** Same invocation as section 7 step 4, with
+`BRAND_DIR` pointed at the profile directory:
+
+```bash
+cd deploy
+BRAND_DIR=/srv/brands/acme \
+VERSION=v1.2.3 \
+UPDATER_KEY_PATH=/srv/keys/peerdesk-updater.key \
+UPDATER_KEY_PASSWORD=… \
+  docker compose --profile build run --rm builder
+```
+
+Leave `BRAND_DIR` unset for a plain PeerDesk build — the `builder` service
+only mounts and forwards it when the host actually sets it, so an operator who
+sets nothing gets the unbranded build, not one pointed at an empty mount.
+
+**A branded build leaves the checkout dirty.** `cargo tauri icon` writes its
+generated set into the tracked `desktop/src-tauri/icons/` — `tauri.conf.json`
+names those files by path, and there's nowhere else to put them. Unlike the
+version stamp (section 7), this one **is** a tracked-file write, and it
+persists after the build exits, including after a hard kill. Restore it
+before building a different brand, or before an unbranded build:
+
+```bash
+git checkout desktop/src-tauri/icons && git clean -fd desktop/src-tauri/icons
+```
+
+This isn't a step you have to remember to run: an **unbranded** build now
+refuses to start if `desktop/src-tauri/icons` is dirty, rather than silently
+compiling whatever a previous brand left there into a release that looks like
+PeerDesk. If you see that refusal, it's telling you exactly what's above —
+run the two commands and re-run the build.
+
+**The agent is never branded.** `BRAND_DIR` affects only the desktop viewer;
+the Linux and Windows agent binaries keep the literal `peerdesk-agent` name
+regardless. Every existing agent install runs under a `peerdesk-agent`
+systemd unit and was set up by `install.sh`, which locates the agent
+artifacts in the release manifest by that literal name — a renamed agent
+would publish a binary nothing could find or manage.
+
+**Trust domains are defined by the signing key, not the brand.** A branded
+build still needs `UPDATER_KEY_PATH`/`UPDATER_KEY_PASSWORD` and is signed and
+verified the same way — see the trust-domain paragraph at the end of section
+7. Building several brands with the same key keeps them in the same trust
+domain; it's the key, not `product_name` or `identifier`, that decides which
+clients a release can update.
