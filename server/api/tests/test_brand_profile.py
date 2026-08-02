@@ -20,6 +20,38 @@ load_profile = _MOD.load_profile
 tauri_config = _MOD.tauri_config
 artifact_prefix = _MOD.artifact_prefix
 
+TAURI_CONF = (
+    Path(__file__).resolve().parents[3] / "desktop" / "src-tauri" / "tauri.conf.json"
+)
+
+
+def _merge_patch(target, patch):
+    """RFC 7386 JSON Merge Patch, the algorithm json_patch::merge implements.
+
+    Written out here rather than imported so the assertion is against the rule
+    tauri-build actually applies to TAURI_CONFIG, not against whatever brand.py
+    happens to do. The clause that matters: a non-object patch value replaces
+    the target outright, so an array replaces the whole array.
+    """
+    if not isinstance(patch, dict):
+        return patch
+    if not isinstance(target, dict):
+        target = {}
+    else:
+        target = dict(target)
+    for name, value in patch.items():
+        if value is None:
+            target.pop(name, None)
+        else:
+            target[name] = _merge_patch(target.get(name), value)
+    return target
+
+
+def _merged_config(profile, version="1.2.3"):
+    """What the compiled app really sees: tauri.conf.json + the fragment."""
+    base = json.loads(TAURI_CONF.read_text())
+    return _merge_patch(base, tauri_config(profile, version))
+
 VALID = {
     "product_name": "Acme Desk",
     "identifier": "com.acme.desk",
@@ -134,17 +166,45 @@ def test_an_unbranded_config_carries_only_the_version():
 
 
 def test_a_branded_config_carries_the_brand_and_the_version(tmp_path):
-    cfg = tauri_config(load_profile(_brand_dir(tmp_path)), "1.2.3")
+    """Asserted on the merged result, not on the fragment.
+
+    Asserting `cfg["app"]["windows"][0]["title"]` on the fragment only restates
+    what the line above it just built; it passes just as happily when the
+    fragment wipes out every other key on that window.
+    """
+    cfg = _merged_config(load_profile(_brand_dir(tmp_path)))
     assert cfg["version"] == "1.2.3"
     assert cfg["productName"] == "Acme Desk"
     assert cfg["identifier"] == "com.acme.desk"
     # Without this the binary keeps its original name inside a branded folder.
     assert cfg["mainBinaryName"] == "acme-desk"
-    assert cfg["app"]["windows"][0]["title"] == "Acme Desk"
     assert cfg["plugins"]["updater"]["endpoints"] == [
         "https://desk.acme.example/api/releases/update/"
         "{{target}}/{{arch}}/{{current_version}}"
     ]
+
+
+def test_branding_retitles_the_window_without_dropping_its_geometry(tmp_path):
+    """app.windows is an array, and RFC 7386 replaces arrays wholesale.
+
+    A fragment carrying only label and title therefore deletes width, height,
+    minWidth, minHeight and -- the one that is visible on every launch --
+    decorations: false, which the app's own TitleBar (drawn with
+    data-tauri-drag-region) requires. The result is an OS titlebar stacked on
+    the app's own, at the default 800x600, with no minimum size.
+    """
+    window = _merged_config(load_profile(_brand_dir(tmp_path)))["app"]["windows"][0]
+    assert window["title"] == "Acme Desk"
+    assert window["decorations"] is False
+    assert window["width"] == 1000
+    assert window["height"] == 700
+    assert window["minWidth"] == 800
+    assert window["minHeight"] == 600
+
+
+def test_an_unbranded_config_leaves_the_window_untouched():
+    base = json.loads(TAURI_CONF.read_text())
+    assert _merged_config(None)["app"]["windows"] == base["app"]["windows"]
 
 
 def test_the_artifact_prefix_falls_back_to_peerdesk(tmp_path):

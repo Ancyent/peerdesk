@@ -25,6 +25,11 @@ IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*(\.[A-Za-z0-9][A-Za-z0-9-]
 
 UPDATE_PATH = "/api/releases/update/{{target}}/{{arch}}/{{current_version}}"
 
+# The config the fragment is merged into. Resolved from this file so the builder
+# image, which runs brand.py by path out of the mounted checkout, finds the same
+# tauri.conf.json the build is about to compile.
+TAURI_CONF = Path(__file__).resolve().parents[2] / "desktop" / "src-tauri" / "tauri.conf.json"
+
 
 @dataclass(frozen=True)
 class Profile:
@@ -112,7 +117,34 @@ def load_profile(brand_dir: Path | None) -> Profile | None:
     )
 
 
-def tauri_config(profile: Profile | None, version: str) -> dict:
+def _retitled_windows(conf_path: Path, product_name: str) -> list[dict]:
+    """The whole app.windows array, with only the main window's title changed.
+
+    Both consumers of this fragment merge it with RFC 7386 JSON Merge Patch
+    (json_patch::merge in tauri-build), whose defining rule is that a patch
+    value which is not an object REPLACES the target outright. Objects merge
+    key by key; arrays do not merge at all.
+
+    So a fragment carrying [{"label": "main", "title": ...}] does not add a
+    title to the existing window -- it substitutes a one-key window for it, and
+    everything tauri.conf.json declares alongside is gone: width, height,
+    minWidth, minHeight, and decorations: false, which the app's own TitleBar
+    (drawn with data-tauri-drag-region) depends on. The branded client then
+    launches with an OS titlebar stacked on its own, at the default 800x600.
+    Reading the real array and re-emitting it complete is the only way to patch
+    one field of it.
+
+    Any future array-valued field needs the same treatment. The deliberate
+    exception is plugins.updater.endpoints: replacing that array wholesale is
+    exactly what a brand wants.
+    """
+    windows = json.loads(Path(conf_path).read_text())["app"]["windows"]
+    if not any(w.get("label") == "main" for w in windows):
+        raise ValueError(f"{conf_path}: app.windows declares no window labelled 'main'")
+    return [{**w, "title": product_name} if w.get("label") == "main" else w for w in windows]
+
+
+def tauri_config(profile: Profile | None, version: str, conf_path: Path = TAURI_CONF) -> dict:
     """The fragment handed to both TAURI_CONFIG and `cargo tauri build --config`.
 
     Both are needed and neither is sufficient. tauri-build reads TAURI_CONFIG,
@@ -121,6 +153,12 @@ def tauri_config(profile: Profile | None, version: str) -> dict:
     is what stamps the deb/rpm/AppImage metadata; it sets TAURI_CONFIG for its
     children but never reads it, so the variable alone would leave those
     packages carrying the wrong name and version.
+
+    conf_path is a parameter of this function rather than of load_profile
+    because it is not part of the brand: a Profile describes what the operator
+    supplied, while producing a merge patch is inherently a statement about the
+    document being patched. Defaulting it to the checkout's own tauri.conf.json
+    keeps build.sh's call unchanged and gives tests an explicit seam.
     """
     config: dict = {"version": version}
     if profile is None:
@@ -129,7 +167,7 @@ def tauri_config(profile: Profile | None, version: str) -> dict:
         "productName": profile.product_name,
         "identifier": profile.identifier,
         "mainBinaryName": profile.slug,
-        "app": {"windows": [{"label": "main", "title": profile.product_name}]},
+        "app": {"windows": _retitled_windows(conf_path, profile.product_name)},
         "plugins": {"updater": {"endpoints": [profile.updater_endpoint]}},
     })
     return config
