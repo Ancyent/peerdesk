@@ -172,9 +172,32 @@ BRAND_ICON="$(brand_field icon)"
 # git's own error is left on stderr and the build refuses if the check cannot be
 # made at all: an unbranded build must not inherit another brand's icons, and
 # treating an unanswerable question as a pass is the failure this guard exists
-# to prevent.
+# to prevent. But two ways of failing are not icon dirt and must not be reported
+# as an unanswerable question:
+#
+#   * `safe.directory`. This image sets no USER, so it runs as root, while
+#     compose mounts the operator's own checkout at /work. An operator who
+#     cloned as themselves - the normal case - owns those files, and git then
+#     refuses to operate on the tree at all. `-c safe.directory='*'` is scoped
+#     to this one command and is not a trust decision of any weight here: the
+#     container already compiles and links this checkout, so it trusts it far
+#     more completely than reading .git could express.
+#   * No .git at all, from a tarball or `git archive` export. That is a
+#     legitimate way to have the sources and deserves its own message with a
+#     remedy, not the generic "cannot determine" refusal.
+git_here() { git -c safe.directory='*' -C "$ROOT" "$@"; }
 if [ -z "$BRAND_ICON" ]; then
-  if ! ICONS_DIRTY="$(git -C "$ROOT" status --porcelain -- desktop/src-tauri/icons)"; then
+  if ! git_here rev-parse --git-dir >/dev/null 2>&1; then
+    echo "'${ROOT}' is not a git repository, so whether desktop/src-tauri/icons" >&2
+    echo "still holds the icons this release should ship cannot be checked." >&2
+    echo "An unbranded build does not regenerate them, so a previous branded" >&2
+    echo "build's icons would ship inside a PeerDesk release unnoticed." >&2
+    echo "Either build from a git clone, or re-extract this export into a clean" >&2
+    echo "directory first so desktop/src-tauri/icons is known-good, or set" >&2
+    echo "BRAND_DIR to build a branded client, which regenerates them anyway." >&2
+    exit 1
+  fi
+  if ! ICONS_DIRTY="$(git_here status --porcelain -- desktop/src-tauri/icons)"; then
     echo "cannot determine whether desktop/src-tauri/icons is clean (see git error above)." >&2
     echo "An unbranded build must not inherit a previous brand's icons and that" >&2
     echo "cannot be ruled out without git, so this is a refusal, not a warning." >&2
@@ -395,6 +418,22 @@ expected=(
 for name in "${expected[@]}"; do
   [ -s "$STAGE/$name" ] || { echo "missing or empty artifact: $name" >&2; exit 1; }
 done
+
+# The version reaches the packages through TAURI_CONFIG and --config, neither of
+# which fails loudly if it does not arrive: the bundle would simply carry
+# whatever tauri.conf.json holds, be published under the new tag, and every
+# client that installed it would report the old version and be offered the same
+# update forever. The deb records what the bundler actually stamped, so one
+# field read here turns that into a build failure. Cheap insurance - this stage
+# had three plan-level assertions turn out to be blind.
+DEB_VERSION="$(dpkg-deb -f "$STAGE/${PREFIX}-viewer-linux-${VERSION}-amd64.deb" Version)"
+[ "$DEB_VERSION" = "$NUMERIC" ] || {
+  echo "the built .deb carries version '${DEB_VERSION}', not '${NUMERIC}'" >&2
+  echo "The version stamp did not reach the bundler, so this release would be" >&2
+  echo "published under ${VERSION} while reporting itself as ${DEB_VERSION}." >&2
+  exit 1
+}
+echo "    packaged version matches ${NUMERIC}"
 
 # A .sig existing proves only that a file was written. These are what every
 # installed client checks before applying an update, so check them the same way
