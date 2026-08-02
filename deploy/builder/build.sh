@@ -8,10 +8,10 @@
 # This writes into the checkout it is pointed at: `npm ci` replaces
 # desktop/node_modules, both target/ trees are filled with release objects, and
 # the Windows cross-build generates
-# desktop/src-tauri/gen/schemas/windows-schema.json. tauri.conf.json is stamped
-# with the release version for the duration of the build and restored on exit,
-# including on Ctrl-C - but a SIGKILL cannot be trapped, so a build killed with
-# `docker rm -f` leaves it stamped and wants a `git checkout` afterwards.
+# desktop/src-tauri/gen/schemas/windows-schema.json. No tracked file is
+# modified: the release version is stamped through TAURI_CONFIG and
+# `cargo tauri build --config`, so a build killed with `docker rm -f` leaves
+# the checkout exactly as it found it.
 set -euo pipefail
 
 VERSION="${VERSION:?VERSION must be set, e.g. VERSION=v1.2.3}"
@@ -110,20 +110,12 @@ export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$UPDATER_KEY_PASSWORD"
 
 STAGE=""
 PKG=""
-CONF_BACKUP=""
 # Set once the publish step starts staging into the cache. It has to be cleaned
 # up on failure as well: the copy it holds is most likely to fail by filling the
 # cache filesystem, and leaving the half-copy behind would keep that filesystem
 # full after the build has gone.
 INCOMING=""
 cleanup() {
-  # `cp` then `rm`, never `mv`: mktemp creates the backup 0600 and `mv` carries
-  # that mode onto tauri.conf.json, so every build silently narrows a tracked
-  # file's permissions. git does not track non-exec mode bits, so `git status`
-  # stays clean and nobody notices until something else cannot read the file.
-  # `cp` writes through the existing inode and leaves its mode alone.
-  [ -n "$CONF_BACKUP" ] && [ -f "$CONF_BACKUP" ] \
-    && cp -f "$CONF_BACKUP" "$CONF" && rm -f "$CONF_BACKUP"
   [ -n "$STAGE" ] && rm -rf "$STAGE"
   [ -n "$PKG" ] && rm -rf "$PKG"
   [ -n "$INCOMING" ] && rm -rf "$INCOMING"
@@ -182,36 +174,23 @@ verify_updater_signature "$PKG/keycheck" || {
 # update still reports the old version afterwards, so the server offers it the
 # same update forever.
 #
-# The file has to be edited rather than overridden with `cargo tauri build
-# --config`, because step 4 builds the Windows viewer with plain `cargo build`,
-# where the Tauri CLI never runs and a CLI-level override would not apply. That
-# would leave the Windows client stale while looking fixed. The original is
-# restored by the trap above.
+# Tauri reads this in two places and needs both. tauri-build merges TAURI_CONFIG
+# into the config it compiles in, which is what reaches the Windows viewer --
+# that one is built by a plain `cargo build`, where the CLI never runs. The CLI
+# merges --config into its own view, which is what stamps the deb/rpm/AppImage
+# metadata; it sets TAURI_CONFIG for its children but never reads it, so the
+# variable alone would leave those packages on the wrong version.
 #
-# Known better approach, deliberately not taken here: `tauri-build` reads the
-# TAURI_CONFIG environment variable, so exporting it (and passing the matching
-# `--config` to `cargo tauri build`) would stamp both the CLI-bundled Linux
-# artifacts AND the plain-`cargo build` Windows exe without ever writing to a
-# tracked file. That removes three things at once: this backup/restore trap
-# branch, the mode-preserving dance it needs, and the "a SIGKILL leaves the
-# checkout dirty" caveat the RUNBOOK has to warn about. It was not done in this
-# pass because the only honest way to verify it is a full ~30-minute build, and
-# a wrong version stamp is exactly the failure that looks green and ships stale
-# clients. Do it next time a full build is being run anyway.
-CONF_BACKUP="$(mktemp)"
-cp "$CONF" "$CONF_BACKUP"
-python3 - "$CONF" "$NUMERIC" <<'PY'
-import json
-import sys
-
-path, version = sys.argv[1], sys.argv[2]
-with open(path) as fh:
-    conf = json.load(fh)
-conf["version"] = version
-with open(path, "w") as fh:
-    json.dump(conf, fh, indent=2)
-    fh.write("\n")
-PY
+# Doing it this way means the build writes no tracked file at all, so a
+# container killed with `docker rm -f` leaves nothing behind. Stage A stamped
+# tauri.conf.json in place and restored it on exit, which a SIGKILL defeated.
+TAURI_CONFIG="$(python3 -c '
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import brand
+print(json.dumps(brand.tauri_config(None, sys.argv[2])))
+' "$ROOT/deploy/builder" "$NUMERIC")"
+export TAURI_CONFIG
 echo "    app version stamped to ${NUMERIC}"
 
 echo "[1/7] frontend"
@@ -242,7 +221,7 @@ BUNDLE=src-tauri/target/release/bundle
 # A bundler that exits zero without emitting anything would otherwise leave the
 # previous run's bundle here to be published under the new tag.
 rm -rf "$BUNDLE"
-cargo tauri build
+cargo tauri build --config "$TAURI_CONFIG"
 cp "$BUNDLE"/deb/*.deb               "$STAGE/peerdesk-viewer-linux-${VERSION}-amd64.deb"
 cp "$BUNDLE"/rpm/*.rpm               "$STAGE/peerdesk-viewer-linux-${VERSION}-x86_64.rpm"
 cp "$BUNDLE"/appimage/*.AppImage     "$STAGE/peerdesk-viewer-linux-${VERSION}.AppImage"
