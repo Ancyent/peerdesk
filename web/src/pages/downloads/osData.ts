@@ -70,11 +70,9 @@ export interface LinuxDistro {
   match: (assetName: string) => boolean;
 }
 
-// The .deb and .rpm install the viewer under a package name Tauri derives
-// from productName -- the project's own builds use "PeerDesk", which Tauri
-// sanitizes to "peer-desk". A white-label build produces a different name, so
-// the real one comes from the release manifest (see uninstallHint() below).
-// The AppImage isn't installed — you just delete the file.
+// {pkg} is filled in by uninstallHint() below, not here — the .deb/.rpm
+// package name depends on how the build was branded. The AppImage isn't
+// installed — you just delete the file.
 export const LINUX_DISTROS: LinuxDistro[] = [
   { id: 'ubuntu',   label: 'downloads:linuxDistros.ubuntu',   pkg: 'deb',      installHint: 'sudo apt install ./<file>',    uninstallTemplate: 'sudo apt remove {pkg}',    match: (n) => /\.deb$/i.test(n) },
   { id: 'fedora',   label: 'downloads:linuxDistros.fedora',   pkg: 'rpm',      installHint: 'sudo dnf install ./<file>',    uninstallTemplate: 'sudo dnf remove {pkg}',    match: (n) => /\.rpm$/i.test(n) },
