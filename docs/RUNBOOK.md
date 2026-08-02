@@ -150,3 +150,88 @@ Host headers entirely (defense against Host-header spoofing), set `PUBLIC_BASE_U
 the api service env (e.g. `PUBLIC_BASE_URL=https://peerdesk.example.com`) — see
 `deploy/docker-compose.yml`. When set it is authoritative; leave empty to auto-derive.
 (The forgeable `X-Forwarded-Host` header is never trusted regardless.)
+
+## 7. Building your own clients (self-hosted release cache)
+
+Instead of pointing users at this project's GitHub releases, a deployment can
+build Linux and Windows clients itself, in a container, and serve them from
+its own release cache. This section covers running that build; the signing
+concepts (updater key, `.sig` files, why signing is not optional) are the same
+ones section 6 already covers in depth — this reuses that key rather than
+introducing a second one.
+
+**1. Generate an updater key pair**, if you don't already have one from
+section 6:
+
+```bash
+cargo tauri signer generate -w ./peerdesk-updater.key
+```
+
+This writes `peerdesk-updater.key` (private) and `peerdesk-updater.key.pub`
+(public). Store the private key **outside the repo**, backed up (a password
+manager, same as section 6 recommends). Losing it means no existing install —
+official or self-built — can ever be updated again; every user has to
+reinstall manually.
+
+**2. Bake the public half into the client.** Set `plugins.updater.pubkey` in
+`desktop/src-tauri/tauri.conf.json` to the contents of the generated `.pub`
+file, and commit that change before building. This is the same field section
+6 describes; a self-hosted deployment sets it to its own key instead of the
+project's.
+
+**3. Run a build:**
+
+```bash
+cd deploy
+VERSION=v1.2.3 \
+UPDATER_KEY_PATH=/srv/keys/peerdesk-updater.key \
+UPDATER_KEY_PASSWORD=… \
+  docker compose --profile build run --rm builder
+```
+
+`VERSION` **must be a plain `vX.Y.Z` tag** — no `-rc1`, no `+build` suffix. The
+build refuses anything else and says why: an RPM `Version` field cannot
+contain a hyphen and an MSI `ProductVersion` is three numeric fields and
+nothing else, so a pre-release tag can't be expressed in two of the four
+packages it produces. This isn't a validation nicety to work around — tag the
+release `x.y.z` and re-run.
+
+A cold build (no cached `cargo`/`npm` state, no base images pulled) needs
+roughly **40 GB of free disk**. This is the constraint most operators hit
+first — check it before the first run.
+
+Know before you run it:
+- The build **mutates the checkout it runs against** for its duration: it
+  stamps the release version into `desktop/src-tauri/tauri.conf.json`, runs
+  `npm ci`, and writes into both `target/` build trees. The version stamp is
+  restored on exit, including on Ctrl-C.
+- If the container is killed hard (`docker rm -f`) instead of being allowed to
+  stop, that restore never runs and `tauri.conf.json` is left with the stamped
+  version. Run `git checkout -- desktop/src-tauri/tauri.conf.json` (or a plain
+  `git status`/`git diff` to check first) before doing anything else with the
+  checkout.
+- It produces **ten** artifacts: two Linux agents (full and headless), one
+  Windows agent, a `.deb`, `.rpm`, `.AppImage` + its `.sig`, and an `.msi` and
+  Windows `-setup.exe` + its `.sig`. The project's GitHub releases carry
+  twelve — the **Android APK and the portable Windows `.exe` are not built**
+  by this path. Switching to a self-hosted release cache removes those two
+  from the Downloads page.
+
+**4. Switch the server to serve it.** Set `RELEASE_SOURCE=local` in
+`deploy/.env` and restart the `api` service. `RELEASE_SOURCE` accepts only
+`github` (the default) or `local` — any other value makes the API refuse to
+start at import time. There is deliberately no `both`: artifacts from the two
+sources are signed with different keys, and offering a mix would mean some
+clients silently can't verify the update they were just told about.
+
+**5. Back up the `release_cache` volume.** It now holds artifacts that exist
+nowhere else — not in git, not on GitHub. It joins the theme volume as the
+second piece of user-facing state living outside Postgres, and belongs in the
+same backup procedure.
+
+A self-built client and an official client are separate trust domains. Each
+verifies updates against the public key baked into it at build time, so a
+self-built client cannot be updated to an official release, and an official
+client cannot be updated from a self-hosted server. This is the point of
+self-hosting, not a limitation — but moving a fleet from one to the other
+means reinstalling, not updating.
