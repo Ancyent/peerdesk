@@ -42,7 +42,9 @@ DownloadAndInvokeBootstrapper\t1058\tINSTALLDIR\tpowershell.exe -NoProfile -wind
 SEQUENCE = """Action\tCondition\tSequence
 s72\tS255\tI2
 InstallExecuteSequence\tAction
+InstallInitialize\t\t1500
 DownloadAndInvokeBootstrapper\tNOT(REMOVE OR INSTALLED_WEBVIEW2_VERSION)\t6599
+InstallFinalize\t\t6600
 """
 
 
@@ -125,6 +127,20 @@ def test_an_msi_with_no_webview2_machinery_at_all_is_reported():
     empty = {k: v.splitlines()[0] + "\n" for k, v in _dumps().items()}
     diffs = differences(parse(empty))
     assert len(diffs) >= 3, diffs
+
+
+def test_an_action_outside_the_install_transaction_is_reported():
+    """`wixl` mis-resolves Before="InstallFinalize" to a nondeterministic
+    sequence number that can land outside the install transaction, e.g. 1402
+    (RemoveExistingProducts+1). A deferred, non-impersonated action scheduled
+    there cannot write its script record; Windows Installer fails it with
+    error 2762, and because Return="check" is set that aborts and rolls back
+    the whole install. A row merely existing with the right condition is not
+    enough -- its Sequence number must fall strictly between
+    InstallInitialize and InstallFinalize."""
+    wrong = SEQUENCE.replace("\t6599\n", "\t1402\n")
+    diffs = differences(parse(_dumps(InstallExecuteSequence=wrong)))
+    assert diffs != [], "an action scheduled outside the install transaction must be reported"
 
 
 def test_a_missing_table_does_not_crash():

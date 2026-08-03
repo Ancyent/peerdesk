@@ -74,8 +74,22 @@
       ExeCommand="-NoProfile -WindowStyle Hidden -Command &quot;$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot;; Start-Process -FilePath \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot; -ArgumentList '/silent','/install' -Wait&quot;"
       Execute="deferred" Return="check" Impersonate="no" />
 
+    <!--
+      Sequence="6599" is literal, not a stand-in for Before="InstallFinalize".
+      wixl mis-resolves that Before= to a nondeterministic sequence number
+      (observed at both 1402, RemoveExistingProducts+1, and 6401,
+      PublishProduct+1, across otherwise-identical builds). 1402 is outside
+      the install transaction: a deferred, non-impersonated action scheduled
+      there cannot write its script record, and Windows Installer fails it
+      with error 2762, which (because Return="check" is set) aborts and
+      rolls back the whole install, on exactly the machines missing
+      WebView2 that this block exists to fix. The official installer runs
+      the same action at 6599, immediately before InstallFinalize (6600) and
+      inside the transaction started by InstallInitialize (1500). Do not
+      change this back to Before="InstallFinalize".
+    -->
     <InstallExecuteSequence>
-      <Custom Action="DownloadAndInvokeBootstrapper" Before="InstallFinalize">NOT(REMOVE OR INSTALLED_WEBVIEW2_VERSION)</Custom>
+      <Custom Action="DownloadAndInvokeBootstrapper" Sequence="6599">NOT(REMOVE OR INSTALLED_WEBVIEW2_VERSION)</Custom>
     </InstallExecuteSequence>
 
     <Directory Id="TARGETDIR" Name="SourceDir">

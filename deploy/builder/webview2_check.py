@@ -19,6 +19,12 @@ The comparison is deliberately behavioural, not textual:
   compared to the number 1058. `wixl` cannot produce the `Directory`-sourced
   form that yields exactly 1058, so a correct installer built through wixl
   will always have a different Type number.
+- The sequence entry's Sequence number is checked against the same dump's
+  InstallInitialize and InstallFinalize rows, not against a fixed number.
+  `wixl` has been observed resolving `Before="InstallFinalize"` to a
+  sequence number outside the install transaction (e.g. 1402, right after
+  RemoveExistingProducts), which is a defect a row simply existing with the
+  right condition would not catch.
 """
 
 from __future__ import annotations
@@ -134,6 +140,11 @@ def _find_download_action(customaction: list[dict[str, str]]) -> dict[str, str] 
     return None
 
 
+def _sequence_number(sequence: list[dict[str, str]], action_name: str) -> int | None:
+    row = next((r for r in sequence if r.get("Action") == action_name), None)
+    return _as_int(row.get("Sequence")) if row is not None else None
+
+
 def differences(facts: Facts) -> list[str]:
     diffs: list[str] = []
 
@@ -196,6 +207,37 @@ def differences(facts: Facts) -> list[str]:
                 diffs.append(
                     f"InstallExecuteSequence: condition for {action_name!r} is "
                     f"{condition!r}, expected {EXPECTED_CONDITION!r}"
+                )
+
+            # A row with the right condition is not enough: `wixl` has been
+            # observed resolving Before="InstallFinalize" to a sequence
+            # number outside the install transaction (e.g. 1402, right after
+            # RemoveExistingProducts). A deferred, non-impersonated action
+            # scheduled there cannot write its script record, and Windows
+            # Installer fails it with error 2762 -- which, given
+            # Return="check", aborts and rolls back the whole install. The
+            # bounds are read from the same dump rather than hardcoded, since
+            # InstallInitialize (1500) and InstallFinalize (6600) are fixed
+            # MSI standard-action sequence numbers, not ours to assume.
+            action_seq = _as_int(seq_row.get("Sequence"))
+            init_seq = _sequence_number(facts.sequence, "InstallInitialize")
+            finalize_seq = _sequence_number(facts.sequence, "InstallFinalize")
+            if action_seq is None:
+                diffs.append(
+                    f"InstallExecuteSequence: {action_name!r} has no numeric Sequence"
+                )
+            elif init_seq is None or finalize_seq is None:
+                diffs.append(
+                    "InstallExecuteSequence: cannot verify "
+                    f"{action_name!r} runs inside the install transaction because "
+                    "InstallInitialize and/or InstallFinalize is missing from this dump"
+                )
+            elif not (init_seq < action_seq < finalize_seq):
+                diffs.append(
+                    f"InstallExecuteSequence: {action_name!r} is scheduled at "
+                    f"{action_seq}, which is not strictly between InstallInitialize "
+                    f"({init_seq}) and InstallFinalize ({finalize_seq}); outside the "
+                    "install transaction a deferred action fails with error 2762"
                 )
 
     return diffs
