@@ -69,13 +69,27 @@
       $ErrorActionPreference / $env:TEMP.
     -->
     <!--
-      Full path, not bare "powershell.exe": a Property-sourced CustomAction
-      launches this with no directory of its own to anchor an unqualified
-      search, and Execute="deferred" here still runs elevated. [SystemFolder]
-      is Windows Installer's own formatted-text token for the system
-      directory, resolved by the engine at execution time.
+      Bare "powershell.exe", deliberately, not a qualified path: this is
+      not an oversight. The Property table's Value column is Text, not
+      Formatted (CustomAction's own Target is Formatted; Source is
+      CustomSource, a different column with different rules), so a
+      "[SystemFolder]..." value here would reach CreateProcess literally,
+      brackets and all: not a syntax error, just a path that does not
+      exist, which fails this Return="check" action and rolls back the
+      install on exactly the WebView2-less machines it exists for. Type 51
+      (a SetProperty formatting the value at execution time) is the
+      documented way to put a resolved system path into a property, but
+      wixl 0.101 rejects <SetProperty> outright.
+      A Property-sourced CustomAction does carry residual unqualified-path
+      exposure, but msiexec.exe, unlike a downloaded setup.exe, launches
+      from System32, so the search order's first hit is already the real
+      one; there is no user-writable "wherever setup.exe was double-clicked
+      from" step the way there is on the NSIS side. That gap is real but
+      materially smaller, and closing it would need a Type 51 SetProperty
+      or a COMSPEC-wrapped command wixl cannot build or this environment
+      cannot verify.
     -->
-    <Property Id="Webview2BootstrapperExe" Value="[SystemFolder]WindowsPowerShell\v1.0\powershell.exe" />
+    <Property Id="Webview2BootstrapperExe" Value="powershell.exe" />
 
     <CustomAction Id="DownloadAndInvokeBootstrapper" Property="Webview2BootstrapperExe"
       ExeCommand="-NoProfile -WindowStyle Hidden -Command &quot;$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot;; Start-Process -FilePath \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot; -ArgumentList '/silent','/install' -Wait&quot;"
