@@ -50,14 +50,28 @@ Function .onInit
 FunctionEnd
 
 Section "Install"
-  SetOutPath "$INSTDIR"
-  File "${BINARY_NAME}"
-
-  ; WebView2. Same mechanism as the MSI and as the official installer: look in
-  ; all three places the runtime can be registered, and download only if none of
-  ; them has it. The per-user view matters -- a runtime installed for the
-  ; current user is invisible to an HKLM-only check, and we would install a
-  ; second copy on top of a working one.
+  ; WebView2. Detection mirrors the MSI: look in all three places the
+  ; runtime can be registered -- HKLM's 64-bit view, HKLM's 32-bit view,
+  ; then HKCU -- and act only if none of them has it. The per-user view
+  ; matters -- a runtime installed for the current user is invisible to an
+  ; HKLM-only check, and we would install a second copy on top of a working
+  ; one. SetRegView is reset to 32 (NSIS's default view) once detection is
+  ; done, not left at 64: it persists for the rest of the process, and 64
+  ; would split the ARP writes below from the 32-bit view .onInit and the
+  ; separate uninstaller process both use, breaking upgrade and uninstall.
+  ;
+  ; The download itself uses PowerShell's Invoke-WebRequest, the same
+  ; mechanism the MSI's custom action shells out to -- not NSISdl, NSIS's
+  ; own downloader plugin, which links no TLS provider and cannot reach an
+  ; https URL (the http fwlink 301s to one). The download and the
+  ; bootstrapper run as two separate steps, each checked against its own
+  ; exit code, so a download failure and a runtime-installer failure produce
+  ; distinguishable messages -- the MSI's single combined PowerShell call
+  ; cannot tell those apart. This whole block runs before SetOutPath/File:
+  ; NSIS has no transactional rollback, so failing here, before anything is
+  ; written, is what keeps a failed install from leaving an orphaned
+  ; Program Files entry with no shortcut, no uninstaller and no Add/Remove
+  ; Programs listing.
   SetRegView 64
   ReadRegStr $0 HKLM "${WV2KEY}" "pv"
   ${If} $0 == ""
@@ -67,14 +81,14 @@ Section "Install"
   ${If} $0 == ""
     ReadRegStr $0 HKCU "${WV2KEY}" "pv"
   ${EndIf}
-  SetRegView 64
+  SetRegView 32
 
   ${If} $0 == ""
     DetailPrint "WebView2 runtime not found - downloading"
-    NSISdl::download "https://go.microsoft.com/fwlink/p/?LinkId=2124703" "$TEMP\MicrosoftEdgeWebview2Setup.exe"
-    Pop $1
-    ${If} $1 != "success"
-      Abort "Could not download the WebView2 runtime ($1). ${APPNAME} cannot run without it."
+    ExecWait `powershell.exe -NoProfile -WindowStyle Hidden -Command "$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile '$TEMP\MicrosoftEdgeWebview2Setup.exe'"` $1
+    ${If} $1 != 0
+      Delete "$TEMP\MicrosoftEdgeWebview2Setup.exe"
+      Abort "Could not download the WebView2 runtime (powershell exit $1). ${APPNAME} cannot run without it."
     ${EndIf}
     ExecWait '"$TEMP\MicrosoftEdgeWebview2Setup.exe" /silent /install' $2
     Delete "$TEMP\MicrosoftEdgeWebview2Setup.exe"
@@ -82,6 +96,9 @@ Section "Install"
       Abort "The WebView2 runtime installer failed (exit $2). ${APPNAME} cannot run without it."
     ${EndIf}
   ${EndIf}
+
+  SetOutPath "$INSTDIR"
+  File "${BINARY_NAME}"
 
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
   CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\${BINARY_NAME}"
