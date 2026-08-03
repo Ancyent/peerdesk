@@ -12,11 +12,6 @@
 
   UpgradeCode must never change between versions - it is what tells Windows
   that v2 replaces v1 rather than installing beside it.
-
-  Not here yet: the WebView2 bootstrapper. Without it the viewer will not start
-  on a clean Windows that has never had Edge WebView2 installed. This is the
-  first follow-up after Stage A, and it needs its own decision about embedding
-  the installer versus downloading it at install time.
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product Id="*"
@@ -33,6 +28,55 @@
       DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." />
 
     <Media Id="1" Cabinet="peerdesk.cab" EmbedCab="yes" />
+
+    <!--
+      WebView2. The viewer is a Tauri app and does not start without the Edge
+      WebView2 runtime, which is present on current Windows 11 and usually on
+      Windows 10, but absent on a clean or LTSC install.
+
+      This mirrors what the official CI-built installer does, established by
+      extracting its tables rather than by reading documentation: three registry
+      searches filling one property, then a custom action that downloads
+      Microsoft's bootstrapper and runs it silently, only on install, and only
+      when nothing was found.
+
+      Win64="yes" produces locator type 18, which is raw (2) plus the 64-bit
+      flag (16). Dropping it leaves XML that looks correct and a search that
+      reads the wrong registry view. deploy/builder/webview2_check.py asserts it.
+    -->
+    <Property Id="INSTALLED_WEBVIEW2_VERSION">
+      <RegistrySearch Id="Webview2VersionSystemx64" Root="HKLM"
+        Key="SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+        Name="pv" Type="raw" Win64="yes" />
+      <RegistrySearch Id="Webview2VersionSystemx86" Root="HKLM"
+        Key="SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+        Name="pv" Type="raw" Win64="yes" />
+      <RegistrySearch Id="Webview2VersionUser" Root="HKCU"
+        Key="SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+        Name="pv" Type="raw" Win64="yes" />
+    </Property>
+
+    <!--
+      Property holds the executable path, ExeCommand holds the argument
+      string; that is what lands each in the CustomAction row's Source and
+      Target columns respectively, and it is Target the checker inspects for
+      the bootstrapper URL and switches.
+
+      wixl's preprocessor treats a bare "$identifier" as a variable reference
+      and silently drops the "$" when nothing matches; "$$" is the escape for
+      a literal dollar sign. Without doubling, ExeCommand would lose every
+      "$" and the PowerShell would reference bareword names instead of
+      $ErrorActionPreference / $env:TEMP.
+    -->
+    <Property Id="Webview2BootstrapperExe" Value="powershell.exe" />
+
+    <CustomAction Id="DownloadAndInvokeBootstrapper" Property="Webview2BootstrapperExe"
+      ExeCommand="-NoProfile -WindowStyle Hidden -Command &quot;$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot;; Start-Process -FilePath \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot; -ArgumentList '/silent','/install' -Wait&quot;"
+      Execute="deferred" Return="check" Impersonate="no" />
+
+    <InstallExecuteSequence>
+      <Custom Action="DownloadAndInvokeBootstrapper" Before="InstallFinalize">NOT(REMOVE OR INSTALLED_WEBVIEW2_VERSION)</Custom>
+    </InstallExecuteSequence>
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
