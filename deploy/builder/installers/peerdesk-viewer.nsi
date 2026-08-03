@@ -2,9 +2,7 @@
 ; See peerdesk-viewer.wxs for why these definitions are ours rather than
 ; Tauri's. This script carries its own WebView2 detection and install block
 ; below, mirroring the MSI's mechanism since the two formats share no
-; tooling. The experiment version produced a working 12,181,042-byte
-; Nullsoft self-extracting archive; this adds the upgrade handling it left
-; out.
+; tooling. Current builds land around 11.3 MB compressed.
 
 !include LogicLib.nsh
 
@@ -72,6 +70,14 @@ Section "Install"
   ; written, is what keeps a failed install from leaving an orphaned
   ; Program Files entry with no shortcut, no uninstaller and no Add/Remove
   ; Programs listing.
+  ;
+  ; powershell.exe is invoked by its full $SYSDIR path, not bare. With
+  ; RequestExecutionLevel admin, CreateProcess's unqualified-name search
+  ; order would check the directory setup.exe was launched from -- usually
+  ; Downloads -- before system32; a powershell.exe planted there would run
+  ; elevated. Running this block before SetOutPath (see above) means the
+  ; CWD hasn't even moved to $INSTDIR yet, so the full path is load-bearing
+  ; here, not belt-and-suspenders.
   SetRegView 64
   ReadRegStr $0 HKLM "${WV2KEY}" "pv"
   ${If} $0 == ""
@@ -85,7 +91,7 @@ Section "Install"
 
   ${If} $0 == ""
     DetailPrint "WebView2 runtime not found - downloading"
-    ExecWait `powershell.exe -NoProfile -WindowStyle Hidden -Command "$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile '$TEMP\MicrosoftEdgeWebview2Setup.exe'"` $1
+    ExecWait `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -WindowStyle Hidden -Command "$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile '$TEMP\MicrosoftEdgeWebview2Setup.exe'"` $1
     ${If} $1 != 0
       Delete "$TEMP\MicrosoftEdgeWebview2Setup.exe"
       Abort "Could not download the WebView2 runtime (powershell exit $1). ${APPNAME} cannot run without it."

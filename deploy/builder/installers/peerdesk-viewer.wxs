@@ -68,7 +68,14 @@
       "$" and the PowerShell would reference bareword names instead of
       $ErrorActionPreference / $env:TEMP.
     -->
-    <Property Id="Webview2BootstrapperExe" Value="powershell.exe" />
+    <!--
+      Full path, not bare "powershell.exe": a Property-sourced CustomAction
+      launches this with no directory of its own to anchor an unqualified
+      search, and Execute="deferred" here still runs elevated. [SystemFolder]
+      is Windows Installer's own formatted-text token for the system
+      directory, resolved by the engine at execution time.
+    -->
+    <Property Id="Webview2BootstrapperExe" Value="[SystemFolder]WindowsPowerShell\v1.0\powershell.exe" />
 
     <CustomAction Id="DownloadAndInvokeBootstrapper" Property="Webview2BootstrapperExe"
       ExeCommand="-NoProfile -WindowStyle Hidden -Command &quot;$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot;; Start-Process -FilePath \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot; -ArgumentList '/silent','/install' -Wait&quot;"
