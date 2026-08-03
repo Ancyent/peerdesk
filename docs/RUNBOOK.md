@@ -279,11 +279,32 @@ Know before you run it:
   downloads Microsoft's Evergreen bootstrapper
   (`https://go.microsoft.com/fwlink/p/?LinkId=2124703`) and runs it silently
   before finishing. That download needs a route out to Microsoft's endpoint.
-  **A machine with no route to that endpoint, and no runtime already
-  present, sees the installation fail and roll back** — it does not install
-  an app that cannot start. On a machine that already has the runtime (most
-  current Windows installs do, since it now ships in-box), nothing is
-  downloaded and install proceeds exactly as before.
+  On a machine that already has the runtime (most current Windows installs
+  do, since it now ships in-box), nothing is downloaded and install proceeds
+  exactly as before.
+
+  **When the runtime is missing and the endpoint is unreachable, the install
+  fails — but what the machine is left with depends on whether it was a
+  fresh install or an upgrade, and the two differ between the formats:**
+
+  | | fresh install | upgrade over an existing install |
+  |---|---|---|
+  | `.msi` | fails and rolls back; nothing installed | fails and rolls back; **the previous version is restored** |
+  | `-setup.exe` (NSIS) | fails and aborts; nothing written | fails and aborts; **the previous version is already gone and is not restored** |
+
+  The MSI schedules the removal of the old version inside the install
+  transaction, so a failure at the WebView2 step rolls the removal back with
+  everything else. The NSIS setup runs the old uninstaller before the install
+  section is entered, and NSIS has no transactional rollback, so there is
+  nothing to restore — that machine is left with **neither** version and
+  needs the previous installer re-run by hand.
+
+  The realistic way to hit the NSIS case: a machine that installed an
+  earlier self-hosted build (which carried no WebView2 machinery, so the app
+  installed but never started) and then takes an upgrade that now checks for
+  the runtime and cannot reach Microsoft. If you are upgrading a fleet that
+  may include such machines, confirm the route to Microsoft's endpoint
+  first, or prefer the `.msi`.
 - **The portable `.exe` is different.** It carries no installer at all, so it
   never runs the check above — it will not launch on a machine without the
   runtime already present. That is a pre-existing, deliberate limitation of

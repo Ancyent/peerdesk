@@ -15,20 +15,45 @@ difference to stderr and exits non-zero if any exist, zero otherwise.
 
 The comparison is deliberately behavioural, not textual:
 - The custom action's Target is checked for the substrings that matter (the
-  bootstrapper URL, `/silent`, `/install`), not compared whole. Our own
-  custom action will not be byte-identical to Tauri's: the temp filename and
-  the exact PowerShell phrasing are ours to choose.
-- The custom action's Type is checked for the two behavioural bits that
-  matter (bit 64, ignore return code; bit 128, run asynchronously), not
-  compared to the number 1058. `wixl` cannot produce the `Directory`-sourced
-  form that yields exactly 1058, so a correct installer built through wixl
-  will always have a different Type number.
+  bootstrapper URL, `/silent`, `/install`, and the TLS 1.2 clause), not
+  compared whole. Our own custom action will not be byte-identical to
+  Tauri's: the temp filename and the exact PowerShell phrasing are ours to
+  choose.
+- The custom action's Type is checked for the behavioural bits that matter,
+  not compared to the number 1058. `wixl` cannot produce the
+  `Directory`-sourced form that yields exactly 1058, so a correct installer
+  built through wixl will always have a different Type number.
+
+  1058 decomposes as 34 (`msidbCustomActionTypeExe` 2 | `...TypeDirectory`
+  32, an EXE whose working directory comes from a Directory) plus 1024
+  (`msidbCustomActionTypeInScript`, i.e. deferred). It does NOT set 2048
+  (`msidbCustomActionTypeNoImpersonate`) -- the reference action runs
+  impersonated. Ours is 3122 = 50 (`...TypeExe` 2 | `...TypeProperty` 48,
+  the Property-sourced form wixl can build) | 1024 | 2048: deferred and
+  non-impersonated. The 2048 divergence is deliberate and documented at the
+  CustomAction in deploy/builder/installers/peerdesk-viewer.wxs.
+
+  Checked here: bit 64 (ignore return code) and bit 128 (run asynchronously)
+  must be clear, and bit 1024 (deferred) must be set. Dropping
+  `Execute="deferred"` clears 1024 and yields 2098, whose 64 and 128 bits are
+  still clear -- so without the 1024 assertion that passes, and an immediate,
+  unelevated action at 6599 cannot install a machine-wide runtime.
 - The sequence entry's Sequence number is checked against the same dump's
   InstallInitialize and InstallFinalize rows, not against a fixed number.
   `wixl` has been observed resolving `Before="InstallFinalize"` to a
   sequence number outside the install transaction (e.g. 1402, right after
   RemoveExistingProducts), which is a defect a row simply existing with the
   right condition would not catch.
+- The `AppSearch` *standard action* must itself be sequenced in
+  InstallExecuteSequence. The AppSearch table only says which property a
+  search fills; it is the standard action that runs the searches. Drop it and
+  INSTALLED_WEBVIEW2_VERSION is never set, the condition below is always
+  true, and the bootstrapper runs on every install -- including on machines
+  that already have the runtime, and failing outright on offline ones.
+
+What this does NOT check: the `Property` table, where a Property-sourced
+custom action's executable path lives. A defect there has passed this check
+before. Passing is necessary, not sufficient.
 """
 
 from __future__ import annotations
@@ -53,6 +78,18 @@ EXPECTED_URL = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 EXPECTED_ARGS = ("/silent", "/install")
 EXPECTED_CONDITION = "NOT(REMOVE OR INSTALLED_WEBVIEW2_VERSION)"
 
+# The TLS 1.2 clause, checked by the two tokens that survive both the
+# reference's Formatted-field escaping ("[\[]Net.ServicePointManager[\]]") and
+# any equivalent phrasing of the same assignment. On a host whose PowerShell
+# defaults to TLS 1.0 the HTTPS fetch fails and, with Return="check", the
+# whole install fails with it. Matching on the escaped bracket form instead
+# would assert the reference's exact spelling rather than the behaviour.
+EXPECTED_TLS_TOKENS = ("::SecurityProtocol", "::Tls12")
+
+# AppSearch is a standard action, not one of ours; it is what actually runs
+# the RegLocator searches and fills the property the condition reads.
+APPSEARCH_ACTION = "AppSearch"
+
 # Type 18 = msidbLocatorTypeRawValue (2) | msidbLocatorType64bit (16): a raw
 # registry value read from the 64-bit view. HKLM is probed in both the
 # WOW6432Node (32-bit view of a 64-bit key written by a 32-bit installer)
@@ -66,6 +103,7 @@ EXPECTED_SEARCHES = (
 
 _IGNORE_RETURN_BIT = 64
 _ASYNC_BIT = 128
+_DEFERRED_BIT = 1024
 
 
 @dataclass
@@ -169,6 +207,19 @@ def differences(facts: Facts) -> list[str]:
                 f"RegLocator search on {root_name}\\{key}\\{name}"
             )
 
+    # The searches above only describe what AppSearch would do. The AppSearch
+    # standard action is what runs them; without a row here the property is
+    # never set, the condition below is always true, and the bootstrapper runs
+    # on every install -- including on machines that already have the runtime,
+    # and failing outright on offline ones.
+    if _sequence_number(facts.sequence, APPSEARCH_ACTION) is None:
+        diffs.append(
+            f"InstallExecuteSequence: the {APPSEARCH_ACTION!r} standard action is "
+            f"not sequenced, so the registry searches never run and "
+            f"{EXPECTED_PROPERTY!r} is never set; the bootstrapper would then run "
+            f"on every install, including on machines that already have the runtime"
+        )
+
     action = _find_download_action(facts.customaction)
     if action is None:
         diffs.append(
@@ -185,6 +236,16 @@ def differences(facts: Facts) -> list[str]:
                     f"argument {arg!r}"
                 )
 
+        for token in EXPECTED_TLS_TOKENS:
+            if token not in target:
+                diffs.append(
+                    f"CustomAction {action_name!r}: Target is missing {token!r}, "
+                    f"part of the TLS 1.2 clause the reference installer carries; "
+                    f"without it the download fails on a host whose PowerShell "
+                    f"still defaults to TLS 1.0, and Return=check turns that into "
+                    f"a failed install"
+                )
+
         action_type = _as_int(action.get("Type"))
         if action_type is None:
             diffs.append(f"CustomAction {action_name!r}: Type is missing or not an integer")
@@ -198,6 +259,14 @@ def differences(facts: Facts) -> list[str]:
                 diffs.append(
                     f"CustomAction {action_name!r}: Type {action_type} sets the "
                     f"async bit (128); the install must wait for the bootstrapper"
+                )
+            if not action_type & _DEFERRED_BIT:
+                diffs.append(
+                    f"CustomAction {action_name!r}: Type {action_type} does not set "
+                    f"the deferred bit (1024); an immediate action runs unelevated "
+                    f"and cannot install a machine-wide runtime. Note this is "
+                    f"invisible to the bits above: dropping Execute=\"deferred\" "
+                    f"yields type 2098, whose 64 and 128 bits are both clear"
                 )
 
         seq_row = next(

@@ -41,6 +41,25 @@ UninstPage instfiles
 
 Function .onInit
   ; Replace an existing install rather than stacking a second copy beside it.
+  ;
+  ; Known exposure, deliberately not changed here: this uninstall runs before
+  ; the install section, so on an *upgrade* the previous version is already
+  ; gone by the time the WebView2 block below can Abort. A machine that
+  ; carried an earlier self-hosted build (no WebView2 machinery, app never
+  ; started) and takes an upgrade it cannot complete is left with neither
+  ; version. NSIS has no transactional rollback, so unlike the MSI -- which
+  ; fixes the same exposure by moving RemoveExistingProducts inside the
+  ; install transaction -- there is nothing to roll back to.
+  ;
+  ; Hoisting the detection and download up here, ahead of the uninstall,
+  ; would close it, and was considered and rejected. .onInit runs before any
+  ; page is shown, so the user would sit on a blank screen for the length of
+  ; a runtime download and install with no progress indication, on *every*
+  ; fresh install missing the runtime -- the common case -- to protect the
+  ; rarer upgrade case. Abort in .onInit also takes no message string (unlike
+  ; Abort in a section), so every failure path would need its own MessageBox
+  ; to say anything at all. docs/RUNBOOK.md states the resulting behaviour
+  ; for operators instead.
   ReadRegStr $0 HKLM "${UNINSTKEY}" "UninstallString"
   StrCmp $0 "" done
   ExecWait '"$0" /S _?=$INSTDIR'
@@ -78,6 +97,21 @@ Section "Install"
   ; elevated. Running this block before SetOutPath (see above) means the
   ; CWD hasn't even moved to $INSTDIR yet, so the full path is load-bearing
   ; here, not belt-and-suspenders.
+  ;
+  ; Do NOT "fix" peerdesk-viewer.wxs to match this. The MSI deliberately
+  ; keeps the bare name "powershell.exe", and that asymmetry is intentional,
+  ; not an oversight someone forgot to clean up: the MSI's path lives in the
+  ; Property table, whose Value column is Text and not Formatted, so a
+  ; "[SystemFolder]..." value would reach CreateProcess with the brackets
+  ; still in it and fail the install on exactly the machines the block
+  ; exists for. That regression was written once and reverted once already.
+  ; The .wxs carries the full reasoning next to its Property declaration.
+  ;
+  ; The TLS 1.2 line mirrors the MSI's, which mirrors the reference
+  ; installer's: on a host whose PowerShell defaults to TLS 1.0 the HTTPS
+  ; request fails outright and the install aborts below. It is wrapped in
+  ; try/catch because assigning an unsupported protocol throws on very old
+  ; .NET, and failing to *raise* the protocol must not itself be fatal.
   SetRegView 64
   ReadRegStr $0 HKLM "${WV2KEY}" "pv"
   ${If} $0 == ""
@@ -91,7 +125,7 @@ Section "Install"
 
   ${If} $0 == ""
     DetailPrint "WebView2 runtime not found - downloading"
-    ExecWait `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -WindowStyle Hidden -Command "$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile '$TEMP\MicrosoftEdgeWebview2Setup.exe'"` $1
+    ExecWait `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -WindowStyle Hidden -Command "$$ErrorActionPreference='Stop'; try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile '$TEMP\MicrosoftEdgeWebview2Setup.exe'"` $1
     ${If} $1 != 0
       Delete "$TEMP\MicrosoftEdgeWebview2Setup.exe"
       Abort "Could not download the WebView2 runtime (powershell exit $1). ${APPNAME} cannot run without it."

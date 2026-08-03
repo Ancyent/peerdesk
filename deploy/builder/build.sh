@@ -448,8 +448,11 @@ echo "    both updater signatures verify against the shipped pubkey"
 # the runtime already present. webview2_check.py compares the built MSI's
 # RegLocator, AppSearch, CustomAction and InstallExecuteSequence tables
 # against what the official Tauri-built installer carries, and prints every
-# difference to stderr itself. It checks the registry searches, the download
-# action's Target and the sequence position - it does not read the
+# difference to stderr itself. It checks the registry searches, that the
+# AppSearch standard action is sequenced to run them, the download action's
+# Target (URL, /silent, /install, the TLS 1.2 clause), its deferred and
+# return-code Type bits, and that it is scheduled inside the install
+# transaction. It compares no tables wholesale, and it does not read the
 # Property table, so it cannot see the executable path a custom action
 # resolves at install time; passing this is necessary, not sufficient,
 # evidence the installer works.

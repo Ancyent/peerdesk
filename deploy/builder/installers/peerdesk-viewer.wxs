@@ -91,8 +91,40 @@
     -->
     <Property Id="Webview2BootstrapperExe" Value="powershell.exe" />
 
+    <!--
+      The TLS 1.2 clause is copied from the reference installer, not invented
+      here. On a host whose PowerShell defaults to TLS 1.0 the HTTPS request
+      to go.microsoft.com simply fails, and Return="check" turns that into
+      "cannot install at all". Windows 10 1803 and later ship .NET 4.7.2 or
+      newer, which negotiates TLS 1.2 by default, so the blast radius is
+      narrow; it is not zero, and the reference guards it, so we guard it too.
+
+      Two details are deliberate rather than accidental:
+      * The brackets and braces are written [\[] [\]] [\{] [\}]. CustomAction's
+        Target column is Formatted, so a bare "[Net.ServicePointManager]" would
+        be read as a property reference and substituted away to nothing,
+        leaving syntactically broken PowerShell. The reference escapes them the
+        same way, which is why its exported Target looks like that too.
+      * SecurityProtocol is assigned, not OR'd, exactly as the reference does
+        it. That narrows the enabled protocol set to TLS 1.2 alone, dropping
+        TLS 1.3 where it was enabled, but only inside this one short lived
+        PowerShell process, which makes exactly one HTTPS request and exits.
+        The parent install is unaffected.
+    -->
+    <!--
+      Impersonate="no" is a deliberate divergence from the reference, which
+      runs its action impersonated. This is a perMachine install, so running
+      as LocalSystem is what lets the bootstrapper install a machine wide
+      runtime without depending on the invoking user's rights. The
+      consequence to know: $env:TEMP resolves to the system profile's temp
+      directory (typically C:\Windows\Temp) rather than the user's, so that
+      is where the downloaded bootstrapper lands and where to look for it
+      when diagnosing a failed install. It is also what makes our Type carry
+      the 2048 bit that the reference's 1058 does not; see the Type note in
+      deploy/builder/webview2_check.py.
+    -->
     <CustomAction Id="DownloadAndInvokeBootstrapper" Property="Webview2BootstrapperExe"
-      ExeCommand="-NoProfile -WindowStyle Hidden -Command &quot;$$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot;; Start-Process -FilePath \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot; -ArgumentList '/silent','/install' -Wait&quot;"
+      ExeCommand="-NoProfile -WindowStyle Hidden -Command &quot;$$ErrorActionPreference='Stop'; try [\{] [\[]Net.ServicePointManager[\]]::SecurityProtocol = [\[]Net.SecurityProtocolType[\]]::Tls12 [\}] catch [\{][\}]; Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot;; Start-Process -FilePath \&quot;$$env:TEMP\MicrosoftEdgeWebview2Setup.exe\&quot; -ArgumentList '/silent','/install' -Wait&quot;"
       Execute="deferred" Return="check" Impersonate="no" />
 
     <!--
@@ -109,7 +141,34 @@
       inside the transaction started by InstallInitialize (1500). Do not
       change this back to Before="InstallFinalize".
     -->
+    <!--
+      RemoveExistingProducts at 1501 is load-bearing on upgrades, and 1501 is
+      the number the reference installer uses.
+
+      wixl's default puts it at 1401, before InstallInitialize (1500) and so
+      outside the install transaction: the previous version is uninstalled and
+      committed before the new one starts. If the WebView2 action then fails
+      at 6599, Windows Installer rolls back the new install but has nothing to
+      restore the removed one from, and the machine is left with neither
+      version. The realistic path is a machine carrying an earlier self hosted
+      build (which had no WebView2 machinery, so the app never started) taking
+      an upgrade that now checks and cannot reach Microsoft.
+
+      At 1501 the removal happens inside the transaction, so the same failure
+      rolls back the removal too and the old version survives.
+
+      MajorUpgrade/@Schedule="afterInstallInitialize" is the documented way to
+      express this and wixl does NOT implement it: it warns
+      "WixlWixMajorUpgrade has no property named 'Schedule'" on stderr and
+      carries on emitting 1401. That warning is not an error and does not fail
+      the build, which is exactly how this would go unnoticed. wixl ignores
+      AllowSameVersionUpgrades on the same element for the same reason.
+      Overriding the standard action's Sequence here does work, verified by
+      building and reading the emitted InstallExecuteSequence rather than by
+      reading documentation.
+    -->
     <InstallExecuteSequence>
+      <RemoveExistingProducts Sequence="1501" />
       <Custom Action="DownloadAndInvokeBootstrapper" Sequence="6599">NOT(REMOVE OR INSTALLED_WEBVIEW2_VERSION)</Custom>
     </InstallExecuteSequence>
 
