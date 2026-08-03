@@ -272,18 +272,38 @@ Know before you run it:
   twelve — the **Android APK and the portable Windows `.exe` are not built**
   by this path. Switching to a self-hosted release cache removes those two
   from the Downloads page.
-- The Windows installers it produces (`.msi` and `-setup.exe`) **do not carry
-  the WebView2 bootstrapper**. On a clean Windows that has never had Edge
-  WebView2 installed — not a rare machine; it is the default state of any
-  install predating the current in-box runtime — the viewer **installs
-  successfully and then does not start**. There is no error at install time,
-  and nothing on the server can detect it. Until that gap is closed, test on a
-  target-like machine before pointing users at these installers.
+- The Windows installers it produces (`.msi` and `-setup.exe`) install the
+  Edge WebView2 runtime automatically when it's missing, the same way the
+  official CI-built installers always have: on install, each checks three
+  registry locations for an already-installed runtime and, if none is found,
+  downloads Microsoft's Evergreen bootstrapper
+  (`https://go.microsoft.com/fwlink/p/?LinkId=2124703`) and runs it silently
+  before finishing. That download needs a route out to Microsoft's endpoint.
+  **A machine with no route to that endpoint, and no runtime already
+  present, sees the installation fail and roll back** — it does not install
+  an app that cannot start. On a machine that already has the runtime (most
+  current Windows installs do, since it now ships in-box), nothing is
+  downloaded and install proceeds exactly as before.
+- **The portable `.exe` is different.** It carries no installer at all, so it
+  never runs the check above — it will not launch on a machine without the
+  runtime already present. That is a pre-existing, deliberate limitation of
+  the portable build, not something this changed. (It is also not one of the
+  ten artifacts this path produces — see above.)
+- Every build now runs `deploy/builder/webview2_check.py` against the staged
+  `.msi` before publishing, comparing its registry searches, its download
+  action, and where that action is scheduled against what the official
+  Tauri-built installer carries — and **fails the build** if any of it is
+  missing. It does **not** inspect the `Property` table, where the download
+  action's own executable path is resolved; a defect there has passed this
+  check before. Treat a green build as evidence the machinery is present, not
+  as proof the installer runs to completion on Windows.
 - **These installers have never been executed on a Windows machine.** The work
-  that produced them proved the definitions are structurally valid — `wixl` and
-  `makensis` accept them and emit installers of the expected shape — not that
-  they install, upgrade, or launch anything. Treat the Windows half of this
-  path as unverified until you have run it yourself.
+  that produced them proved the definitions are structurally valid —
+  `wixl` and `makensis` accept them and emit installers of the expected
+  shape, and the build now checks the MSI's WebView2 machinery against the
+  official installer's — not that they install, upgrade, or launch anything.
+  Treat the Windows half of this path as unverified until you have run it
+  yourself.
 
 **5. Back up the `release_cache` volume.** It now holds artifacts that exist
 nowhere else — not in git, not on GitHub. Alongside `postgres_data`, it is one

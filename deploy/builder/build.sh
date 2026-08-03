@@ -442,6 +442,26 @@ verify_updater_signature "$STAGE/${PREFIX}-viewer-linux-${VERSION}.AppImage"
 verify_updater_signature "$STAGE/${PREFIX}-viewer-windows-${VERSION}-x64-setup.exe"
 echo "    both updater signatures verify against the shipped pubkey"
 
+# wixl accepts a peerdesk-viewer.wxs missing the WebView2 detection/bootstrap
+# block exactly as happily as one carrying it, so a staged, well-signed MSI
+# can still be one that installs and then never starts on a machine without
+# the runtime already present. webview2_check.py compares the built MSI's
+# RegLocator, AppSearch, CustomAction and InstallExecuteSequence tables
+# against what the official Tauri-built installer carries, and prints every
+# difference to stderr itself. It checks the registry searches, the download
+# action's Target and the sequence position - it does not read the
+# Property table, so it cannot see the executable path a custom action
+# resolves at install time; passing this is necessary, not sufficient,
+# evidence the installer works.
+python3 "$ROOT/deploy/builder/webview2_check.py" \
+  "$STAGE/${PREFIX}-viewer-windows-${VERSION}-x64.msi" || {
+  echo "the MSI is missing WebView2 bootstrap machinery (differences above)" >&2
+  echo "shipping it would install successfully and then never start on a" >&2
+  echo "machine without the WebView2 runtime already present" >&2
+  exit 1
+}
+echo "    MSI carries the expected WebView2 bootstrap machinery"
+
 echo "[7/7] publish"
 mkdir -p "$CACHE_DIR"
 # Copy in beside the live release first, and only replace it once the whole set

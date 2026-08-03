@@ -4,10 +4,14 @@ detect an installed WebView2 runtime, a custom action that downloads and
 runs the Evergreen bootstrapper when none is found, and a sequence entry
 that runs that action (but not during uninstall).
 
-This module is text-in, differences-out: it does not touch the filesystem
-or invoke any MSI tooling itself. Callers run `msiinfo export <msi> <table>`
-for each of RegLocator, AppSearch, CustomAction and InstallExecuteSequence
-and pass the raw stdout in as a dict.
+`parse` and `differences` are text-in, differences-out: they do not touch the
+filesystem or invoke any MSI tooling themselves. Callers run
+`msiinfo export <msi> <table>` for each of RegLocator, AppSearch, CustomAction
+and InstallExecuteSequence and pass the raw stdout in as a dict.
+
+Run as a script (`python3 webview2_check.py <path-to-msi>`), the module does
+that shelling-out itself, for build.sh's convenience: it prints every
+difference to stderr and exits non-zero if any exist, zero otherwise.
 
 The comparison is deliberately behavioural, not textual:
 - The custom action's Target is checked for the substrings that matter (the
@@ -29,6 +33,8 @@ The comparison is deliberately behavioural, not textual:
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from dataclasses import dataclass, field
 
 # The registry key Microsoft's own WebView2 bootstrapper writes to, under
@@ -241,3 +247,40 @@ def differences(facts: Facts) -> list[str]:
                 )
 
     return diffs
+
+
+def _msiinfo_export(msi_path: str, table: str) -> str:
+    """Run `msiinfo export` for one table, the same way build.sh's callers do.
+
+    A table `wixl` never populated (nothing searches the registry, no custom
+    action was added) makes `msiinfo` itself exit non-zero rather than print
+    an empty table. That is indistinguishable, for this checker's purposes,
+    from the table existing and being empty, so both are folded to "" and
+    left to `parse`/`differences` to report as missing machinery.
+    """
+    result = subprocess.run(
+        ["msiinfo", "export", msi_path, table],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout if result.returncode == 0 else ""
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2:
+        print("usage: webview2_check.py <path-to-msi>", file=sys.stderr)
+        return 2
+
+    msi_path = argv[1]
+    dumps = {
+        table: _msiinfo_export(msi_path, table)
+        for table in ("RegLocator", "AppSearch", "CustomAction", "InstallExecuteSequence")
+    }
+    diffs = differences(parse(dumps))
+    for line in diffs:
+        print(line, file=sys.stderr)
+    return 1 if diffs else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
