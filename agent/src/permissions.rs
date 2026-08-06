@@ -51,6 +51,26 @@ pub fn fixed(p: Permissions) -> tokio::sync::watch::Receiver<Permissions> {
     rx
 }
 
+/// What a service agent runs with: whatever the settings file the desktop
+/// writes says, resolved by exactly the same rules the desktop uses.
+///
+/// This is the whole of `main.rs`'s permission logic, moved here so it can be
+/// tested against a real file — a service install has no UI, so before this
+/// existed the settings screen's decisions simply did not reach the machines
+/// installed by `install.sh`.
+///
+/// Missing, unreadable or malformed all converge on `AppSettings::default()`,
+/// which permits everything that worked before enforcement. A service agent
+/// must never be locked out of its own capabilities by a bad file.
+///
+/// The result is `fixed` because a CLI agent cannot change its settings while
+/// running; only the desktop pushes updates.
+pub fn for_service_agent(
+    settings_path: &std::path::Path,
+) -> tokio::sync::watch::Receiver<Permissions> {
+    fixed(resolve(&AppSettings::load(settings_path).unwrap_or_default()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,6 +138,62 @@ mod tests {
         assert!(p.input, "keyboard/mouse worked by default before this feature");
         assert!(p.file_transfer, "file transfer worked unconditionally before this feature");
         assert!(p.terminal, "the terminal IS the session on a headless agent");
+    }
+
+    #[test]
+    fn a_service_agent_resolves_the_same_permissions_the_desktop_would() {
+        // The spec's named test for the service install. Every value below is
+        // deliberately NOT the default, so a resolution that ignored the file
+        // and fell back to defaults would differ on all three booleans.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("peerdesk-settings.json");
+        let on_disk = AppSettings {
+            access_mode: AccessMode::ViewOnly,
+            allow_keyboard_mouse: false,
+            allow_file_transfer: false,
+            allow_terminal: false,
+            ..AppSettings::default()
+        };
+        on_disk.save(&path).unwrap();
+
+        let from_file = *for_service_agent(&path).borrow();
+        assert_eq!(
+            from_file,
+            resolve(&on_disk),
+            "the service agent and the desktop must read one file the same way"
+        );
+        // Spelled out, so the assertion above cannot pass by both sides being
+        // wrong in the same direction.
+        assert!(!from_file.input);
+        assert!(!from_file.file_transfer);
+        assert!(!from_file.terminal);
+    }
+
+    #[test]
+    fn a_service_agent_with_no_settings_file_permits_what_worked_before() {
+        // install.sh writes no settings file — the desktop does. A machine
+        // that never ran the desktop must keep every capability it had.
+        let dir = tempfile::tempdir().unwrap();
+        let p = *for_service_agent(&dir.path().join("does-not-exist.json")).borrow();
+        assert_eq!(p, Permissions::default());
+        assert!(p.input && p.file_transfer && p.terminal);
+    }
+
+    #[test]
+    fn a_service_agent_reading_a_pre_enforcement_file_keeps_its_capabilities() {
+        // The upgrade path, end to end for a service install: a v0 file's
+        // accidental `false` reaches `resolve` already rescued by the
+        // migration, so the shell keeps being served.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("peerdesk-settings.json");
+        std::fs::write(
+            &path,
+            r#"{"allow_file_transfer": false, "allow_terminal": false, "language": "ro"}"#,
+        )
+        .unwrap();
+        let p = *for_service_agent(&path).borrow();
+        assert!(p.file_transfer);
+        assert!(p.terminal);
     }
 
     #[test]

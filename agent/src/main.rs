@@ -168,15 +168,12 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("peer_id={} — ready for connections", cfg.peer_id);
 
     // The service agent has no UI, but it has the same settings file the
-    // desktop writes — read it rather than assuming. A missing file means
-    // defaults, which permit everything that worked before permissions were
-    // enforced.
-    let settings = peerdesk_agent::config::AppSettings::load(
+    // desktop writes — read it rather than assuming. The rules (and the
+    // missing-file fallback) live in `permissions::for_service_agent`, where
+    // they are tested against a real file; this binary has no test harness.
+    let permissions = peerdesk_agent::permissions::for_service_agent(
         &peerdesk_agent::config::AppSettings::settings_path(cli.portable),
-    )
-    .unwrap_or_default();
-    let permissions =
-        peerdesk_agent::permissions::fixed(peerdesk_agent::permissions::resolve(&settings));
+    );
 
     // Run agent
     run_agent(AgentConfig {
