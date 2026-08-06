@@ -261,11 +261,14 @@ pub struct AppSettings {
     pub allow_keyboard_mouse: bool,
     #[serde(default = "default_true")]
     pub allow_clipboard: bool,
-    #[serde(default)]
+    // `default_true`, not `default`: a settings file written before permissions
+    // were enforced has no opinion on these, and the honest reading of "no
+    // opinion" is the behaviour that file was running with — permitted.
+    #[serde(default = "default_true")]
     pub allow_file_transfer: bool,
     #[serde(default)]
     pub allow_audio: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub allow_terminal: bool,
     #[serde(default)]
     pub allow_remote_restart: bool,
@@ -316,9 +319,9 @@ impl Default for AppSettings {
             lock_screen_after_session: false,
             allow_keyboard_mouse: true,
             allow_clipboard: true,
-            allow_file_transfer: false,
+            allow_file_transfer: true,
             allow_audio: false,
-            allow_terminal: false,
+            allow_terminal: true,
             allow_remote_restart: false,
             block_user_input: false,
             image_quality: default_quality(),
@@ -491,7 +494,8 @@ mod tests {
         assert!(s.show_approval_dialog);
         assert!(s.allow_keyboard_mouse);
         assert!(s.allow_clipboard);
-        assert!(!s.allow_file_transfer);
+        assert!(s.allow_file_transfer);
+        assert!(s.allow_terminal);
         assert!(s.minimize_to_tray);
     }
 
@@ -499,13 +503,18 @@ mod tests {
     fn app_settings_roundtrips_to_file() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("peerdesk-settings.json");
+        // Deliberately the non-default value: `allow_file_transfer` now
+        // defaults to `true`, so asserting `true` here would pass even if
+        // save/load dropped the field entirely. `false` proves the
+        // round-trip actually carries the value instead of just falling
+        // back to the default.
         let s = AppSettings {
-            allow_file_transfer: true,
+            allow_file_transfer: false,
             ..AppSettings::default()
         };
         s.save(&path).unwrap();
         let loaded = AppSettings::load(&path).unwrap();
-        assert!(loaded.allow_file_transfer);
+        assert!(!loaded.allow_file_transfer);
     }
 
     #[test]

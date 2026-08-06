@@ -13,6 +13,7 @@ pub mod display;
 pub mod encode;
 pub mod file_transfer;
 pub mod input;
+pub mod permissions;
 pub mod logging;
 pub mod mode;
 pub mod quality;
