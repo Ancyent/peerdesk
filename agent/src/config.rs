@@ -247,8 +247,25 @@ pub enum AccessMode {
     NoIncoming,
 }
 
+/// Schema stamp written into every settings file this build saves.
+///
+/// Bumped only when a released default changes in a way that a file already on
+/// disk cannot express. `AppSettings::migrate` walks a file from its stamp up
+/// to this one.
+///
+/// - 0 — every file written before permissions were enforced. `save` had no
+///   `skip_serializing_if`, so such a file carries an *explicit* value for every
+///   field, including the two toggles that governed nothing at the time.
+/// - 1 — file transfer and the terminal are enforced, and their stored values
+///   are opinions the host actually expressed.
+pub const SETTINGS_VERSION: u32 = 1;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppSettings {
+    /// Which schema wrote this file. Absent (`0`) means "written before
+    /// enforcement existed" — see `SETTINGS_VERSION` and `migrate`.
+    #[serde(default)]
+    pub settings_version: u32,
     #[serde(default)]
     pub access_mode: AccessMode,
     #[serde(default = "default_true")]
@@ -264,6 +281,10 @@ pub struct AppSettings {
     // `default_true`, not `default`: a settings file written before permissions
     // were enforced has no opinion on these, and the honest reading of "no
     // opinion" is the behaviour that file was running with — permitted.
+    //
+    // That covers only ABSENT keys. A pre-enforcement file usually has the key
+    // present and `false`, because `save` serialized every field and the old
+    // default was `false`; `migrate` is what rescues those.
     #[serde(default = "default_true")]
     pub allow_file_transfer: bool,
     #[serde(default)]
@@ -313,6 +334,7 @@ fn default_view() -> String {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            settings_version: SETTINGS_VERSION,
             access_mode: AccessMode::Full,
             show_approval_dialog: true,
             auto_disconnect_minutes: None,
@@ -340,14 +362,50 @@ impl Default for AppSettings {
 impl AppSettings {
     pub fn load(path: &Path) -> Result<Self> {
         let raw = std::fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&raw)?)
+        let mut settings: Self = serde_json::from_str(&raw)?;
+        settings.migrate();
+        Ok(settings)
+    }
+
+    /// Walk a file from the schema that wrote it up to `SETTINGS_VERSION`.
+    ///
+    /// **v0 → v1.** Before this release `allow_file_transfer` and
+    /// `allow_terminal` defaulted to `false` and gated nothing: file transfer
+    /// ran unconditionally and every terminal session got a shell. `save`
+    /// serialized every field, so anyone who ever touched the settings screen —
+    /// or merely picked a UI language — has an explicit `false` on disk that
+    /// they never chose and that never meant anything. Honouring it at the
+    /// first upgrade would take file transfer away from that host, and take the
+    /// entire session away from a headless one.
+    ///
+    /// So for v0 files these two keys are treated as opinion-less and forced to
+    /// the behaviour the file was actually running with: permitted. Every other
+    /// setting in a v0 file *was* enforced and is left exactly as written.
+    ///
+    /// From v1 on, a stored `false` is a real choice and is obeyed.
+    fn migrate(&mut self) {
+        if self.settings_version < 1 {
+            self.allow_file_transfer = true;
+            self.allow_terminal = true;
+        }
+        // Never stamp a file *down*: a newer build's file read by an older one
+        // keeps its own version, so the older build cannot re-run a migration
+        // the newer build already applied.
+        self.settings_version = self.settings_version.max(SETTINGS_VERSION);
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
         if let Some(p) = path.parent() {
             std::fs::create_dir_all(p)?;
         }
-        std::fs::write(path, serde_json::to_string_pretty(self)?)?;
+        // Stamp at write time rather than trusting the caller. `save_settings`
+        // in the desktop deserializes a JSON object sent by the UI, which may
+        // not carry the field at all; without this, every save would write a v0
+        // file and the next load would migrate the host's deliberate `false`
+        // back to `true` forever.
+        let mut stamped = self.clone();
+        stamped.settings_version = SETTINGS_VERSION;
+        std::fs::write(path, serde_json::to_string_pretty(&stamped)?)?;
         Ok(())
     }
 
@@ -515,6 +573,141 @@ mod tests {
         s.save(&path).unwrap();
         let loaded = AppSettings::load(&path).unwrap();
         assert!(!loaded.allow_file_transfer);
+    }
+
+    /// What a pre-enforcement build wrote: every field explicit, both
+    /// permission toggles `false` because that was the default then, and no
+    /// schema stamp because the field did not exist.
+    fn pre_enforcement_settings_file(dir: &Path) -> PathBuf {
+        let path = dir.join("peerdesk-settings.json");
+        std::fs::write(
+            &path,
+            r#"{
+              "access_mode": "full",
+              "show_approval_dialog": true,
+              "auto_disconnect_minutes": null,
+              "lock_screen_after_session": false,
+              "allow_keyboard_mouse": true,
+              "allow_clipboard": true,
+              "allow_file_transfer": false,
+              "allow_audio": false,
+              "allow_terminal": false,
+              "allow_remote_restart": false,
+              "block_user_input": false,
+              "image_quality": "balanced",
+              "codec": "auto",
+              "view_mode": "fit",
+              "show_remote_cursor": true,
+              "hardware_acceleration": true,
+              "start_on_boot": false,
+              "minimize_to_tray": true,
+              "auto_update": true,
+              "language": "ro"
+            }"#,
+        )
+        .unwrap();
+        path
+    }
+
+    #[test]
+    fn a_pre_enforcement_false_is_not_an_opinion_and_does_not_deny() {
+        // THE UPGRADE-OUTAGE GUARD, aimed at what a real file looks like.
+        // `#[serde(default = "default_true")]` only fires for ABSENT keys, and
+        // these keys are present-and-false in every file a pre-enforcement
+        // build ever saved — including one written by a host who did nothing
+        // but pick a UI language. Nobody chose that `false`; the toggles
+        // governed nothing when it was written. Honouring it would take file
+        // transfer off every upgraded host and the whole session off a
+        // headless one.
+        let dir = tempfile::tempdir().unwrap();
+        let path = pre_enforcement_settings_file(dir.path());
+        let loaded = AppSettings::load(&path).unwrap();
+        assert!(
+            loaded.allow_file_transfer,
+            "a v0 file's `false` predates the gate and must not close it"
+        );
+        assert!(
+            loaded.allow_terminal,
+            "a v0 file's `false` predates the gate and must not close it"
+        );
+    }
+
+    #[test]
+    fn a_false_written_by_this_build_is_a_real_choice_and_is_obeyed() {
+        // Same two keys, same value — the only difference is the stamp, which
+        // says a build that enforced these toggles wrote the file. Now the
+        // host meant it.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("peerdesk-settings.json");
+        let raw = std::fs::read_to_string(pre_enforcement_settings_file(dir.path())).unwrap();
+        std::fs::write(
+            &path,
+            raw.replace('{', &format!("{{\n \"settings_version\": {SETTINGS_VERSION},")),
+        )
+        .unwrap();
+        let loaded = AppSettings::load(&path).unwrap();
+        assert!(!loaded.allow_file_transfer);
+        assert!(!loaded.allow_terminal);
+    }
+
+    #[test]
+    fn the_migration_touches_only_the_two_keys_it_is_about() {
+        // It is a targeted rescue, not a reset: everything else in a v0 file
+        // WAS enforced when it was written and stays exactly as the host left
+        // it.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("peerdesk-settings.json");
+        std::fs::write(
+            &path,
+            r#"{
+              "access_mode": "view_only",
+              "show_approval_dialog": false,
+              "allow_keyboard_mouse": false,
+              "allow_clipboard": false,
+              "allow_file_transfer": false,
+              "allow_terminal": false,
+              "auto_update": false,
+              "minimize_to_tray": false,
+              "language": "ro"
+            }"#,
+        )
+        .unwrap();
+        let loaded = AppSettings::load(&path).unwrap();
+        assert_eq!(loaded.access_mode, AccessMode::ViewOnly);
+        assert!(!loaded.show_approval_dialog);
+        assert!(!loaded.allow_keyboard_mouse);
+        assert!(!loaded.allow_clipboard);
+        assert!(!loaded.auto_update);
+        assert!(!loaded.minimize_to_tray);
+        assert_eq!(loaded.language, "ro");
+        // ...and only these two moved.
+        assert!(loaded.allow_file_transfer);
+        assert!(loaded.allow_terminal);
+    }
+
+    #[test]
+    fn saving_stamps_the_schema_so_the_migration_runs_once() {
+        // The desktop's `save_settings` deserializes a JSON object built by the
+        // UI, which need not carry `settings_version` at all. If `save` did not
+        // stamp, every write would produce a v0 file and the migration would
+        // undo the host's deliberate denial on every single load.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("peerdesk-settings.json");
+        let unstamped = AppSettings {
+            settings_version: 0,
+            allow_file_transfer: false,
+            allow_terminal: false,
+            ..AppSettings::default()
+        };
+        unstamped.save(&path).unwrap();
+
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(json["settings_version"], serde_json::json!(SETTINGS_VERSION));
+
+        let loaded = AppSettings::load(&path).unwrap();
+        assert!(!loaded.allow_file_transfer);
+        assert!(!loaded.allow_terminal);
     }
 
     #[test]
