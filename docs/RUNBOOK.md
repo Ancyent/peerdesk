@@ -272,18 +272,59 @@ Know before you run it:
   twelve — the **Android APK and the portable Windows `.exe` are not built**
   by this path. Switching to a self-hosted release cache removes those two
   from the Downloads page.
-- The Windows installers it produces (`.msi` and `-setup.exe`) **do not carry
-  the WebView2 bootstrapper**. On a clean Windows that has never had Edge
-  WebView2 installed — not a rare machine; it is the default state of any
-  install predating the current in-box runtime — the viewer **installs
-  successfully and then does not start**. There is no error at install time,
-  and nothing on the server can detect it. Until that gap is closed, test on a
-  target-like machine before pointing users at these installers.
+- The Windows installers it produces (`.msi` and `-setup.exe`) install the
+  Edge WebView2 runtime automatically when it's missing, the same way the
+  official CI-built installers always have: on install, each checks three
+  registry locations for an already-installed runtime and, if none is found,
+  downloads Microsoft's Evergreen bootstrapper
+  (`https://go.microsoft.com/fwlink/p/?LinkId=2124703`) and runs it silently
+  before finishing. That download needs a route out to Microsoft's endpoint.
+  On a machine that already has the runtime (most current Windows installs
+  do, since it now ships in-box), nothing is downloaded and install proceeds
+  exactly as before.
+
+  **When the runtime is missing and the endpoint is unreachable, the install
+  fails — but what the machine is left with depends on whether it was a
+  fresh install or an upgrade, and the two differ between the formats:**
+
+  | | fresh install | upgrade over an existing install |
+  |---|---|---|
+  | `.msi` | fails and rolls back; nothing installed | fails and rolls back; **the previous version is restored** |
+  | `-setup.exe` (NSIS) | fails and aborts; nothing written | fails and aborts; **the previous version is already gone and is not restored** |
+
+  The MSI schedules the removal of the old version inside the install
+  transaction, so a failure at the WebView2 step rolls the removal back with
+  everything else. The NSIS setup runs the old uninstaller before the install
+  section is entered, and NSIS has no transactional rollback, so there is
+  nothing to restore — that machine is left with **neither** version and
+  needs the previous installer re-run by hand.
+
+  The realistic way to hit the NSIS case: a machine that installed an
+  earlier self-hosted build (which carried no WebView2 machinery, so the app
+  installed but never started) and then takes an upgrade that now checks for
+  the runtime and cannot reach Microsoft. If you are upgrading a fleet that
+  may include such machines, confirm the route to Microsoft's endpoint
+  first, or prefer the `.msi`.
+- **The portable `.exe` is different.** It carries no installer at all, so it
+  never runs the check above — it will not launch on a machine without the
+  runtime already present. That is a pre-existing, deliberate limitation of
+  the portable build, not something this changed. (It is also not one of the
+  ten artifacts this path produces — see above.)
+- Every build now runs `deploy/builder/webview2_check.py` against the staged
+  `.msi` before publishing, comparing its registry searches, its download
+  action, and where that action is scheduled against what the official
+  Tauri-built installer carries — and **fails the build** if any of it is
+  missing. It does **not** inspect the `Property` table, where the download
+  action's own executable path is resolved; a defect there has passed this
+  check before. Treat a green build as evidence the machinery is present, not
+  as proof the installer runs to completion on Windows.
 - **These installers have never been executed on a Windows machine.** The work
-  that produced them proved the definitions are structurally valid — `wixl` and
-  `makensis` accept them and emit installers of the expected shape — not that
-  they install, upgrade, or launch anything. Treat the Windows half of this
-  path as unverified until you have run it yourself.
+  that produced them proved the definitions are structurally valid —
+  `wixl` and `makensis` accept them and emit installers of the expected
+  shape, and the build now checks the MSI's WebView2 machinery against the
+  official installer's — not that they install, upgrade, or launch anything.
+  Treat the Windows half of this path as unverified until you have run it
+  yourself.
 
 **5. Back up the `release_cache` volume.** It now holds artifacts that exist
 nowhere else — not in git, not on GitHub. Alongside `postgres_data`, it is one
