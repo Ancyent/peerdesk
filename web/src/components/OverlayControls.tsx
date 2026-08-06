@@ -30,6 +30,8 @@ interface Props {
   displays: DisplayInfo[];
   currentDisplay: number;
   onDisplayChange: (index: number) => void;
+  /** `undefined` means the host never said — an agent older than this feature. Treated as permitted, because it is. */
+  canFileTransfer?: boolean;
 }
 
 function latencyColor(ms: number | null): string {
@@ -45,7 +47,7 @@ export function OverlayControls(props: Props) {
     peerId, latencyMs, fps, isViewOnly, videoRef, fullscreenTargetRef,
     onDisconnect, onCtrlAltDel, onToggleViewOnly, onFileTransfer, onQualityChange,
     showStats, onToggleStats, showCursor, onToggleCursor,
-    displays, currentDisplay, onDisplayChange,
+    displays, currentDisplay, onDisplayChange, canFileTransfer,
   } = props;
 
   const [collapsed, setCollapsed] = React.useState(true);
@@ -200,7 +202,9 @@ export function OverlayControls(props: Props) {
         </div>
       </div>
       <button style={btn(isViewOnly)} onClick={onToggleViewOnly}>👁 {isViewOnly ? t('viewer:controls.viewOnlyOn') : t('viewer:controls.viewOnly')}</button>
-      <button style={btn()} onClick={onFileTransfer}>📁 {t('viewer:controls.files')}</button>
+      {canFileTransfer !== false && (
+        <button style={btn()} onClick={onFileTransfer}>📁 {t('viewer:controls.files')}</button>
+      )}
       <button style={btn()} onClick={handleScreenshot}>📸 {t('viewer:controls.screenshot')}</button>
       <button style={btn()} onClick={onCtrlAltDel}>⌨ {t('viewer:controls.ctrlAltDel')}</button>
 

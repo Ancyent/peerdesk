@@ -75,6 +75,9 @@ export default function App() {
   const [showCursor, setShowCursor] = useState(true);
   const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
   const [sessionMode, setSessionMode] = useState<'gui' | 'terminal'>('gui');
+  const [capabilities, setCapabilities] = useState<
+    { input: boolean; file_transfer: boolean; terminal: boolean } | null
+  >(null);
 
   const navigate = useRoute((p, sub, params) => {
     // Fix 1: tear down WebRTC session when navigating back from viewer or connect
@@ -84,6 +87,7 @@ export default function App() {
       setIsViewOnly(false);
       setShowFileTransfer(false);
       setSessionMode('gui');
+      setCapabilities(null);
     }
     // Fix 2: if an authed user pops back to a login/register URL, redirect to machines
     if (user && (p === 'login' || p === 'register')) {
@@ -187,16 +191,18 @@ export default function App() {
       pendingSaveRef.current = null;
       setErrMsg(msg.code === 'unauthorized' ? t('dashboard:viewer.errors.wrongCredentials') : t('dashboard:viewer.errors.machineNotFound')); setViewerState('error'); setPage('connect');
     }
-    else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg(t('dashboard:viewer.errors.remoteDisconnected')); setViewerState('error'); go('machines'); }
+    else if (msg.type === 'agent_disconnected') { webrtc.disconnect(); setErrMsg(t('dashboard:viewer.errors.remoteDisconnected')); setViewerState('error'); go('machines'); setCapabilities(null); }
     else if (msg.type === 'session_taken_over') {
       webrtc.disconnect();
       setErrMsg(msg.by_name
         ? t('dashboard:viewer.errors.takenOverBy', { name: msg.by_name })
         : t('dashboard:viewer.errors.takenOver'));
       setViewerState('error');
+      setCapabilities(null);
     }
-    else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? t('dashboard:viewer.errors.connectionDenied')); setViewerState('error'); setPage('connect'); }
+    else if (msg.type === 'denied')        { webrtc.disconnect(); setErrMsg(msg.reason ?? t('dashboard:viewer.errors.connectionDenied')); setViewerState('error'); setPage('connect'); setCapabilities(null); }
     else if (msg.type === 'session_mode')  { setSessionMode(msg.mode); }
+    else if (msg.type === 'capabilities')  { setCapabilities({ input: msg.input, file_transfer: msg.file_transfer, terminal: msg.terminal }); }
     else if (msg.type === 'display_list')  {
       setDisplays(msg.displays);
       // Always start a fresh connection on the default (primary) monitor, not
@@ -323,7 +329,7 @@ export default function App() {
           isViewOnly={isViewOnly}
           videoRef={{ current: viewerRef.current?.videoElement ?? null } as React.RefObject<HTMLVideoElement | null>}
           fullscreenTargetRef={fsRef}
-          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); go('machines'); setIsViewOnly(false); setShowFileTransfer(false); setSessionMode('gui'); }}
+          onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); go('machines'); setIsViewOnly(false); setShowFileTransfer(false); setSessionMode('gui'); setCapabilities(null); }}
           onCtrlAltDel={() => {
             webrtc.sendInput({ type: 'key_down', key: 'Control', code: 'ControlLeft' });
             webrtc.sendInput({ type: 'key_down', key: 'Alt', code: 'AltLeft' });
@@ -342,6 +348,7 @@ export default function App() {
           displays={displays}
           currentDisplay={currentDisplay}
           onDisplayChange={handleDisplaySwitch}
+          canFileTransfer={capabilities?.file_transfer}
         />
         {(showFileTransfer || transfer) && (
           <FileTransferBar transfer={transfer} onSendFile={sendFile} />
