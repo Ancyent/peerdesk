@@ -462,6 +462,79 @@ mod tests {
         );
     }
 
+    /// Builds a `PeerConnection` with the given `file_transfer` permission and
+    /// returns its `ft_in_tx` — the sender any `"filetransfer"` data channel
+    /// message eventually funnels into. Shared by the pair of tests below
+    /// that prove the `if permissions.file_transfer { spawn } else { drop }`
+    /// branch in `PeerConnection::new` actually took the arm it should have.
+    async fn peer_connection_ft_in_tx(
+        file_transfer: bool,
+    ) -> tokio::sync::mpsc::Sender<crate::file_transfer::FtMessage> {
+        let (_frame_tx, frame_rx) =
+            tokio::sync::broadcast::channel::<std::sync::Arc<crate::capture::FrameData>>(1);
+        let (input_tx, _input_rx) = tokio::sync::mpsc::channel(10);
+        let (qtx, _qrx) = tokio::sync::watch::channel(crate::quality::QualitySettings::default());
+        let (ctx, _crx) = tokio::sync::watch::channel((0.5_f32, 0.5_f32));
+        let (pty_out, _pty_out_rx) = tokio::sync::broadcast::channel::<Vec<u8>>(16);
+        let (pty_in_tx, _pty_in_rx) = tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(16);
+        let permissions = Permissions { input: true, file_transfer, terminal: true };
+        let pc = PeerConnection::new(
+            crate::mode::SessionMode::Gui,
+            frame_rx,
+            input_tx,
+            vec![],
+            qtx,
+            ctx,
+            pty_out,
+            pty_in_tx,
+            permissions,
+        )
+        .await
+        .expect("PeerConnection should construct regardless of the file_transfer permission");
+        // `PeerConnection` implements `Drop` (it aborts the video task), so its
+        // `ft_in_tx` field can't be moved out — clone the sender instead. `pc`
+        // itself is then dropped, which is fine: whether `ft_in_rx` is alive
+        // is a property of the channel, not of this `PeerConnection` value.
+        pc.ft_in_tx.clone()
+    }
+
+    #[tokio::test]
+    async fn denies_the_file_transfer_worker_when_permission_is_off() {
+        // The `if permissions.file_transfer { spawn(...) } else { drop(ft_in_rx) }`
+        // branch runs unconditionally at construction time, before any data
+        // channel ever opens — so this needs no WebRTC signaling to exercise
+        // the `drop` arm. Once `ft_in_rx` is dropped, every clone of the
+        // sender (including this one) gets a channel-closed error the moment
+        // something tries to send, regardless of how many sender clones are
+        // still alive elsewhere — that's what proves no worker is listening.
+        let ft_in_tx = peer_connection_ft_in_tx(false).await;
+        let sent = ft_in_tx
+            .send(crate::file_transfer::FtMessage::Control("probe".to_string()))
+            .await;
+        assert!(
+            sent.is_err(),
+            "ft_in_tx accepted a message with file_transfer permission off — \
+             the worker's receiver should have been dropped, not spawned"
+        );
+    }
+
+    #[tokio::test]
+    async fn spawns_the_file_transfer_worker_when_permission_is_on() {
+        // Mirror of the test above: without it, a change that dropped the
+        // receiver unconditionally (denying file transfer even when
+        // permitted) would leave the suite just as green as the bug this
+        // pair was added to catch.
+        let ft_in_tx = peer_connection_ft_in_tx(true).await;
+        let sent = ft_in_tx
+            .send(crate::file_transfer::FtMessage::Control("probe".to_string()))
+            .await;
+        assert!(
+            sent.is_ok(),
+            "ft_in_tx rejected a message with file_transfer permission on — \
+             the worker should have been spawned and listening"
+        );
+    }
+
     #[test]
     fn security_code_is_6_digits() {
         let code = derive_security_code("sha-256 AA:BB:CC", "sha-256 DD:EE:FF");
@@ -476,12 +549,44 @@ mod tests {
         assert_eq!(code_ab, code_ba);
     }
 
+    // Each gated label gets its own denial test, built from a fixture where
+    // that label alone is off and its two neighbours are on. This is
+    // deliberately one test per label rather than folding them together: the
+    // point is that a future reader can see at a glance that all three
+    // denials are proven, instead of having to check which labels a shared
+    // fixture happened to touch. (A prior version of this suite used one
+    // fixture — `input: false, file_transfer: true, terminal: false` — for
+    // both the input and terminal cases, which left file_transfer's denial
+    // unproven: replacing `"filetransfer" => p.file_transfer` with
+    // `"filetransfer" => true` passed the whole suite.) The allowed side of
+    // all three labels is covered separately, below, by
+    // `permitting_everything_allows_every_gated_label`.
+
     #[test]
-    fn a_denied_label_is_refused_and_its_neighbours_are_not() {
-        let only_files = Permissions { input: false, file_transfer: true, terminal: false };
-        assert!(!label_allowed("input", only_files));
-        assert!(label_allowed("filetransfer", only_files));
-        assert!(!label_allowed("terminal", only_files));
+    fn input_denial_is_specific_to_input() {
+        let only_input_denied =
+            Permissions { input: false, file_transfer: true, terminal: true };
+        assert!(!label_allowed("input", only_input_denied));
+        assert!(label_allowed("filetransfer", only_input_denied));
+        assert!(label_allowed("terminal", only_input_denied));
+    }
+
+    #[test]
+    fn file_transfer_denial_is_specific_to_file_transfer() {
+        let only_file_transfer_denied =
+            Permissions { input: true, file_transfer: false, terminal: true };
+        assert!(label_allowed("input", only_file_transfer_denied));
+        assert!(!label_allowed("filetransfer", only_file_transfer_denied));
+        assert!(label_allowed("terminal", only_file_transfer_denied));
+    }
+
+    #[test]
+    fn terminal_denial_is_specific_to_terminal() {
+        let only_terminal_denied =
+            Permissions { input: true, file_transfer: true, terminal: false };
+        assert!(label_allowed("input", only_terminal_denied));
+        assert!(label_allowed("filetransfer", only_terminal_denied));
+        assert!(!label_allowed("terminal", only_terminal_denied));
     }
 
     #[test]
