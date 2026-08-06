@@ -14,9 +14,11 @@ interface Props {
   showCursor: boolean;
   onToggleCursor: () => void;
   onDisconnect: () => void;
+  /** `undefined` means the host never said — an agent older than this feature. */
+  canFileTransfer?: boolean;
 }
 
-export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, showCursor, onToggleCursor, onDisconnect }: Props) {
+export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, showCursor, onToggleCursor, onDisconnect, canFileTransfer }: Props) {
   const { t } = useTranslation('viewer');
   const [qOpen, setQOpen] = useState(false);
   const btn: CSSProperties = {
@@ -36,7 +38,9 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
 
       <button style={btn} onClick={onFullscreen} title={t('viewer:toolbar.fullscreen')}>⛶ {t('viewer:toolbar.fullscreen')}</button>
       <button style={btn} onClick={onClipboardSync} title={t('viewer:toolbar.clipboardTitle')}>📋 {t('viewer:toolbar.clipboard')}</button>
-      <button style={btn} onClick={onFiles} title={t('viewer:toolbar.filesTitle')}>📁 {t('viewer:toolbar.files')}</button>
+      {canFileTransfer !== false && (
+        <button style={btn} onClick={onFiles} title={t('viewer:toolbar.filesTitle')}>📁 {t('viewer:toolbar.files')}</button>
+      )}
       <div style={{ position: 'relative' }}>
         <button style={btn} onClick={() => setQOpen(o => !o)} title={t('viewer:toolbar.quality')}>⚙ {t('viewer:toolbar.quality')}</button>
         <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 20, background: '#0d1117',

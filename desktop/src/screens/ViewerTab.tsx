@@ -59,6 +59,9 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   const [targetKbps, setTargetKbps] = useState(PRESETS.balanced.bitrate_kbps);
   const [displays, setDisplays] = useState<Array<{ index: number; width: number; height: number; is_primary: boolean }>>([]);
   const [currentDisplay, setCurrentDisplay] = useState(0);
+  const [capabilities, setCapabilities] = useState<
+    { input: boolean; file_transfer: boolean; terminal: boolean } | null
+  >(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const sendRef = useRef<((m: SignalingMessage) => void) | null>(null);
   const iceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,6 +127,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
       setErrMsg(m);
       setViewState('error');
       onStateChange(session.id, 'error', m);
+      setCapabilities(null);
     } else if (msg.type === 'display_list') {
       setDisplays(msg.displays);
     } else if (msg.type === 'agent_disconnected') {
@@ -131,6 +135,9 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
       webrtc.disconnect();
       onStateChange(session.id, 'error', t('viewer:errors.remoteDisconnected'));
       onClose();
+      setCapabilities(null);
+    } else if (msg.type === 'capabilities') {
+      setCapabilities({ input: msg.input, file_transfer: msg.file_transfer, terminal: msg.terminal });
     }
   }, [webrtc, session.id, onStateChange, onClose, password, t]),
   useCallback(() => {
@@ -175,12 +182,14 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
   const handleJoin = () => {
     setViewState('pending_approval');
     onStateChange(session.id, 'negotiating');
+    setCapabilities(null);
     send({ type: 'request_challenge', peer_id: session.id });
   };
 
   const handleDisconnect = () => {
     webrtc.disconnect();
     onClose();
+    setCapabilities(null);
   };
 
   const handleFullscreen = () => {
@@ -278,6 +287,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         showCursor={showCursor}
         onToggleCursor={() => setShowCursor((s) => !s)}
         onDisconnect={handleDisconnect}
+        canFileTransfer={capabilities?.file_transfer}
       />
       <div style={{ flex: 1, position: 'relative', display: 'flex', minHeight: 0 }}>
         <DisplaySelector displays={displays} current={currentDisplay} onChange={handleDisplaySwitch} />
