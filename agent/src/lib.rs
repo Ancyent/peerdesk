@@ -79,6 +79,38 @@ impl Default for AgentConfig {
     }
 }
 
+/// Everything the agent tells a viewer about a session before the peer
+/// connection exists, in the order it is sent.
+///
+/// Extracted from the Offer handler so the payload is testable: `run_agent`
+/// needs a signaling server, a config file and a capture pipeline, and none of
+/// that is reachable from a unit test, so building the messages here is the
+/// only part that can be pinned. Transposing two of the three capability
+/// booleans is silent and would hand the viewer the wrong answers.
+///
+/// Signaling, not a data channel: this arrives *before* the peer connection is
+/// up, so the toolbar is drawn once, correctly, instead of being drawn and then
+/// corrected.
+fn session_announcements(
+    session_mode: crate::mode::SessionMode,
+    permissions: crate::permissions::Permissions,
+) -> Vec<signaling::SignalingMessage> {
+    vec![
+        signaling::SignalingMessage::SessionMode {
+            mode: if session_mode == crate::mode::SessionMode::Gui {
+                "gui".to_string()
+            } else {
+                "terminal".to_string()
+            },
+        },
+        signaling::SignalingMessage::Capabilities {
+            input: permissions.input,
+            file_transfer: permissions.file_transfer,
+            terminal: permissions.terminal,
+        },
+    ]
+}
+
 /// Aborts the agent's background tokio tasks (signaling, heartbeat, forwarding)
 /// when run_agent's future is dropped — e.g. when the Tauri host aborts the
 /// agent on restart. Without this the signaling reconnect loop would keep
@@ -452,30 +484,18 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
             }
             Some(signaling::SignalingMessage::Offer { sdp }) => {
                 info!("Got offer — creating a fresh peer connection for this session");
+                // Read the host's permissions ONCE, before anything is announced,
+                // started or wired, so every part of this session agrees with
+                // itself even if the host flips a toggle while it is being set up.
+                let session_permissions = *permissions_rx.borrow();
                 // Announce the session mode so the viewer renders the right surface
-                // (screen vs terminal). The attended-approval flow never delivers a
-                // ViewerJoined to the agent, so the Offer (which always arrives) is
-                // the reliable point to publish session metadata.
-                let mode_str = if session_mode == crate::mode::SessionMode::Gui {
-                    "gui"
-                } else {
-                    "terminal"
-                };
-                let _ = to_sig_tx
-                    .send(signaling::SignalingMessage::SessionMode {
-                        mode: mode_str.to_string(),
-                    })
-                    .await;
-                // Tell the viewer what this host permits before the peer connection
-                // exists, so it never draws a control the agent will refuse.
-                let announced = *permissions_rx.borrow();
-                let _ = to_sig_tx
-                    .send(signaling::SignalingMessage::Capabilities {
-                        input: announced.input,
-                        file_transfer: announced.file_transfer,
-                        terminal: announced.terminal,
-                    })
-                    .await;
+                // (screen vs terminal), and what this host permits so it never
+                // draws a control the agent will refuse. The attended-approval flow
+                // never delivers a ViewerJoined to the agent, so the Offer (which
+                // always arrives) is the reliable point to publish session metadata.
+                for msg in session_announcements(session_mode, session_permissions) {
+                    let _ = to_sig_tx.send(msg).await;
+                }
                 if session_mode == crate::mode::SessionMode::Gui {
                     let displays = capture::list_displays();
                     let _ = to_sig_tx
@@ -501,8 +521,15 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                         tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(1).0,
                     )
                 };
+                // A denied terminal starts no shell. The label gate already made
+                // the shell unreachable, but forking one per Offer on a host that
+                // said no is a live process serving a session that will not use
+                // it — visible in `ps`, and a surprise for the host who turned
+                // the toggle off.
                 let (pty_output, pty_input_tx) =
-                    if session_mode == crate::mode::SessionMode::Terminal {
+                    if session_mode == crate::mode::SessionMode::Terminal
+                        && session_permissions.terminal
+                    {
                         match crate::terminal::start_bridge(80, 24) {
                             Ok(bridge) => {
                                 let wiring = (bridge.output.clone(), bridge.input.clone());
@@ -528,9 +555,6 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                     } else {
                         idle_terminal()
                     };
-                // Read once, here, so the whole session agrees with itself even
-                // if the host flips a toggle while it is being set up.
-                let session_permissions = *permissions_rx.borrow();
                 match webrtc_peer::PeerConnection::new(
                     session_mode,
                     frame_tx.subscribe(),
@@ -595,6 +619,107 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod announcement_tests {
+    use super::session_announcements;
+    use crate::mode::SessionMode;
+    use crate::permissions::Permissions;
+    use crate::signaling::SignalingMessage;
+
+    fn capabilities_in(msgs: &[SignalingMessage]) -> (bool, bool, bool) {
+        for m in msgs {
+            if let SignalingMessage::Capabilities {
+                input,
+                file_transfer,
+                terminal,
+            } = m
+            {
+                return (*input, *file_transfer, *terminal);
+            }
+        }
+        panic!(
+            "no `capabilities` message in the session announcement — the viewer \
+             would draw every control and the agent would refuse them in silence"
+        );
+    }
+
+    #[test]
+    fn every_session_announces_its_capabilities() {
+        // Guards the announcement's existence. Without it the viewer has no way
+        // to learn what is on offer: it draws the full toolbar and the agent
+        // closes the channels behind it, with no badge and no message.
+        let msgs = session_announcements(SessionMode::Gui, Permissions::default());
+        capabilities_in(&msgs);
+    }
+
+    #[test]
+    fn the_mode_is_announced_before_the_capabilities() {
+        // The viewer decides which surface to render from the mode; a
+        // capabilities message that arrived first would be applied to a
+        // toolbar that does not exist yet.
+        let msgs = session_announcements(SessionMode::Gui, Permissions::default());
+        assert!(matches!(msgs[0], SignalingMessage::SessionMode { .. }));
+        assert!(matches!(msgs[1], SignalingMessage::Capabilities { .. }));
+    }
+
+    #[test]
+    fn each_capability_is_announced_under_its_own_name() {
+        // Guards against a TRANSPOSITION, which is silent: the viewer gets
+        // three plausible booleans attached to the wrong three capabilities,
+        // hides the control the host allowed and offers the one it denied.
+        //
+        // Three booleans cannot all differ, so no single case can catch every
+        // swap. One-hot per capability can: swapping any two fields moves the
+        // single `true` in at least one of these three cases.
+        let only_input = Permissions {
+            input: true,
+            file_transfer: false,
+            terminal: false,
+        };
+        assert_eq!(
+            capabilities_in(&session_announcements(SessionMode::Gui, only_input)),
+            (true, false, false),
+            "input announced as something else"
+        );
+
+        let only_files = Permissions {
+            input: false,
+            file_transfer: true,
+            terminal: false,
+        };
+        assert_eq!(
+            capabilities_in(&session_announcements(SessionMode::Gui, only_files)),
+            (false, true, false),
+            "file transfer announced as something else"
+        );
+
+        let only_terminal = Permissions {
+            input: false,
+            file_transfer: false,
+            terminal: true,
+        };
+        assert_eq!(
+            capabilities_in(&session_announcements(SessionMode::Terminal, only_terminal)),
+            (false, false, true),
+            "the terminal announced as something else"
+        );
+    }
+
+    #[test]
+    fn the_mode_string_is_the_one_the_viewers_switch_on() {
+        let gui = session_announcements(SessionMode::Gui, Permissions::default());
+        assert!(
+            matches!(&gui[0], SignalingMessage::SessionMode { mode } if mode == "gui"),
+            "both viewers compare against the literal \"gui\""
+        );
+        let term = session_announcements(SessionMode::Terminal, Permissions::default());
+        assert!(
+            matches!(&term[0], SignalingMessage::SessionMode { mode } if mode == "terminal"),
+            "both viewers compare against the literal \"terminal\""
+        );
+    }
 }
 
 #[cfg(test)]
