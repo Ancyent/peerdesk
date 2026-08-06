@@ -128,7 +128,24 @@ impl PeerConnection {
                         "refusing data channel '{}': the host has that capability turned off",
                         dc.label()
                     );
-                    let _ = dc.close().await;
+                    // Calling dc.close() right here is a no-op: this handler runs
+                    // before the SCTP accept loop calls handle_open (webrtc-0.11.0
+                    // sctp_transport/mod.rs accept_data_channels), so
+                    // RTCDataChannel::data_channel is still None. close() would set
+                    // ready_state to Closing, notify zero waiters, and return
+                    // Ok(()) without ever touching the SCTP stream — then
+                    // handle_open runs immediately after, unconditionally flips
+                    // ready_state back to Open, and spawns a read loop for the
+                    // whole session. The viewer would see onopen and never onclose.
+                    // Deferring the close to on_open lets it run after handle_open
+                    // has populated data_channel, so it finds a real channel to
+                    // close and the viewer gets a genuine onclose.
+                    let dc2 = dc.clone();
+                    dc.on_open(Box::new(move || {
+                        Box::pin(async move {
+                            let _ = dc2.close().await;
+                        })
+                    }));
                     return;
                 }
                 match dc.label() {
@@ -484,5 +501,191 @@ mod tests {
         for label in ["input", "filetransfer", "terminal"] {
             assert!(label_allowed(label, all), "{label} should be allowed");
         }
+    }
+
+    // --- Loopback: prove the gate discriminates, not just the predicate ---
+    //
+    // `label_allowed` is a pure function; the tests above only prove it
+    // returns the right bool. They would stay green even if the `if
+    // !label_allowed(...)` block above were deleted entirely, or if the
+    // `file_transfer` worker were spawned unconditionally again — nothing
+    // exercises the actual wiring from a real data channel down to the
+    // channel that a permission-gated worker reads from. These two tests
+    // stand up a real second `RTCPeerConnection` (the "viewer"), connect it
+    // to an agent-side `PeerConnection` over loopback WebRTC exactly as a
+    // real browser would, open an `"input"` data channel, and check what
+    // actually lands in `input_rx`.
+
+    /// A bare `RTCPeerConnection` with default codecs/interceptors, playing
+    /// the viewer's role — the counterpart to what `PeerConnection::new`
+    /// builds for the agent side.
+    async fn new_viewer_peer_connection() -> RTCPeerConnection {
+        let mut media_engine = MediaEngine::default();
+        media_engine.register_default_codecs().unwrap();
+        let registry = interceptor_registry::register_default_interceptors(
+            webrtc::interceptor::registry::Registry::new(),
+            &mut media_engine,
+        )
+        .unwrap();
+        let api = APIBuilder::new()
+            .with_media_engine(media_engine)
+            .with_interceptor_registry(registry)
+            .build();
+        api.new_peer_connection(RTCConfiguration::default())
+            .await
+            .unwrap()
+    }
+
+    /// Connects a real viewer `RTCPeerConnection` to an agent `PeerConnection`
+    /// built with `Permissions { input: input_allowed, .. }`, opens an
+    /// `"input"` data channel from the viewer side, sends one input event on
+    /// it, and reports whether the agent's `input_rx` received it within a
+    /// bounded wait.
+    async fn probe_input_gate(input_allowed: bool) -> bool {
+        let viewer_pc = new_viewer_peer_connection().await;
+
+        let (_frame_tx, frame_rx) =
+            tokio::sync::broadcast::channel::<std::sync::Arc<crate::capture::FrameData>>(1);
+        let (input_tx, mut input_rx) = tokio::sync::mpsc::channel(10);
+        let (qtx, _qrx) = tokio::sync::watch::channel(crate::quality::QualitySettings::default());
+        let (ctx, _crx) = tokio::sync::watch::channel((0.5_f32, 0.5_f32));
+        let (pty_out, _pty_out_rx) = tokio::sync::broadcast::channel::<Vec<u8>>(16);
+        let (pty_in_tx, _pty_in_rx) =
+            tokio::sync::mpsc::channel::<crate::terminal::ClientMsg>(16);
+
+        let permissions =
+            Permissions { input: input_allowed, file_transfer: false, terminal: false };
+        let mut agent_pc = PeerConnection::new(
+            crate::mode::SessionMode::Terminal,
+            frame_rx,
+            input_tx,
+            vec![],
+            qtx,
+            ctx,
+            pty_out,
+            pty_in_tx,
+            permissions,
+        )
+        .await
+        .expect("agent PeerConnection should construct");
+
+        let mut from_agent = agent_pc
+            .from_signaling_rx
+            .take()
+            .expect("agent PeerConnection should hand back its outbound signaling receiver");
+
+        let viewer_pc = Arc::new(viewer_pc);
+        let agent_pc = Arc::new(agent_pc);
+
+        // There is no real signaling server in this test, so wire the two
+        // peers' ICE candidates and SDP directly to each other.
+        {
+            let agent_pc = Arc::clone(&agent_pc);
+            viewer_pc.on_ice_candidate(Box::new(move |c| {
+                let agent_pc = Arc::clone(&agent_pc);
+                Box::pin(async move {
+                    if let Some(candidate) = c {
+                        if let Ok(init) = candidate.to_json() {
+                            let val = serde_json::to_value(init).unwrap_or_default();
+                            let _ = agent_pc.add_ice_candidate(val).await;
+                        }
+                    }
+                })
+            }));
+        }
+
+        let (answer_tx, answer_rx) = tokio::sync::oneshot::channel::<String>();
+        {
+            let viewer_pc = Arc::clone(&viewer_pc);
+            tokio::spawn(async move {
+                let mut answer_tx = Some(answer_tx);
+                while let Some(msg) = from_agent.recv().await {
+                    match msg {
+                        SignalingMessage::IceCandidate { candidate } => {
+                            if let Ok(init) = serde_json::from_value::<
+                                webrtc::ice_transport::ice_candidate::RTCIceCandidateInit,
+                            >(candidate)
+                            {
+                                let _ = viewer_pc.add_ice_candidate(init).await;
+                            }
+                        }
+                        SignalingMessage::Answer { sdp } => {
+                            if let Some(tx) = answer_tx.take() {
+                                let _ = tx.send(sdp);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            });
+        }
+
+        let dc_viewer = viewer_pc
+            .create_data_channel("input", None)
+            .await
+            .expect("viewer should be able to open an input data channel");
+
+        let (open_tx, open_rx) = tokio::sync::oneshot::channel::<()>();
+        dc_viewer.on_open(Box::new(move || {
+            let _ = open_tx.send(());
+            Box::pin(async {})
+        }));
+
+        let offer = viewer_pc.create_offer(None).await.expect("create_offer");
+        viewer_pc
+            .set_local_description(offer.clone())
+            .await
+            .expect("viewer set_local_description");
+
+        agent_pc
+            .handle_offer(offer.sdp.clone())
+            .await
+            .expect("agent should answer the offer");
+
+        let answer_sdp = tokio::time::timeout(std::time::Duration::from_secs(5), answer_rx)
+            .await
+            .expect("timed out waiting for the agent's answer")
+            .expect("answer channel closed early");
+        let answer =
+            RTCSessionDescription::answer(answer_sdp).expect("agent's answer should parse");
+        viewer_pc
+            .set_remote_description(answer)
+            .await
+            .expect("viewer set_remote_description");
+
+        tokio::time::timeout(std::time::Duration::from_secs(5), open_rx)
+            .await
+            .expect("viewer's input channel never opened")
+            .expect("open signal dropped");
+
+        // The payload only needs to be well-formed for the allowed case —
+        // the denied case's gate is that no `on_message` handler was ever
+        // installed on the agent side, so nothing is listening regardless of
+        // what arrives or when.
+        let _ = dc_viewer
+            .send_text(r#"{"type":"mouse_move","x":1.0,"y":2.0}"#)
+            .await;
+
+        tokio::time::timeout(std::time::Duration::from_secs(2), input_rx.recv())
+            .await
+            .map(|received| received.is_some())
+            .unwrap_or(false)
+    }
+
+    #[tokio::test]
+    async fn a_denied_input_channel_never_reaches_the_input_worker() {
+        assert!(
+            !probe_input_gate(false).await,
+            "input_rx received a message despite Permissions.input == false"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_permitted_input_channel_reaches_the_input_worker() {
+        assert!(
+            probe_input_gate(true).await,
+            "input_rx received nothing despite Permissions.input == true \
+             — the gate broke the pipe, not just the denial"
+        );
     }
 }
