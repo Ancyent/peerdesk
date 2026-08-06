@@ -309,11 +309,26 @@ export default function App() {
       <div ref={fsRef} style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', overflow: 'hidden' }}>
         {showStats && <StatsOverlay stats={liveStats} targetKbps={targetKbps} />}
         {sessionMode === 'terminal'
-          ? <TerminalView channel={webrtc.getTerminalChannel()} />
+          ? (capabilities?.terminal === false
+              // A terminal session with the terminal denied has nothing to
+              // show: the agent refuses the channel, so TerminalView would sit
+              // empty forever with no explanation. Say what happened instead.
+              ? <div style={{
+                  height: '100%', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 10,
+                  padding: 24, textAlign: 'center', fontFamily: 'system-ui, sans-serif',
+                }}>
+                  <div style={{ fontSize: 15, color: 'var(--text-2)' }}>{t('viewer:terminal.disabledTitle')}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', maxWidth: 420 }}>{t('viewer:terminal.disabledBody')}</div>
+                </div>
+              : <TerminalView channel={webrtc.getTerminalChannel()} />)
           : <Viewer
               ref={viewerRef}
               stream={webrtc.stream}
-              isViewOnly={isViewOnly}
+              // The agent drops every input event when the host denied it, so
+              // stop sending them and stop drawing the crosshair that promises
+              // they land. Most restrictive wins, same rule the agent applies.
+              isViewOnly={isViewOnly || capabilities?.input === false}
               cursor={showCursor ? webrtc.cursor : null}
               onMouseMove={(x, y) => webrtc.sendInput({ type: 'mouse_move', x, y })}
               onMouseDown={(b) => webrtc.sendInput({ type: 'mouse_down', button: b })}
@@ -326,7 +341,7 @@ export default function App() {
           peerId={connectPeerId}
           latencyMs={latencyMs}
           fps={fps}
-          isViewOnly={isViewOnly}
+          isViewOnly={isViewOnly || capabilities?.input === false}
           videoRef={{ current: viewerRef.current?.videoElement ?? null } as React.RefObject<HTMLVideoElement | null>}
           fullscreenTargetRef={fsRef}
           onDisconnect={() => { webrtc.disconnect(); setViewerState('idle'); go('machines'); setIsViewOnly(false); setShowFileTransfer(false); setSessionMode('gui'); setCapabilities(null); }}
@@ -349,6 +364,7 @@ export default function App() {
           currentDisplay={currentDisplay}
           onDisplayChange={handleDisplaySwitch}
           canFileTransfer={capabilities?.file_transfer}
+          canInput={capabilities?.input}
         />
         {(showFileTransfer || transfer) && (
           <FileTransferBar transfer={transfer} onSendFile={sendFile} />

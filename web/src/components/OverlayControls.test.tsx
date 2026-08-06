@@ -31,6 +31,13 @@ afterEach(() => {
 const filesButton = () =>
   Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('viewer:controls.files')) ?? null;
 
+const byLabel = (key: string) =>
+  Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes(key)) ?? null;
+const ctrlAltDelButton = () => byLabel('viewer:controls.ctrlAltDel');
+const viewOnlyButton = () => byLabel('viewer:controls.viewOnly');
+const inputDeniedBadge = () =>
+  Array.from(document.querySelectorAll('div')).find(d => d.textContent?.trim() === '🔒 viewer:controls.inputDisabled') ?? null;
+
 // OverlayControls starts collapsed (only the drag handle, open, fullscreen
 // and disconnect icons render); the file-transfer button only exists in the
 // expanded panel, so every test must open it first.
@@ -83,5 +90,34 @@ describe('OverlayControls capability gating', () => {
     render(<OverlayControls {...props({ canFileTransfer: undefined })} />);
     openPanel();
     expect(filesButton()).not.toBeNull();
+  });
+
+  it('offers Ctrl+Alt+Del and the view-only toggle when input is permitted', () => {
+    render(<OverlayControls {...props({ canInput: true })} />);
+    openPanel();
+    expect(ctrlAltDelButton()).not.toBeNull();
+    expect(viewOnlyButton()).not.toBeNull();
+    expect(inputDeniedBadge()).toBeNull();
+  });
+
+  it('hides the controls that need input, and says why, when the host denies it', () => {
+    // Ctrl+Alt+Del sends six key events the agent throws away, and the
+    // view-only toggle claims to control something the host has already
+    // decided. Neither is honest with input denied.
+    render(<OverlayControls {...props({ canInput: false })} />);
+    openPanel();
+    expect(ctrlAltDelButton()).toBeNull();
+    expect(viewOnlyButton()).toBeNull();
+    expect(inputDeniedBadge()).not.toBeNull();
+  });
+
+  it('offers them when the host said nothing', () => {
+    // An agent older than this feature sends no `capabilities` message and
+    // still injects input. Silence is not denial.
+    render(<OverlayControls {...props({ canInput: undefined })} />);
+    openPanel();
+    expect(ctrlAltDelButton()).not.toBeNull();
+    expect(viewOnlyButton()).not.toBeNull();
+    expect(inputDeniedBadge()).toBeNull();
   });
 });

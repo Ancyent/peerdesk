@@ -32,6 +32,8 @@ interface Props {
   onDisplayChange: (index: number) => void;
   /** `undefined` means the host never said — an agent older than this feature. Treated as permitted, because it is. */
   canFileTransfer?: boolean;
+  /** Same three-state reading as `canFileTransfer`. `false` means the agent drops every input event. */
+  canInput?: boolean;
 }
 
 function latencyColor(ms: number | null): string {
@@ -47,8 +49,14 @@ export function OverlayControls(props: Props) {
     peerId, latencyMs, fps, isViewOnly, videoRef, fullscreenTargetRef,
     onDisconnect, onCtrlAltDel, onToggleViewOnly, onFileTransfer, onQualityChange,
     showStats, onToggleStats, showCursor, onToggleCursor,
-    displays, currentDisplay, onDisplayChange, canFileTransfer,
+    displays, currentDisplay, onDisplayChange, canFileTransfer, canInput,
   } = props;
+
+  // The host denied keyboard and mouse. Every event we send is dropped at the
+  // agent, so offering controls that only make sense when input works would be
+  // a lie; say so once instead. `undefined` means an agent older than this
+  // feature, which permits input — never hide on silence.
+  const inputDenied = canInput === false;
 
   const [collapsed, setCollapsed] = React.useState(true);
   const [top, setTop] = React.useState(8);
@@ -201,12 +209,30 @@ export function OverlayControls(props: Props) {
           <QualitySelector onChange={onQualityChange} />
         </div>
       </div>
-      <button style={btn(isViewOnly)} onClick={onToggleViewOnly}>👁 {isViewOnly ? t('viewer:controls.viewOnlyOn') : t('viewer:controls.viewOnly')}</button>
+      {inputDenied ? (
+        <div
+          title={t('viewer:controls.inputDisabledHint')}
+          style={{
+            padding: '5px 10px', borderRadius: 7, fontSize: 11,
+            border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.1)',
+            color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 5,
+          }}
+        >
+          🔒 {t('viewer:controls.inputDisabled')}
+        </div>
+      ) : (
+        // The view-only toggle only means something while input is possible:
+        // with input denied the session is already view-only and nothing the
+        // user does here can change that.
+        <button style={btn(isViewOnly)} onClick={onToggleViewOnly}>👁 {isViewOnly ? t('viewer:controls.viewOnlyOn') : t('viewer:controls.viewOnly')}</button>
+      )}
       {canFileTransfer !== false && (
         <button style={btn()} onClick={onFileTransfer}>📁 {t('viewer:controls.files')}</button>
       )}
       <button style={btn()} onClick={handleScreenshot}>📸 {t('viewer:controls.screenshot')}</button>
-      <button style={btn()} onClick={onCtrlAltDel}>⌨ {t('viewer:controls.ctrlAltDel')}</button>
+      {!inputDenied && (
+        <button style={btn()} onClick={onCtrlAltDel}>⌨ {t('viewer:controls.ctrlAltDel')}</button>
+      )}
 
       <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'monospace', textAlign: 'center' }}>
         {peerId.replace(/(\d{3})(\d{3})(\d{3})/, '$1·$2·$3')}

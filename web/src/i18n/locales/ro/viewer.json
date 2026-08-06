@@ -17,7 +17,9 @@
     "viewOnlyOn": "Doar vizualizare (activă)",
     "files": "Fișiere",
     "screenshot": "Captură de ecran",
-    "ctrlAltDel": "Ctrl+Alt+Del"
+    "ctrlAltDel": "Ctrl+Alt+Del",
+    "inputDisabled": "Control dezactivat de gazdă",
+    "inputDisabledHint": "Gazda a dezactivat controlul tastaturii și al mouse-ului pentru această sesiune. Poți vedea în continuare ecranul."
   },
   "stats": {
     "speed": "Viteză",
@@ -46,5 +48,9 @@
       "reaction": "Optimizează timpul de reacție",
       "custom": "Personalizat"
     }
+  },
+  "terminal": {
+    "disabledTitle": "Accesul la terminal este dezactivat",
+    "disabledBody": "Gazda a dezactivat accesul la terminal pe acest dispozitiv, deci nu există niciun shell de afișat. Cere-i să îl permită din setările PeerDesk."
   }
 }
