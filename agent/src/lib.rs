@@ -357,6 +357,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
     // until audio has a real consumer.
 
     let peer_id = cfg.peer_id.clone();
+    let permissions_rx = agent_cfg.permissions.clone();
     let pw_hash = cfg.password_hash.clone();
     let hmac_key = cfg.hmac_key.clone().unwrap_or_default();
     let sig_url = signaling_url;
@@ -517,6 +518,9 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                     } else {
                         idle_terminal()
                     };
+                // Read once, here, so the whole session agrees with itself even
+                // if the host flips a toggle while it is being set up.
+                let session_permissions = *permissions_rx.borrow();
                 match webrtc_peer::PeerConnection::new(
                     session_mode,
                     frame_tx.subscribe(),
@@ -526,6 +530,7 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                     cursor_tx.clone(),
                     pty_output,
                     pty_input_tx,
+                    session_permissions,
                 )
                 .await
                 {

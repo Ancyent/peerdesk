@@ -18,6 +18,19 @@ use webrtc::{
     track::track_local::track_local_static_sample::TrackLocalStaticSample,
 };
 
+/// Whether a data channel with this label may be wired for this session.
+///
+/// Labels that are not permission-gated are always allowed — denying every
+/// permission must not disable quality control or the cursor feed.
+pub(crate) fn label_allowed(label: &str, p: crate::permissions::Permissions) -> bool {
+    match label {
+        "input" => p.input,
+        "filetransfer" => p.file_transfer,
+        "terminal" => p.terminal,
+        _ => true,
+    }
+}
+
 pub struct PeerConnection {
     pc: Arc<RTCPeerConnection>,
     pub to_signaling_tx: Sender<SignalingMessage>,
@@ -45,6 +58,7 @@ impl PeerConnection {
         cursor_tx: tokio::sync::watch::Sender<(f32, f32)>,
         pty_output: tokio::sync::broadcast::Sender<Vec<u8>>,
         pty_input_tx: tokio::sync::mpsc::Sender<crate::terminal::ClientMsg>,
+        permissions: crate::permissions::Permissions,
     ) -> Result<Self> {
         let mut media_engine = MediaEngine::default();
         media_engine.register_default_codecs()?;
@@ -98,6 +112,7 @@ impl PeerConnection {
         let cursor_tx_dc = cursor_tx.clone();
         let pty_out_dc = pty_output.clone();
         let pty_in_dc = pty_input_tx.clone();
+        let perms_dc = permissions;
         pc.on_data_channel(Box::new(move |dc| {
             let input_tx = input_tx_clone.clone();
             let clipboard_tx = clipboard_in_tx_clone.clone();
@@ -106,7 +121,16 @@ impl PeerConnection {
             let cursor_tx = cursor_tx_dc.clone();
             let pty_output = pty_out_dc.clone();
             let pty_input = pty_in_dc.clone();
+            let perms = perms_dc;
             Box::pin(async move {
+                if !label_allowed(dc.label(), perms) {
+                    tracing::debug!(
+                        "refusing data channel '{}': the host has that capability turned off",
+                        dc.label()
+                    );
+                    let _ = dc.close().await;
+                    return;
+                }
                 match dc.label() {
                     "input" => {
                         dc.on_message(Box::new(move |msg| {
@@ -216,7 +240,14 @@ impl PeerConnection {
             })
         }));
 
-        tokio::spawn(crate::file_transfer::run(ft_in_rx, ft_control_tx));
+        // Refusing the label above is the gate that matters; not starting the
+        // worker is what keeps a denied session from carrying a task with
+        // nothing to do.
+        if permissions.file_transfer {
+            tokio::spawn(crate::file_transfer::run(ft_in_rx, ft_control_tx));
+        } else {
+            drop(ft_in_rx);
+        }
 
         // Spawn video frame sender (GUI mode only; terminal mode adds no video track)
         let video_task = match &video_track {
@@ -384,6 +415,7 @@ async fn send_video_frames(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::permissions::Permissions;
 
     #[tokio::test]
     async fn creates_peer_connection() {
@@ -403,6 +435,7 @@ mod tests {
             ctx,
             pty_out,
             pty_in_tx,
+            crate::permissions::Permissions::default(),
         )
         .await;
         assert!(
@@ -424,5 +457,32 @@ mod tests {
         let code_ab = derive_security_code("fp_a", "fp_b");
         let code_ba = derive_security_code("fp_b", "fp_a");
         assert_eq!(code_ab, code_ba);
+    }
+
+    #[test]
+    fn a_denied_label_is_refused_and_its_neighbours_are_not() {
+        let only_files = Permissions { input: false, file_transfer: true, terminal: false };
+        assert!(!label_allowed("input", only_files));
+        assert!(label_allowed("filetransfer", only_files));
+        assert!(!label_allowed("terminal", only_files));
+    }
+
+    #[test]
+    fn ungated_labels_are_always_allowed() {
+        // Quality control and the cursor feed are not permissions; denying
+        // everything must not take them down too.
+        let nothing = Permissions { input: false, file_transfer: false, terminal: false };
+        assert!(label_allowed("control", nothing));
+        assert!(label_allowed("cursor", nothing));
+        assert!(label_allowed("clipboard", nothing));
+        assert!(label_allowed("something-new", nothing));
+    }
+
+    #[test]
+    fn permitting_everything_allows_every_gated_label() {
+        let all = Permissions { input: true, file_transfer: true, terminal: true };
+        for label in ["input", "filetransfer", "terminal"] {
+            assert!(label_allowed(label, all), "{label} should be allowed");
+        }
     }
 }
