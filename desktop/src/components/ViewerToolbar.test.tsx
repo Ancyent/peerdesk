@@ -45,6 +45,7 @@ function props(overrides: Partial<React.ComponentProps<typeof ViewerToolbar>> = 
 }
 
 const filesButton = () => document.querySelector<HTMLButtonElement>('button[title="viewer:toolbar.filesTitle"]');
+const inputDeniedBadge = () => document.querySelector('[title="viewer:toolbar.inputDisabledTitle"]');
 
 describe('ViewerToolbar capability gating', () => {
   it('offers files when the host permits it', () => {
@@ -63,5 +64,24 @@ describe('ViewerToolbar capability gating', () => {
     // because it was never told about it.
     render(<ViewerToolbar {...props({ canFileTransfer: undefined })} />);
     expect(filesButton()).not.toBeNull();
+  });
+
+  it('says so when the host has input disabled', () => {
+    // Without this the viewer looks fully interactive and every keystroke
+    // vanishes at the agent with no explanation.
+    render(<ViewerToolbar {...props({ canInput: false })} />);
+    expect(inputDeniedBadge()).not.toBeNull();
+  });
+
+  it('says nothing when the host permits input', () => {
+    render(<ViewerToolbar {...props({ canInput: true })} />);
+    expect(inputDeniedBadge()).toBeNull();
+  });
+
+  it('says nothing when the host said nothing', () => {
+    // An agent older than this feature sends no `capabilities` message and
+    // still injects input. Silence is not denial.
+    render(<ViewerToolbar {...props({ canInput: undefined })} />);
+    expect(inputDeniedBadge()).toBeNull();
   });
 });

@@ -16,9 +16,11 @@ interface Props {
   onDisconnect: () => void;
   /** `undefined` means the host never said — an agent older than this feature. */
   canFileTransfer?: boolean;
+  /** Same three-state reading as `canFileTransfer`. `false` means the agent drops every input event. */
+  canInput?: boolean;
 }
 
-export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, showCursor, onToggleCursor, onDisconnect, canFileTransfer }: Props) {
+export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, showCursor, onToggleCursor, onDisconnect, canFileTransfer, canInput }: Props) {
   const { t } = useTranslation('viewer');
   const [qOpen, setQOpen] = useState(false);
   const btn: CSSProperties = {
@@ -51,6 +53,19 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
       </div>
       <button style={btn} onClick={onToggleStats} title={t('viewer:toolbar.statsTitle')}>📊 {t('viewer:toolbar.stats')}</button>
       <button style={btn} onClick={onToggleCursor} title={t('viewer:toolbar.cursorTitle')}>🖱 {t('viewer:toolbar.cursor')}</button>
+
+      {/* Parity with the web viewer's overlay: the host denied keyboard and
+          mouse, every event is dropped at the agent, and the user is told
+          rather than left to wonder why nothing responds. `undefined` means an
+          agent older than this feature, which permits input. */}
+      {canInput === false && (
+        <span
+          title={t('viewer:toolbar.inputDisabledTitle')}
+          style={{ color: '#f85149', fontSize: 11, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        >
+          🔒 {t('viewer:toolbar.inputDisabled')}
+        </span>
+      )}
 
       <div style={{ flex: 1 }} />
 

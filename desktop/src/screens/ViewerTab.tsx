@@ -275,6 +275,12 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
     );
   }
 
+  // The agent drops every input event when the host denied it, so stop sending
+  // them and stop drawing the crosshair that promises they land. `undefined`
+  // (an agent older than this feature) still injects input, so silence is not
+  // denial. Same reading, same behaviour as the web viewer.
+  const canInput = capabilities?.input !== false;
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#000', position: 'relative' }}>
       <ViewerToolbar
@@ -288,6 +294,7 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
         onToggleCursor={() => setShowCursor((s) => !s)}
         onDisconnect={handleDisconnect}
         canFileTransfer={capabilities?.file_transfer}
+        canInput={capabilities?.input}
       />
       <div style={{ flex: 1, position: 'relative', display: 'flex', minHeight: 0 }}>
         <DisplaySelector displays={displays} current={currentDisplay} onChange={handleDisplaySwitch} />
@@ -296,8 +303,9 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
           autoPlay
           muted
           tabIndex={0}
-          style={{ flex: 1, width: '100%', objectFit: 'contain', display: 'block', cursor: 'crosshair', outline: 'none' }}
+          style={{ flex: 1, width: '100%', objectFit: 'contain', display: 'block', cursor: canInput ? 'crosshair' : 'default', outline: 'none' }}
           onMouseMove={e => {
+            if (!canInput) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const vw = videoRef.current?.videoWidth ?? 0;
             const vh = videoRef.current?.videoHeight ?? 0;
@@ -309,12 +317,12 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
             const lX = e.clientX - rect.left - oX, lY = e.clientY - rect.top - oY;
             webrtc.sendInput({ type: 'mouse_move', x: lX / rW, y: lY / rH });
           }}
-          onMouseDown={e => { e.preventDefault(); e.currentTarget.focus(); webrtc.sendInput({ type: 'mouse_down', button: e.button }); }}
-          onMouseUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'mouse_up', button: e.button }); }}
+          onMouseDown={e => { if (!canInput) return; e.preventDefault(); e.currentTarget.focus(); webrtc.sendInput({ type: 'mouse_down', button: e.button }); }}
+          onMouseUp={e => { if (!canInput) return; e.preventDefault(); webrtc.sendInput({ type: 'mouse_up', button: e.button }); }}
           onContextMenu={e => e.preventDefault()}
-          onKeyDown={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_down', key: e.key, code: e.code }); }}
-          onKeyUp={e => { e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key, code: e.code }); }}
-          onWheel={e => { e.preventDefault(); webrtc.sendInput({ type: 'scroll', delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); }}
+          onKeyDown={e => { if (!canInput) return; e.preventDefault(); webrtc.sendInput({ type: 'key_down', key: e.key, code: e.code }); }}
+          onKeyUp={e => { if (!canInput) return; e.preventDefault(); webrtc.sendInput({ type: 'key_up', key: e.key, code: e.code }); }}
+          onWheel={e => { if (!canInput) return; e.preventDefault(); webrtc.sendInput({ type: 'scroll', delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); }}
         />
         {showCursor && webrtc.cursor && videoRef.current && (() => {
           const r = videoRef.current.getBoundingClientRect();

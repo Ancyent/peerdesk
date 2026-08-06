@@ -31,7 +31,9 @@
     "statsTitle": "Statistici conexiune",
     "cursor": "Cursor",
     "cursorTitle": "Arată cursorul de la distanță",
-    "disconnect": "Deconectare"
+    "disconnect": "Deconectare",
+    "inputDisabled": "Control dezactivat de gazdă",
+    "inputDisabledTitle": "Gazda a dezactivat controlul tastaturii și al mouse-ului pentru această sesiune. Poți vedea în continuare ecranul."
   },
   "stats": {
     "speed": "Viteză",

@@ -31,7 +31,9 @@
     "statsTitle": "Connection stats",
     "cursor": "Cursor",
     "cursorTitle": "Show remote cursor",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "inputDisabled": "Input disabled by host",
+    "inputDisabledTitle": "The host has turned off keyboard and mouse control for this session. You can still see the screen."
   },
   "stats": {
     "speed": "Speed",
