@@ -8,6 +8,11 @@ export interface AgentStatus {
 }
 
 export interface AppSettings {
+  /// Schema stamp owned by the agent (`SETTINGS_VERSION` in agent/src/config.rs).
+  /// The UI never sets it — `AppSettings::save` stamps every write — but it
+  /// rides along on the object `get_settings` returns, so it is declared here
+  /// rather than being silently dropped from the type.
+  settings_version?: number;
   access_mode: 'full' | 'view_only' | 'no_incoming';
   show_approval_dialog: boolean;
   auto_disconnect_minutes: number | null;
@@ -37,9 +42,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   lock_screen_after_session: false,
   allow_keyboard_mouse: true,
   allow_clipboard: true,
-  allow_file_transfer: false,
+  // These two must mirror `AppSettings::default()` in agent/src/config.rs. They
+  // are what the UI shows when `get_settings` fails, and the next toggle
+  // persists the whole object -- so a stale `false` here silently revokes two
+  // capabilities the host never turned off. `types.test.ts` pins them.
+  allow_file_transfer: true,
   allow_audio: false,
-  allow_terminal: false,
+  allow_terminal: true,
   allow_remote_restart: false,
   block_user_input: false,
   image_quality: 'balanced',
