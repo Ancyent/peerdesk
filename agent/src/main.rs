@@ -167,6 +167,17 @@ async fn main() -> anyhow::Result<()> {
     }
     tracing::info!("peer_id={} — ready for connections", cfg.peer_id);
 
+    // The service agent has no UI, but it has the same settings file the
+    // desktop writes — read it rather than assuming. A missing file means
+    // defaults, which permit everything that worked before permissions were
+    // enforced.
+    let settings = peerdesk_agent::config::AppSettings::load(
+        &peerdesk_agent::config::AppSettings::settings_path(cli.portable),
+    )
+    .unwrap_or_default();
+    let permissions =
+        peerdesk_agent::permissions::fixed(peerdesk_agent::permissions::resolve(&settings));
+
     // Run agent
     run_agent(AgentConfig {
         password: effective_password.to_string(),
@@ -177,6 +188,7 @@ async fn main() -> anyhow::Result<()> {
         cast_only: false,
         approval_tx: None, // CLI agent auto-approves (no UI)
         show_remote_cursor: true,
+        permissions,
     })
     .await
 }

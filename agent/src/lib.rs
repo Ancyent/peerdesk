@@ -53,6 +53,11 @@ pub struct AgentConfig {
     pub approval_tx: Option<tokio::sync::mpsc::Sender<ApprovalRequest>>,
     /// When false the agent does not send host cursor positions to the viewer.
     pub show_remote_cursor: bool,
+    /// What this host allows a viewer to do. Read when a session starts, so a
+    /// toggle changed in the desktop UI takes effect on the next connection
+    /// without restarting the agent and without cutting the session in
+    /// progress.
+    pub permissions: tokio::sync::watch::Receiver<crate::permissions::Permissions>,
 }
 
 impl Default for AgentConfig {
@@ -69,6 +74,7 @@ impl Default for AgentConfig {
             cast_only: false,
             approval_tx: None,
             show_remote_cursor: true,
+            permissions: crate::permissions::fixed(crate::permissions::Permissions::default()),
         }
     }
 }
@@ -582,5 +588,27 @@ mod agent_cfg_tests {
     #[test]
     fn default_shows_remote_cursor() {
         assert!(AgentConfig::default().show_remote_cursor);
+    }
+
+    #[test]
+    fn default_agent_config_permits_what_worked_before() {
+        let cfg = AgentConfig::default();
+        let p = *cfg.permissions.borrow();
+        assert!(p.input);
+        assert!(p.file_transfer);
+        assert!(p.terminal);
+    }
+
+    #[test]
+    fn a_pushed_value_is_what_the_next_read_sees() {
+        let denied = crate::permissions::Permissions {
+            input: false,
+            file_transfer: false,
+            terminal: false,
+        };
+        let (tx, rx) = tokio::sync::watch::channel(crate::permissions::Permissions::default());
+        let cfg = AgentConfig { permissions: rx, ..AgentConfig::default() };
+        tx.send(denied).unwrap();
+        assert_eq!(*cfg.permissions.borrow(), denied);
     }
 }
