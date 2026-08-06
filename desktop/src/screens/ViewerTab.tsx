@@ -155,17 +155,28 @@ export function ViewerTab({ session, signalingUrl, onStateChange, onClose }: Pro
 
   useEffect(() => () => { webrtc.disconnect(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The stream arriving IS the connection succeeding, and saying so must not
+  // depend on the <video> element: that element only renders once viewState is
+  // 'connected', so requiring it here left the two waiting on each other --
+  // the viewer sat on "Establishing connection..." until the 15s ICE timeout
+  // turned a working session into "Could not reach remote machine".
   useEffect(() => {
-    if (!webrtc.stream || !videoRef.current) return;
+    if (!webrtc.stream) return;
+    if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
+    setViewState('connected');
+    onStateChange(session.id, 'connected');
+  }, [webrtc.stream]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ...and attach the stream once the element the effect above caused to
+  // render actually exists.
+  useEffect(() => {
+    if (viewState !== 'connected' || !webrtc.stream || !videoRef.current) return;
     videoRef.current.srcObject = webrtc.stream;
     // Silent: autoplay rejection is normal browser policy (e.g. no user
     // gesture yet); the video plays once the user interacts with the tab.
     videoRef.current.play().catch(() => {});
     videoRef.current.focus();
-    if (iceTimeoutRef.current) clearTimeout(iceTimeoutRef.current);
-    setViewState('connected');
-    onStateChange(session.id, 'connected');
-  }, [webrtc.stream]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewState, webrtc.stream]);
 
   useEffect(() => {
     if (viewState !== 'negotiating') return;

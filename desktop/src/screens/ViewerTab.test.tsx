@@ -18,17 +18,22 @@ import type { Session } from '../types';
 // A hoisted ref-object is required because vi.mock factories are hoisted
 // above ordinary `let`/`const` declarations.
 const capturedOnClipboard = vi.hoisted(() => ({ current: undefined as ((text: string) => void) | undefined }));
+// Reaching the connected view needs a stream from useWebRTC and a
+// `capabilities` message from signaling, so both ends are captured here too.
+const fakeStream = vi.hoisted(() => ({ current: null as MediaStream | null }));
+const sendInput = vi.hoisted(() => ({ current: vi.fn() }));
+const capturedOnSignal = vi.hoisted(() => ({ current: undefined as ((m: unknown) => void) | undefined }));
 
 vi.mock('../hooks/useWebRTC', () => ({
   useWebRTC: (_send: unknown, onClipboardFromAgent?: (text: string) => void) => {
     capturedOnClipboard.current = onClipboardFromAgent;
     return {
       startOffer: vi.fn(),
-      stream: null,
+      stream: fakeStream.current,
       cursor: null,
       handleAnswer: vi.fn(),
       handleIceCandidate: vi.fn(),
-      sendInput: vi.fn(),
+      sendInput: sendInput.current,
       sendClipboard: vi.fn(),
       setQuality: vi.fn(),
       getPc: () => null,
@@ -38,10 +43,13 @@ vi.mock('../hooks/useWebRTC', () => ({
   },
 }));
 
-// Avoid opening a real WebSocket to a fake signaling URL; the test only
-// cares about the clipboard-write guard, not connection negotiation.
+// Avoid opening a real WebSocket to a fake signaling URL; these tests care
+// about the clipboard-write guard and the capability gate, not negotiation.
 vi.mock('../hooks/useSignaling', () => ({
-  useSignaling: () => ({ send: vi.fn() }),
+  useSignaling: (_url: string, onMessage: (m: unknown) => void) => {
+    capturedOnSignal.current = onMessage;
+    return { send: vi.fn() };
+  },
 }));
 
 let root: Root | null = null;
@@ -83,7 +91,79 @@ afterEach(() => {
   container = null;
   document.body.innerHTML = '';
   capturedOnClipboard.current = undefined;
+  capturedOnSignal.current = undefined;
+  fakeStream.current = null;
+  sendInput.current = vi.fn();
   vi.restoreAllMocks();
+});
+
+describe('ViewerTab reaching the connected view', () => {
+  it('shows the remote screen once the stream arrives', async () => {
+    // The <video> only renders when viewState is 'connected', and viewState
+    // only became 'connected' from an effect that required the <video> to
+    // already exist. The two waited on each other, so a session that had
+    // negotiated fine still died on the 15s ICE timeout.
+    mount();
+    await act(async () => { await capturedOnSignal.current!({ type: 'joined' }); });
+    expect(container!.querySelector('video'), 'still negotiating').toBeNull();
+
+    fakeStream.current = new MediaStream();
+    // Any signaling message re-renders with the new stream, the way a real
+    // ontrack-driven setState would.
+    await act(async () => {
+      await capturedOnSignal.current!({ type: 'capabilities', input: true, file_transfer: true, terminal: true });
+    });
+    expect(container!.querySelector('video'), 'the stream arriving IS the connection succeeding').not.toBeNull();
+  });
+});
+
+describe('ViewerTab input capability gate', () => {
+  /** Drive the component into the connected view the way signaling does. */
+  async function mountConnected(capabilities: { input: boolean; file_transfer: boolean; terminal: boolean }) {
+    mount();
+    await act(async () => { await capturedOnSignal.current!({ type: 'joined' }); });
+    fakeStream.current = new MediaStream();
+    await act(async () => { await capturedOnSignal.current!({ type: 'capabilities', ...capabilities }); });
+    const video = container!.querySelector('video');
+    expect(video, 'the connected view must be rendered').not.toBeNull();
+    return video!;
+  }
+
+  it('sends no input when the host denied it', async () => {
+    // The agent drops these events anyway; sending them makes the viewer look
+    // interactive while nothing happens, with no message to the user.
+    const video = await mountConnected({ input: false, file_transfer: true, terminal: true });
+    act(() => {
+      video.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      video.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'a', code: 'KeyA' }));
+    });
+    expect(sendInput.current).not.toHaveBeenCalled();
+    // ...and the cursor stops promising that clicks land.
+    expect(video.style.cursor).toBe('default');
+  });
+
+  it('sends input when the host permits it', async () => {
+    // The other half: a gate that refused everything would pass the test above
+    // while breaking every normal session.
+    const video = await mountConnected({ input: true, file_transfer: true, terminal: true });
+    act(() => {
+      video.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      video.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'a', code: 'KeyA' }));
+    });
+    expect(sendInput.current).toHaveBeenCalled();
+    expect(video.style.cursor).toBe('crosshair');
+  });
+
+  it('sends input when the host said nothing', async () => {
+    // An agent older than this feature announces no capabilities at all.
+    mount();
+    await act(async () => { await capturedOnSignal.current!({ type: 'joined' }); });
+    fakeStream.current = new MediaStream();
+    await act(async () => { await capturedOnSignal.current!({ type: 'display_list', displays: [] }); });
+    const video = container!.querySelector('video')!;
+    act(() => { video.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); });
+    expect(sendInput.current).toHaveBeenCalled();
+  });
 });
 
 describe('ViewerTab remote clipboard-write failures', () => {
