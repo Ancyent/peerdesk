@@ -466,6 +466,16 @@ pub async fn run_agent(agent_cfg: AgentConfig) -> Result<()> {
                         mode: mode_str.to_string(),
                     })
                     .await;
+                // Tell the viewer what this host permits before the peer connection
+                // exists, so it never draws a control the agent will refuse.
+                let announced = *permissions_rx.borrow();
+                let _ = to_sig_tx
+                    .send(signaling::SignalingMessage::Capabilities {
+                        input: announced.input,
+                        file_transfer: announced.file_transfer,
+                        terminal: announced.terminal,
+                    })
+                    .await;
                 if session_mode == crate::mode::SessionMode::Gui {
                     let displays = capture::list_displays();
                     let _ = to_sig_tx

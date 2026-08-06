@@ -173,6 +173,7 @@ async def websocket_endpoint(ws: WebSocket):
                     "display_list",
                     "switch_display",
                     "session_mode",
+                    "capabilities",
                 ):
                     await forward_to_peer(state, peer_id, viewer_id, data)
 
