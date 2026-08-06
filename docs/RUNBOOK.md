@@ -80,6 +80,26 @@ Troubleshooting "machine doesn't appear":
 - After changing the **agent** (`agent/`) or **desktop** (`desktop/`), users need a **new client build**
   (new tag). After changing **web/server**, redeploy with `docker compose up -d --build`.
 
+### Rollout order: signaling first, then agents
+
+From the release that carries runtime permission enforcement onward, agents
+announce what the host permits (keyboard/mouse, file transfer, terminal) with a
+`capabilities` signaling message, and viewers hide the controls the host turned
+off.
+
+**Redeploy the signaling server before you roll out new agents.** A signaling
+server that predates this message does not relay it — it drops unknown message
+types silently, with nothing in any log.
+
+Symptom if you get the order wrong: viewers show every control (file transfer,
+Ctrl+Alt+Del, an interactive screen) while the agent refuses them. Clicks and
+keystrokes go nowhere, file transfer never opens, and no error is shown on
+either side. Nothing is *insecure* — the agent still enforces, so a viewer can
+never do more than the host allowed — but the UI lies about what is on offer.
+
+The fix is to redeploy signaling (`docker compose up -d --build`); no agent or
+viewer restart is needed, the next session picks it up.
+
 ## 6. Desktop auto-update (signing)
 
 The desktop viewer verifies every update against a Tauri signing key. The public

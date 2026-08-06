@@ -17,7 +17,9 @@
     "viewOnlyOn": "View-Only ON",
     "files": "Files",
     "screenshot": "Screenshot",
-    "ctrlAltDel": "Ctrl+Alt+Del"
+    "ctrlAltDel": "Ctrl+Alt+Del",
+    "inputDisabled": "Input disabled by host",
+    "inputDisabledHint": "The host has turned off keyboard and mouse control for this session. You can still see the screen."
   },
   "stats": {
     "speed": "Speed",
@@ -46,5 +48,9 @@
       "reaction": "Optimize reaction time",
       "custom": "Custom"
     }
+  },
+  "terminal": {
+    "disabledTitle": "Terminal access is turned off",
+    "disabledBody": "The host has disabled terminal access on this machine, so there is no shell to show. Ask them to allow it in PeerDesk settings."
   }
 }

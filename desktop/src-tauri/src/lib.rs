@@ -35,6 +35,9 @@ pub struct AgentState {
     pub pending_approvals: HashMap<String, PendingApproval>,
     /// Order in which approvals arrived (FIFO for the UI to show).
     pub pending_order: Vec<String>,
+    /// Kept so `save_settings` can push new permissions to the running agent.
+    /// `None` while no agent is running.
+    pub permissions_tx: Option<tokio::sync::watch::Sender<peerdesk_agent::permissions::Permissions>>,
 }
 
 /// Plaintext access password, stored 0600 next to config.json so the host can
@@ -320,6 +323,12 @@ async fn start_agent(
 
     let had_key = cfg.api_key.is_some();
     let cast_only = settings.access_mode == AccessMode::ViewOnly;
+    let (permissions_tx, permissions_rx) =
+        tokio::sync::watch::channel(peerdesk_agent::permissions::resolve(&settings));
+    {
+        let mut s = state.lock().await;
+        s.permissions_tx = Some(permissions_tx);
+    }
     let agent_cfg = AgentConfig {
         password: String::new(),
         server_url: cfg.server_url,
@@ -329,6 +338,7 @@ async fn start_agent(
         cast_only,
         approval_tx: Some(approval_tx),
         show_remote_cursor: settings.show_remote_cursor,
+        permissions: permissions_rx,
     };
 
     let state_arc = Arc::clone(state.inner());
@@ -339,6 +349,7 @@ async fn start_agent(
         let mut s = state_arc.lock().await;
         s.running = false;
         s.task = None;
+        s.permissions_tx = None;
     });
     {
         let mut s = state.lock().await;
@@ -377,6 +388,7 @@ async fn stop_agent(state: State<'_, SharedAgentState>) -> Result<(), String> {
         handle.abort();
     }
     s.running = false;
+    s.permissions_tx = None;
     Ok(())
 }
 
@@ -396,16 +408,28 @@ async fn get_settings() -> Result<serde_json::Value, String> {
 // ── save_settings ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
-async fn save_settings(settings: serde_json::Value) -> Result<(), String> {
+async fn save_settings(
+    settings: serde_json::Value,
+    state: State<'_, SharedAgentState>,
+) -> Result<(), String> {
     #[cfg(not(target_os = "android"))]
     {
         let s: AppSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
         s.save(&AppSettings::settings_path(false))
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+
+        // A running agent reads this when the next session starts, so the
+        // change lands without a restart and without cutting the session in
+        // progress. No agent running means nothing to tell.
+        let tx = { state.lock().await.permissions_tx.clone() };
+        if let Some(tx) = tx {
+            let _ = tx.send(peerdesk_agent::permissions::resolve(&s));
+        }
+        Ok(())
     }
     #[cfg(target_os = "android")]
     {
-        let _ = settings;
+        let _ = (settings, state);
         Ok(())
     }
 }
@@ -485,6 +509,7 @@ async fn apply_config_link(
                 h.abort();
             }
             s.running = false;
+            s.permissions_tx = None;
         }
         Ok(())
     }
@@ -528,6 +553,7 @@ async fn reset_password(state: State<'_, SharedAgentState>) -> Result<String, St
                 h.abort();
             }
             s.running = false;
+            s.permissions_tx = None;
         }
         Ok(new_pw)
     }

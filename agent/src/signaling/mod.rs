@@ -52,6 +52,19 @@ pub enum SignalingMessage {
     SessionMode {
         mode: String,
     },
+    /// What this host permits for the session being set up. Sent on `Offer`,
+    /// beside `SessionMode`, so the viewer can decide what to draw before the
+    /// peer connection exists — a capability list delivered over a data
+    /// channel would arrive after the toolbar is already on screen.
+    ///
+    /// Three booleans rather than a list of names: a viewer that does not
+    /// recognise a name cannot tell "denied" from "this build is older than
+    /// the name", and an unknown field is simply ignored.
+    Capabilities {
+        input: bool,
+        file_transfer: bool,
+        terminal: bool,
+    },
 }
 
 pub async fn run(
@@ -241,5 +254,19 @@ mod tests {
         let json = r#"{"type":"switch_display","index":1}"#;
         let msg: SignalingMessage = serde_json::from_str(json).unwrap();
         assert!(matches!(msg, SignalingMessage::SwitchDisplay { index: 1 }));
+    }
+
+    #[test]
+    fn capabilities_serializes_to_the_shape_the_viewers_parse() {
+        let msg = SignalingMessage::Capabilities {
+            input: true,
+            file_transfer: false,
+            terminal: true,
+        };
+        let v: serde_json::Value = serde_json::to_value(&msg).unwrap();
+        assert_eq!(v["type"], "capabilities");
+        assert_eq!(v["input"], true);
+        assert_eq!(v["file_transfer"], false);
+        assert_eq!(v["terminal"], true);
     }
 }

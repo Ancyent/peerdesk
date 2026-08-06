@@ -10,14 +10,16 @@ interface Props {
 export function PermissionsSettings({ settings, updateSetting }: Props) {
   const { t } = useTranslation('settings');
 
-  const PERMS: { key: keyof AppSettings; label: string; desc?: string }[] = [
-    { key: 'allow_keyboard_mouse', label: t('settings:permissions.items.keyboardMouse.label') },
-    { key: 'allow_clipboard', label: t('settings:permissions.items.clipboard.label') },
+  // Only toggles that govern something are offered. `allow_remote_restart` and
+  // `block_user_input` are gone: nothing implements them, so a control for them
+  // is a promise the product cannot keep. Their config fields survive, so
+  // settings files written by older builds still parse.
+  const PERMS: { key: keyof AppSettings; label: string; desc?: string; pending?: boolean }[] = [
+    { key: 'allow_keyboard_mouse', label: t('settings:permissions.items.keyboardMouse.label'), desc: t('settings:permissions.items.keyboardMouse.desc') },
+    { key: 'allow_clipboard', label: t('settings:permissions.items.clipboard.label'), pending: true },
     { key: 'allow_file_transfer', label: t('settings:permissions.items.fileTransfer.label') },
-    { key: 'allow_audio', label: t('settings:permissions.items.audio.label') },
-    { key: 'allow_terminal', label: t('settings:permissions.items.terminal.label') },
-    { key: 'allow_remote_restart', label: t('settings:permissions.items.remoteRestart.label') },
-    { key: 'block_user_input', label: t('settings:permissions.items.blockUserInput.label'), desc: t('settings:permissions.items.blockUserInput.desc') },
+    { key: 'allow_audio', label: t('settings:permissions.items.audio.label'), pending: true },
+    { key: 'allow_terminal', label: t('settings:permissions.items.terminal.label'), desc: t('settings:permissions.items.terminal.desc') },
   ];
 
   return (
@@ -29,11 +31,13 @@ export function PermissionsSettings({ settings, updateSetting }: Props) {
       {PERMS.map((p, i) => (
         <div key={String(p.key)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < PERMS.length - 1 ? '1px solid #1c2128' : 'none' }}>
           <div>
-            <div style={{ fontSize: 12, color: '#e6ebf1' }}>{p.label}</div>
+            <div style={{ fontSize: 12, color: p.pending ? '#7d8590' : '#e6ebf1' }}>{p.label}</div>
             {p.desc && <div style={{ fontSize: 10, color: '#b3bdca', marginTop: 2 }}>{p.desc}</div>}
+            {p.pending && <div style={{ fontSize: 10, color: '#7d8590', marginTop: 2 }}>{t('settings:permissions.notYetActive')}</div>}
           </div>
           <Toggle
             value={settings[p.key] as boolean}
+            disabled={p.pending}
             onChange={v => updateSetting(p.key, v as AppSettings[typeof p.key])}
           />
         </div>

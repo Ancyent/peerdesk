@@ -101,12 +101,13 @@
   "permissions": {
     "title": "Permissions",
     "sectionTitle": "What remote users can do",
+    "notYetActive": "Not enforced yet",
     "items": {
-      "keyboardMouse": { "label": "Keyboard & Mouse control" },
+      "keyboardMouse": { "label": "Keyboard & Mouse control", "desc": "Also requires access mode to be Full" },
       "clipboard": { "label": "Clipboard sync" },
       "fileTransfer": { "label": "File transfer" },
       "audio": { "label": "Audio transmission" },
-      "terminal": { "label": "Terminal access" },
+      "terminal": { "label": "Terminal access", "desc": "Applies to hosts with no screen to share" },
       "remoteRestart": { "label": "Remote restart" },
       "blockUserInput": {
         "label": "Block user's input during session",

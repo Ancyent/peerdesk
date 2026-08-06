@@ -101,12 +101,13 @@
   "permissions": {
     "title": "Permisiuni",
     "sectionTitle": "Ce pot face utilizatorii de la distanță",
+    "notYetActive": "Încă neaplicat",
     "items": {
-      "keyboardMouse": { "label": "Control tastatură și mouse" },
+      "keyboardMouse": { "label": "Control tastatură și mouse", "desc": "Necesită și modul de acces Complet" },
       "clipboard": { "label": "Sincronizare clipboard" },
       "fileTransfer": { "label": "Transfer de fișiere" },
       "audio": { "label": "Transmisie audio" },
-      "terminal": { "label": "Acces terminal" },
+      "terminal": { "label": "Acces terminal", "desc": "Se aplică gazdelor fără ecran de partajat" },
       "remoteRestart": { "label": "Repornire la distanță" },
       "blockUserInput": {
         "label": "Blochează intrările utilizatorului în timpul sesiunii",

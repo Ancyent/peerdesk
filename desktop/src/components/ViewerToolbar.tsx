@@ -14,9 +14,13 @@ interface Props {
   showCursor: boolean;
   onToggleCursor: () => void;
   onDisconnect: () => void;
+  /** `undefined` means the host never said — an agent older than this feature. */
+  canFileTransfer?: boolean;
+  /** Same three-state reading as `canFileTransfer`. `false` means the agent drops every input event. */
+  canInput?: boolean;
 }
 
-export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, showCursor, onToggleCursor, onDisconnect }: Props) {
+export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, onQualityChange, onToggleStats, showCursor, onToggleCursor, onDisconnect, canFileTransfer, canInput }: Props) {
   const { t } = useTranslation('viewer');
   const [qOpen, setQOpen] = useState(false);
   const btn: CSSProperties = {
@@ -36,7 +40,9 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
 
       <button style={btn} onClick={onFullscreen} title={t('viewer:toolbar.fullscreen')}>⛶ {t('viewer:toolbar.fullscreen')}</button>
       <button style={btn} onClick={onClipboardSync} title={t('viewer:toolbar.clipboardTitle')}>📋 {t('viewer:toolbar.clipboard')}</button>
-      <button style={btn} onClick={onFiles} title={t('viewer:toolbar.filesTitle')}>📁 {t('viewer:toolbar.files')}</button>
+      {canFileTransfer !== false && (
+        <button style={btn} onClick={onFiles} title={t('viewer:toolbar.filesTitle')}>📁 {t('viewer:toolbar.files')}</button>
+      )}
       <div style={{ position: 'relative' }}>
         <button style={btn} onClick={() => setQOpen(o => !o)} title={t('viewer:toolbar.quality')}>⚙ {t('viewer:toolbar.quality')}</button>
         <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 20, background: '#0d1117',
@@ -47,6 +53,19 @@ export function ViewerToolbar({ peerId, onFullscreen, onClipboardSync, onFiles, 
       </div>
       <button style={btn} onClick={onToggleStats} title={t('viewer:toolbar.statsTitle')}>📊 {t('viewer:toolbar.stats')}</button>
       <button style={btn} onClick={onToggleCursor} title={t('viewer:toolbar.cursorTitle')}>🖱 {t('viewer:toolbar.cursor')}</button>
+
+      {/* Parity with the web viewer's overlay: the host denied keyboard and
+          mouse, every event is dropped at the agent, and the user is told
+          rather than left to wonder why nothing responds. `undefined` means an
+          agent older than this feature, which permits input. */}
+      {canInput === false && (
+        <span
+          title={t('viewer:toolbar.inputDisabledTitle')}
+          style={{ color: '#f85149', fontSize: 11, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        >
+          🔒 {t('viewer:toolbar.inputDisabled')}
+        </span>
+      )}
 
       <div style={{ flex: 1 }} />
 

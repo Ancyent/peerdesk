@@ -14,4 +14,5 @@ export type SignalingMessage =
   | { type: 'denied'; reason: string }
   | { type: 'switch_display'; index: number }
   | { type: 'session_mode'; mode: 'gui' | 'terminal' }
-  | { type: 'display_list'; displays: Array<{ index: number; width: number; height: number; is_primary: boolean }> };
+  | { type: 'display_list'; displays: Array<{ index: number; width: number; height: number; is_primary: boolean }> }
+  | { type: 'capabilities'; input: boolean; file_transfer: boolean; terminal: boolean };
